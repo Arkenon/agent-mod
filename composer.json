@@ -1,0 +1,10 @@
+{
+	"require": {
+		"php-di/php-di": "^6.4"
+	},
+	"autoload": {
+		"psr-4": {
+			"AgentMod\\": "includes/"
+		}
+	}
+}
