@@ -1,6 +1,6 @@
 {
 	"require": {
-		"php-di/php-di": "^6.4"
+		"php-di/php-di": "^7.1.1"
 	},
 	"autoload": {
 		"psr-4": {

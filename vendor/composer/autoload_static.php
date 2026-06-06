@@ -14,7 +14,6 @@ class ComposerStaticInitf859de02b9673142097baa55e3643c5c
         'P' => 
         array (
             'Psr\\Container\\' => 14,
-            'PhpDocReader\\' => 13,
         ),
         'L' => 
         array (
@@ -38,10 +37,6 @@ class ComposerStaticInitf859de02b9673142097baa55e3643c5c
         'Psr\\Container\\' => 
         array (
             0 => __DIR__ . '/..' . '/psr/container/src',
-        ),
-        'PhpDocReader\\' => 
-        array (
-            0 => __DIR__ . '/..' . '/php-di/phpdoc-reader/src/PhpDocReader',
         ),
         'Laravel\\SerializableClosure\\' => 
         array (

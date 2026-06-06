@@ -1,0 +1,99 @@
+/**
+ * Admin chat widget styles.
+ */
+
+// Admin bar icon spacing.
+#wp-admin-bar-agent-mod-chat .ab-icon::before {
+	font: normal 20px/1 dashicons;
+	content: '\f125'; // dashicons-format-chat
+	top: 2px;
+}
+
+.agent-mod-chat__modal {
+	max-width: 640px;
+	width: 100%;
+
+	.components-modal__content {
+		display: flex;
+		flex-direction: column;
+	}
+}
+
+.agent-mod-chat__body {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	min-height: 320px;
+}
+
+.agent-mod-chat__messages {
+	flex: 1 1 auto;
+	overflow-y: auto;
+	max-height: 50vh;
+	padding: 8px 4px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.agent-mod-chat__empty {
+	color: #757575;
+	text-align: center;
+	margin: auto;
+}
+
+.agent-mod-chat__message {
+	display: flex;
+
+	&--user {
+		justify-content: flex-end;
+	}
+
+	&--assistant {
+		justify-content: flex-start;
+	}
+}
+
+.agent-mod-chat__bubble {
+	max-width: 80%;
+	padding: 10px 14px;
+	border-radius: 14px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.agent-mod-chat__message--user .agent-mod-chat__bubble {
+	background: #2271b1;
+	color: #fff;
+	border-bottom-right-radius: 4px;
+}
+
+.agent-mod-chat__message--assistant .agent-mod-chat__bubble {
+	background: #f0f0f1;
+	color: #1e1e1e;
+	border-bottom-left-radius: 4px;
+}
+
+.agent-mod-chat__loading {
+	display: flex;
+	justify-content: flex-start;
+	padding: 4px;
+}
+
+.agent-mod-chat__composer {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	border-top: 1px solid #e0e0e0;
+	padding-top: 12px;
+
+	.agent-mod-chat__input textarea {
+		width: 100%;
+		resize: vertical;
+	}
+
+	.components-button {
+		align-self: flex-end;
+	}
+}

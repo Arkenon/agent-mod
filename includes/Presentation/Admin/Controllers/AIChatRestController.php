@@ -17,7 +17,7 @@ use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
 use AgentMod\Common\Constants;
-use AgentMod\Common\Helpers\Helper;
+use AgentMod\Common\Helper;
 use AgentMod\Services\AI\AIOrchestratorService;
 use AgentMod\Services\AI\DTO\AgentConfig;
 
@@ -54,15 +54,17 @@ final class AIChatRestController
 	 */
 	public function registerRoutes(): void
 	{
-		register_rest_route(
-			Constants::REST_NAMESPACE,
-			'/test-chat',
-			[
-				'methods'             => 'POST',
-				'callback'            => [$this, 'handleChat'],
-				'permission_callback' => [$this, 'checkPermission'],
-			]
-		);
+		$args = [
+			'methods'             => 'POST',
+			'callback'            => [$this, 'handleChat'],
+			'permission_callback' => [$this, 'checkPermission'],
+		];
+
+		// Temporary testing route (kept for backwards compatibility).
+		register_rest_route(Constants::REST_NAMESPACE, '/test-chat', $args);
+
+		// Permanent chat route used by the admin chat widget.
+		register_rest_route(Constants::REST_NAMESPACE, '/chat', $args);
 	}
 
 	/**

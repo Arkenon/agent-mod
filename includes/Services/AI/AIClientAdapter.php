@@ -63,11 +63,14 @@ class AIClientAdapter
 		for ($i = 0; $i < $maxToolCalls; $i++) {
 			$builder = wp_ai_client_prompt()
 				->with_history(...$history)
-				->using_system_instruction($systemInstruction)
-				->using_provider($provider);
+				->using_system_instruction($systemInstruction);
 
-			if ($model) {
-				$builder->using_model_preference([$provider, $model]);
+			if ('' !== $provider) {
+				$builder->using_provider($provider);
+
+				if ($model) {
+					$builder->using_model_preference([$provider, $model]);
+				}
 			}
 
 			if (! empty($abilities)) {
@@ -109,11 +112,14 @@ class AIClientAdapter
 		// Tool-call limit reached: do a final pass without abilities to force a text answer.
 		$finalBuilder = wp_ai_client_prompt()
 			->with_history(...$history)
-			->using_system_instruction($systemInstruction)
-			->using_provider($provider);
+			->using_system_instruction($systemInstruction);
 
-		if ($model) {
-			$finalBuilder->using_model_preference([$provider, $model]);
+		if ('' !== $provider) {
+			$finalBuilder->using_provider($provider);
+
+			if ($model) {
+				$finalBuilder->using_model_preference([$provider, $model]);
+			}
 		}
 
 		$finalResult = $finalBuilder->generate_result();

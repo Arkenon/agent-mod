@@ -16,6 +16,7 @@ use Exception;
 use AgentMod\Common\DI;
 use AgentMod\Presentation\Admin\Controllers\AdminController;
 use AgentMod\Presentation\Admin\Controllers\AIChatRestController;
+use AgentMod\Presentation\Admin\Controllers\AIChatWidgetController;
 use AgentMod\Presentation\Client\Controllers\ClientController;
 
 final class ControllerInit
@@ -28,6 +29,7 @@ final class ControllerInit
 	 */
 	private array $adminControllers =  [
 		AdminController::class,
+		AIChatWidgetController::class,
 	];
 
 	/**

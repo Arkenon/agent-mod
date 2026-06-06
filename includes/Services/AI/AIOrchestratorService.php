@@ -124,11 +124,17 @@ class AIOrchestratorService
 	}
 
 	/**
-	 * Ensures AI support and the requested provider connector are available.
+	 * Ensures AI text generation is available for the request.
 	 *
-	 * @param string $provider Provider id.
+	 * Provider-agnostic: instead of probing a single hard-coded connector, this
+	 * asks the WordPress AI Client whether text generation is supported. When a
+	 * specific provider is requested it scopes the check to that provider; when
+	 * the provider is empty ("auto") it passes if any configured provider
+	 * (Google, OpenAI, Anthropic, …) can handle text generation.
 	 *
-	 * @return WP_Error|null Null when everything is available.
+	 * @param string $provider Provider id, or '' for auto-select.
+	 *
+	 * @return WP_Error|null Null when text generation is available.
 	 * @since 1.0.0
 	 */
 	private function guard(string $provider): ?WP_Error
@@ -141,16 +147,51 @@ class AIOrchestratorService
 			);
 		}
 
-		if (function_exists('wp_is_connector_registered') && ! wp_is_connector_registered($provider)) {
+		if (! function_exists('wp_ai_client_prompt')) {
 			return new WP_Error(
-				'connector_not_registered',
-				/* translators: %s: provider id. */
-				sprintf(__('The "%s" AI connector is not registered or configured.', 'agent-mod'), $provider),
+				'ai_client_unavailable',
+				__('The WordPress AI Client is not available.', 'agent-mod'),
 				['status' => 503]
 			);
 		}
 
+		if (! $this->supportsTextGeneration($provider)) {
+			$message = '' === $provider
+				? __('No configured AI provider can handle this request. Connect a provider (e.g. Google, OpenAI, or Anthropic) in the AI settings.', 'agent-mod')
+				/* translators: %s: provider id. */
+				: sprintf(__('The "%s" AI provider is not configured for text generation.', 'agent-mod'), $provider);
+
+			return new WP_Error('ai_not_configured', $message, ['status' => 503]);
+		}
+
 		return null;
+	}
+
+	/**
+	 * Checks whether text generation is supported for the given provider.
+	 *
+	 * Delegates the capability check to the AI Client builder, which considers
+	 * the configured connectors and their credentials. An empty provider lets
+	 * the client evaluate every configured provider.
+	 *
+	 * @param string $provider Provider id, or '' for auto-select.
+	 *
+	 * @return bool True when text generation is available.
+	 * @since 1.0.0
+	 */
+	private function supportsTextGeneration(string $provider): bool
+	{
+		try {
+			$builder = wp_ai_client_prompt('ping');
+
+			if ('' !== $provider) {
+				$builder->using_provider($provider);
+			}
+
+			return (bool) $builder->is_supported_for_text_generation();
+		} catch (\Throwable $e) {
+			return false;
+		}
 	}
 
 	/**

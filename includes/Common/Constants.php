@@ -27,9 +27,13 @@ class Constants
 	/**
 	 * Default AI provider id.
 	 *
+	 * An empty string means "auto": the orchestrator lets the WordPress AI Client
+	 * pick whichever configured provider (e.g. Google, OpenAI, Anthropic) can
+	 * handle the request, instead of forcing a single provider.
+	 *
 	 * @since 1.0.0
 	 */
-	public const AI_PROVIDER_DEFAULT = 'gemini';
+	public const AI_PROVIDER_DEFAULT = '';
 
 	/**
 	 * REST namespace for the plugin.

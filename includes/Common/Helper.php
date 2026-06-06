@@ -4,11 +4,11 @@
  * Helper class for common functions
  *
  * @package AgentMod
- * @subpackage Common\Helpers
+ * @subpackage Common
  * @since 1.0.0
  */
 
-namespace AgentMod\Common\Helpers;
+namespace AgentMod\Common;
 
 defined('ABSPATH') || exit;
 
