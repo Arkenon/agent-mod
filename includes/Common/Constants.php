@@ -23,4 +23,25 @@ class Constants
 	public const EMAIL = 'info@kadimgultekin.com';
 	public const PHP_VERSION = '7.4';
 	public const WP_VERSION = '6.1';
+
+	/**
+	 * Default AI provider id.
+	 *
+	 * @since 1.0.0
+	 */
+	public const AI_PROVIDER_DEFAULT = 'gemini';
+
+	/**
+	 * REST namespace for the plugin.
+	 *
+	 * @since 1.0.0
+	 */
+	public const REST_NAMESPACE = 'agent-mod/v1';
+
+	/**
+	 * Default maximum number of tool-calling iterations.
+	 *
+	 * @since 1.0.0
+	 */
+	public const AI_MAX_TOOL_CALLS = 10;
 }

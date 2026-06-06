@@ -76,7 +76,7 @@ class Helper
 	{
 		return array_map(function ($value) {
 			if (is_array($value)) {
-				return $this->sanitizeArray($value);
+				return self::sanitizeArray($value);
 			}
 
 			return sanitize_text_field($value);
