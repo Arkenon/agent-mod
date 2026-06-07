@@ -20,6 +20,7 @@ use Throwable;
 use WP_AI_Client_Ability_Function_Resolver;
 use WP_Ability;
 use AgentMod\Services\AI\DTO\AgentResponse;
+use AgentMod\Services\AI\Http\ToolCallRepairManager;
 use WordPress\AiClient\Messages\DTO\Message;
 use WordPress\AiClient\Results\DTO\GenerativeAiResult;
 use WordPress\AiClient\Tools\DTO\FunctionCall;
@@ -28,6 +29,26 @@ defined('ABSPATH') || exit;
 
 class AIClientAdapter
 {
+	/**
+	 * Provider tool-call repair manager.
+	 *
+	 * @var ToolCallRepairManager
+	 * @since 1.0.0
+	 */
+	private ToolCallRepairManager $toolCallRepairs;
+
+	/**
+	 * Constructor (PHP-DI autowired).
+	 *
+	 * @param ToolCallRepairManager $toolCallRepairs Provider tool-call repair manager.
+	 *
+	 * @since 1.0.0
+	 */
+	public function __construct(ToolCallRepairManager $toolCallRepairs)
+	{
+		$this->toolCallRepairs = $toolCallRepairs;
+	}
+
 	/**
 	 * Generates an agent response, running the agentic tool-calling loop.
 	 *
@@ -55,6 +76,44 @@ class AIClientAdapter
 			);
 		}
 
+		// Compensate for provider connectors that drop tool-call metadata across turns.
+		$this->toolCallRepairs->register();
+
+		try {
+			return $this->runGenerationLoop(
+				$systemInstruction,
+				$messages,
+				$abilities,
+				$provider,
+				$model,
+				$maxToolCalls
+			);
+		} finally {
+			$this->toolCallRepairs->unregister();
+		}
+	}
+
+	/**
+	 * Runs the agentic tool-calling loop.
+	 *
+	 * @param string      $systemInstruction Full system instruction.
+	 * @param Message[]   $messages          Initial conversation history (incl. the latest user message).
+	 * @param WP_Ability[] $abilities         Abilities the model is allowed to call.
+	 * @param string      $provider          Provider id.
+	 * @param string|null $model             Optional model id.
+	 * @param int         $maxToolCalls      Max tool-calling iterations.
+	 *
+	 * @return AgentResponse
+	 * @since 1.0.0
+	 */
+	private function runGenerationLoop(
+		string $systemInstruction,
+		array $messages,
+		array $abilities,
+		string $provider,
+		?string $model,
+		int $maxToolCalls
+	): AgentResponse {
 		$resolver   = new WP_AI_Client_Ability_Function_Resolver(...$abilities);
 		$history    = $messages;
 		$toolCalls  = [];

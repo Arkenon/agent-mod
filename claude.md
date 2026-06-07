@@ -50,6 +50,9 @@ light-wp-plugin-boilerplate/
                 ├── css/agent-mod-client.css
                 └── js/agent-mod-client.js
 ```
+AgentMod must be PROVIDER AGNOSTIC
+
+Do not change 3rd party plugins code. (such as Wp AI Client, AI Provider plugins etc.) All solutions should be located at AgentMod plugin.
 
 ## 📚 Detailed Explanation:
 
