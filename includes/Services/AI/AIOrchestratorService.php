@@ -21,6 +21,7 @@ namespace AgentMod\Services\AI;
 use WP_Error;
 use AgentMod\Services\AI\DTO\AgentConfig;
 use AgentMod\Services\AI\DTO\AgentResponse;
+use WordPress\AiClient\Files\DTO\File;
 use WordPress\AiClient\Messages\DTO\Message;
 use WordPress\AiClient\Messages\DTO\MessagePart;
 use WordPress\AiClient\Messages\Enums\MessageRoleEnum;
@@ -86,21 +87,22 @@ class AIOrchestratorService
 	/**
 	 * Runs an agent against a user message.
 	 *
-	 * @param AgentConfig                       $agent   The agent configuration.
-	 * @param string                            $message The user message.
-	 * @param array<int, array<string, string>> $history Prior turns as ['role' => ..., 'text' => ...].
+	 * @param AgentConfig                       $agent       The agent configuration.
+	 * @param string                            $message     The user message.
+	 * @param array<int, array<string, mixed>>  $history     Prior turns as ['role' => ..., 'text' => ..., 'attachments' => [...]].
+	 * @param array<int, array<string, string>> $attachments Attachments for the current turn (each ['data' => dataUri, 'mimeType' => ..., 'name' => ...]).
 	 *
 	 * @return AgentResponse
 	 * @since 1.0.0
 	 */
-	public function chat(AgentConfig $agent, string $message, array $history = []): AgentResponse
+	public function chat(AgentConfig $agent, string $message, array $history = [], array $attachments = []): AgentResponse
 	{
 		$guard = $this->guard($agent->provider);
 		if ($guard instanceof WP_Error) {
 			return AgentResponse::fromError($guard);
 		}
 
-		if ('' === trim($message)) {
+		if ('' === trim($message) && empty($attachments)) {
 			return AgentResponse::fromError(
 				new WP_Error('empty_message', __('The user message cannot be empty.', 'agent-mod'))
 			);
@@ -111,7 +113,7 @@ class AIOrchestratorService
 		$abilities = $this->abilityResolver->resolve($agent);
 
 		$messages   = $this->mapHistoryToMessages($history);
-		$messages[] = new Message(MessageRoleEnum::user(), [new MessagePart($message)]);
+		$messages[] = new Message(MessageRoleEnum::user(), $this->buildMessageParts($message, $attachments));
 
 		return $this->clientAdapter->generate(
 			$systemInstruction,
@@ -197,7 +199,7 @@ class AIOrchestratorService
 	/**
 	 * Maps a plain history array to AI Client Message objects.
 	 *
-	 * @param array<int, array<string, string>> $history Prior turns.
+	 * @param array<int, array<string, mixed>> $history Prior turns.
 	 *
 	 * @return Message[]
 	 * @since 1.0.0
@@ -207,8 +209,10 @@ class AIOrchestratorService
 		$messages = [];
 
 		foreach ($history as $turn) {
-			$text = isset($turn['text']) ? (string) $turn['text'] : '';
-			if ('' === trim($text)) {
+			$text        = isset($turn['text']) ? (string) $turn['text'] : '';
+			$attachments = isset($turn['attachments']) && is_array($turn['attachments']) ? $turn['attachments'] : [];
+
+			if ('' === trim($text) && empty($attachments)) {
 				continue;
 			}
 
@@ -217,10 +221,78 @@ class AIOrchestratorService
 
 			$messages[] = new Message(
 				$isUser ? MessageRoleEnum::user() : MessageRoleEnum::model(),
-				[new MessagePart($text)]
+				$this->buildMessageParts($text, $attachments)
 			);
 		}
 
 		return $messages;
+	}
+
+	/**
+	 * Builds the message parts for a turn: a text part plus one file part per
+	 * attachment. Invalid attachments are skipped so a malformed upload never
+	 * breaks the whole request.
+	 *
+	 * @param string                            $text        The turn text.
+	 * @param array<int, array<string, string>> $attachments Attachments (each ['data' => dataUri, 'mimeType' => ..., 'name' => ...]).
+	 *
+	 * @return MessagePart[]
+	 * @since 1.0.0
+	 */
+	private function buildMessageParts(string $text, array $attachments): array
+	{
+		$parts = [];
+		$text  = trim($text);
+
+		if ('' !== $text) {
+			$parts[] = new MessagePart($text);
+		}
+
+		foreach ($attachments as $attachment) {
+			if (! is_array($attachment)) {
+				continue;
+			}
+
+			$file = $this->attachmentToFile($attachment);
+
+			if ($file instanceof File) {
+				$parts[] = new MessagePart($file);
+			}
+		}
+
+		// A message must carry at least one part; fall back to an (empty) text part.
+		if (empty($parts)) {
+			$parts[] = new MessagePart($text);
+		}
+
+		return $parts;
+	}
+
+	/**
+	 * Converts a sanitized attachment array to a WP AI Client File, or null when
+	 * the data cannot be turned into a valid file.
+	 *
+	 * @param array<string, string> $attachment Attachment data (['data' => dataUri, 'mimeType' => ...]).
+	 *
+	 * @return File|null
+	 * @since 1.0.0
+	 */
+	private function attachmentToFile(array $attachment): ?File
+	{
+		$data = isset($attachment['data']) ? (string) $attachment['data'] : '';
+
+		if ('' === $data) {
+			return null;
+		}
+
+		$mimeType = isset($attachment['mimeType']) && '' !== $attachment['mimeType']
+			? (string) $attachment['mimeType']
+			: null;
+
+		try {
+			return new File($data, $mimeType);
+		} catch (\Throwable $e) {
+			return null;
+		}
 	}
 }

@@ -63,6 +63,13 @@ final class AIChatWidgetController
 			return;
 		}
 
+		// Hide the icon on the AgentMod admin page itself.
+		$current_page = isset($_GET['page']) ? sanitize_key(wp_unslash($_GET['page'])) : '';
+
+		if ('agent-mod' === $current_page) {
+			return;
+		}
+
 		$title = '<span class="ab-icon" aria-hidden="true"></span>'
 			. '<span class="ab-label">' . esc_html__('Assistant', 'agent-mod') . '</span>';
 
@@ -125,11 +132,21 @@ final class AIChatWidgetController
 					'provider'      => Constants::AI_PROVIDER_DEFAULT,
 					'abilitySource' => 'all',
 				],
+				'attachments'  => [
+					'maxBytes'  => Constants::AI_ATTACHMENT_MAX_BYTES,
+					'maxCount'  => Constants::AI_ATTACHMENT_MAX_COUNT,
+					'mimeTypes' => array_values(Constants::AI_ATTACHMENT_MIME_TYPES),
+				],
 				'strings'      => [
-					'title'       => __('AgentMod Assistant', 'agent-mod'),
-					'placeholder' => __('Type your message…', 'agent-mod'),
-					'send'        => __('Send', 'agent-mod'),
-					'error'       => __('An unexpected error occurred.', 'agent-mod'),
+					'title'             => __('AgentMod Assistant', 'agent-mod'),
+					'placeholder'       => __('Type your message…', 'agent-mod'),
+					'send'              => __('Send', 'agent-mod'),
+					'error'             => __('An unexpected error occurred.', 'agent-mod'),
+					'attach'            => __('Attach files', 'agent-mod'),
+					'removeAttachment'  => __('Remove attachment', 'agent-mod'),
+					'fileTooLarge'      => __('"%s" is too large.', 'agent-mod'),
+					'fileTypeNotAllowed' => __('"%s" is not an allowed file type.', 'agent-mod'),
+					'tooManyFiles'      => __('You can attach up to %d files.', 'agent-mod'),
 				],
 			]
 		);

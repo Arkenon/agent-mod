@@ -33,14 +33,29 @@ export function clearError() {
 }
 
 /**
+ * Maps a stored attachment to the minimal shape sent to the REST endpoint.
+ *
+ * @param {Object} attachment Stored attachment.
+ * @return {Object} Wire-shape attachment.
+ */
+function toWireAttachment( { name, mimeType, data } ) {
+	return { name, mimeType, data };
+}
+
+/**
  * Sends a user message to the chat endpoint and appends the assistant reply.
  *
- * @param {string} text The user message.
+ * @param {string} text          The user message.
+ * @param {Array}  [attachments] Attachments for this turn (each has name, mimeType, data).
  */
-export const sendMessage = ( text ) => async ( { dispatch, select } ) => {
+export const sendMessage = ( text, attachments = [] ) => async ( {
+	dispatch,
+	select,
+} ) => {
 	const trimmed = ( text || '' ).trim();
+	const files = Array.isArray( attachments ) ? attachments : [];
 
-	if ( '' === trimmed ) {
+	if ( '' === trimmed && 0 === files.length ) {
 		return;
 	}
 
@@ -49,13 +64,14 @@ export const sendMessage = ( text ) => async ( { dispatch, select } ) => {
 	// Build history from the messages present *before* this new turn.
 	const history = select
 		.getMessages()
-		.map( ( { role, text: messageText } ) => ( {
+		.map( ( { role, text: messageText, attachments: turnFiles } ) => ( {
 			role,
 			text: messageText,
+			attachments: ( turnFiles || [] ).map( toWireAttachment ),
 		} ) );
 
 	dispatch.clearError();
-	dispatch.appendMessage( { role: 'user', text: trimmed } );
+	dispatch.appendMessage( { role: 'user', text: trimmed, attachments: files } );
 	dispatch.setLoading( true );
 
 	try {
@@ -66,6 +82,7 @@ export const sendMessage = ( text ) => async ( { dispatch, select } ) => {
 				message: trimmed,
 				agent: config.defaultAgent || {},
 				history,
+				attachments: files.map( toWireAttachment ),
 			},
 		} );
 

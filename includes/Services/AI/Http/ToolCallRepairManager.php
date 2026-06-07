@@ -34,14 +34,18 @@ class ToolCallRepairManager
      * Each provider repairer is injected by type and added to the set. New
      * providers are wired up by adding a constructor parameter here.
      *
-     * @param GeminiThoughtSignatureRepairer $geminiThoughtSignatureRepairer Gemini repairer.
+     * @param GeminiThoughtSignatureRepairer $geminiThoughtSignatureRepairer Gemini thought-signature repairer.
+     * @param GeminiToolSchemaRepairer       $geminiToolSchemaRepairer       Gemini tool-schema repairer.
      *
      * @since 1.0.0
      */
-    public function __construct(GeminiThoughtSignatureRepairer $geminiThoughtSignatureRepairer)
-    {
+    public function __construct(
+        GeminiThoughtSignatureRepairer $geminiThoughtSignatureRepairer,
+        GeminiToolSchemaRepairer $geminiToolSchemaRepairer
+    ) {
         $this->repairers = [
             $geminiThoughtSignatureRepairer,
+            $geminiToolSchemaRepairer,
         ];
     }
 

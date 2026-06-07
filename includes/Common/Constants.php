@@ -48,4 +48,39 @@ class Constants
 	 * @since 1.0.0
 	 */
 	public const AI_MAX_TOOL_CALLS = 10;
+
+	/**
+	 * Maximum decoded size (in bytes) allowed for a single chat attachment.
+	 *
+	 * @since 1.0.0
+	 */
+	public const AI_ATTACHMENT_MAX_BYTES = 5242880; // 5 MB.
+
+	/**
+	 * Maximum number of attachments allowed per chat turn.
+	 *
+	 * @since 1.0.0
+	 */
+	public const AI_ATTACHMENT_MAX_COUNT = 5;
+
+	/**
+	 * MIME types accepted as chat attachments.
+	 *
+	 * Provider-agnostic allow-list. Whether a given provider can actually consume
+	 * a type (e.g. vision for images) is the provider's concern; this only guards
+	 * what AgentMod is willing to forward.
+	 *
+	 * @since 1.0.0
+	 * @var string[]
+	 */
+	public const AI_ATTACHMENT_MIME_TYPES = [
+		'image/png',
+		'image/jpeg',
+		'image/gif',
+		'image/webp',
+		'application/pdf',
+		'text/plain',
+		'text/markdown',
+		'text/csv',
+	];
 }

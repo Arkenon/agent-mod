@@ -81,6 +81,56 @@
 	padding: 4px;
 }
 
+// Attachments shown inside a message bubble area.
+.agent-mod-chat__message-content {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	max-width: 80%;
+}
+
+.agent-mod-chat__message--user .agent-mod-chat__message-content {
+	align-items: flex-end;
+}
+
+.agent-mod-chat__message-attachments {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+
+	li {
+		margin: 0;
+	}
+}
+
+.agent-mod-chat__message-image {
+	max-width: 200px;
+	max-height: 200px;
+	border-radius: 10px;
+	display: block;
+}
+
+.agent-mod-chat__message-file {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 10px;
+	background: #f0f0f1;
+	border-radius: 10px;
+	font-size: 12px;
+	word-break: break-all;
+
+	.agent-mod-chat__message-file-icon {
+		color: #50575e;
+		font-size: 16px;
+		width: 16px;
+		height: 16px;
+	}
+}
+
 .agent-mod-chat__composer {
 	display: flex;
 	flex-direction: column;
@@ -92,8 +142,67 @@
 		width: 100%;
 		resize: vertical;
 	}
+}
 
-	.components-button {
-		align-self: flex-end;
-	}
+// Hidden native file input; triggered by the attach button.
+.agent-mod-chat__file-input {
+	display: none;
+}
+
+.agent-mod-chat__composer-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+// Pending attachment previews above the textarea.
+.agent-mod-chat__attachments {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.agent-mod-chat__attachment {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	max-width: 220px;
+	padding: 4px 4px 4px 8px;
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+	margin: 0;
+}
+
+.agent-mod-chat__attachment-thumb {
+	width: 32px;
+	height: 32px;
+	object-fit: cover;
+	border-radius: 4px;
+	flex: 0 0 auto;
+}
+
+.agent-mod-chat__attachment-icon {
+	flex: 0 0 auto;
+	color: #50575e;
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+}
+
+.agent-mod-chat__attachment-name {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 12px;
+}
+
+.agent-mod-chat__attachment-remove {
+	flex: 0 0 auto;
 }
