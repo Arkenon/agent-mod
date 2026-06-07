@@ -1,0 +1,88 @@
+/**
+ * AgentMod admin page styles (page=agent-mod).
+ *
+ * Two-pane layout: left sidebar (chat history) + main conversation pane. The
+ * conversation itself is rendered by the admin-chat bundle; the rules here only
+ * adapt the reusable chat panel to fill a full page instead of a modal.
+ */
+
+.agent-mod-agent-page {
+	margin-right: 20px;
+}
+
+.agent-mod-agent-page__layout {
+	display: flex;
+	gap: 16px;
+	height: calc(100vh - 90px);
+	min-height: 420px;
+}
+
+/* Left sidebar — reserved for chat history. */
+.agent-mod-agent-page__sidebar {
+	flex: 0 0 260px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 16px;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+	overflow-y: auto;
+}
+
+.agent-mod-agent-page__sidebar-title {
+	margin: 0;
+	font-size: 14px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: #50575e;
+}
+
+.agent-mod-agent-page__sidebar-note {
+	margin: 0;
+	color: #787c82;
+	font-style: italic;
+}
+
+/* Main conversation pane. */
+.agent-mod-agent-page__main {
+	flex: 1 1 auto;
+	display: flex;
+	min-width: 0;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+	overflow: hidden;
+}
+
+.agent-mod-agent-page__chat {
+	display: flex;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+/* Adapt the reusable chat panel to fill the page (it defaults to modal sizing). */
+.agent-mod-agent-page__chat .agent-mod-chat__body {
+	flex: 1 1 auto;
+	min-height: 0;
+	padding: 16px;
+}
+
+.agent-mod-agent-page__chat .agent-mod-chat__messages {
+	max-height: none;
+}
+
+@media screen and (max-width: 782px) {
+	.agent-mod-agent-page__layout {
+		flex-direction: column;
+		height: auto;
+	}
+
+	.agent-mod-agent-page__sidebar {
+		flex-basis: auto;
+	}
+
+	.agent-mod-agent-page__main {
+		min-height: 60vh;
+	}
+}
