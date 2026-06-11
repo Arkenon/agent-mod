@@ -19,6 +19,7 @@
 namespace AgentMod\Services\AI;
 
 use WP_Error;
+use AgentMod\Services\AI\ConfirmationStore;
 use AgentMod\Services\AI\DTO\AgentConfig;
 use AgentMod\Services\AI\DTO\AgentResponse;
 use WordPress\AiClient\Files\DTO\File;
@@ -63,12 +64,21 @@ class AIOrchestratorService
 	private AIClientAdapter $clientAdapter;
 
 	/**
+	 * Confirmation state store.
+	 *
+	 * @var ConfirmationStore
+	 * @since 1.0.0
+	 */
+	private ConfirmationStore $confirmationStore;
+
+	/**
 	 * Constructor (PHP-DI autowired).
 	 *
 	 * @param PromptBuilder     $promptBuilder     System instruction builder.
 	 * @param AbilityResolver   $abilityResolver   Ability resolver.
 	 * @param KnowledgeResolver $knowledgeResolver Knowledge resolver.
 	 * @param AIClientAdapter   $clientAdapter     WP AI Client adapter.
+	 * @param ConfirmationStore $confirmationStore Pending write-action store.
 	 *
 	 * @since 1.0.0
 	 */
@@ -76,12 +86,14 @@ class AIOrchestratorService
 		PromptBuilder $promptBuilder,
 		AbilityResolver $abilityResolver,
 		KnowledgeResolver $knowledgeResolver,
-		AIClientAdapter $clientAdapter
+		AIClientAdapter $clientAdapter,
+		ConfirmationStore $confirmationStore
 	) {
 		$this->promptBuilder     = $promptBuilder;
 		$this->abilityResolver   = $abilityResolver;
 		$this->knowledgeResolver = $knowledgeResolver;
 		$this->clientAdapter     = $clientAdapter;
+		$this->confirmationStore = $confirmationStore;
 	}
 
 	/**
@@ -115,7 +127,7 @@ class AIOrchestratorService
 		$messages   = $this->mapHistoryToMessages($history);
 		$messages[] = new Message(MessageRoleEnum::user(), $this->buildMessageParts($message, $attachments));
 
-		return $this->clientAdapter->generate(
+		$response = $this->clientAdapter->generate(
 			$systemInstruction,
 			$messages,
 			$abilities,
@@ -123,6 +135,23 @@ class AIOrchestratorService
 			$agent->model,
 			$agent->maxToolCalls
 		);
+
+		// When a write ability requires confirmation, persist the wire-format
+		// context in a short-lived transient so the confirm endpoint can resume.
+		if ($response->isPendingConfirmation) {
+			$this->confirmationStore->save(
+				$response->confirmationToken,
+				[
+					'agent'        => $agent,
+					'history'      => $history,
+					'message'      => $message,
+					'attachments'  => $attachments,
+					'pendingCalls' => $response->pendingToolCalls,
+				]
+			);
+		}
+
+		return $response;
 	}
 
 	/**

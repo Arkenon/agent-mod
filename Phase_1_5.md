@@ -1,0 +1,5 @@
+🛠️ Phase 1.5 — Kısa Vade (Hızlı Kazanımlar: Güvenlik, Prompt & UI Cilalama)
+- **Prompt Tanımlarının Güvenli Hale Getirilmesi:** `PromptBuilder.php` içerisine ajanların yıkıcı eylemler yapmasını kesin olarak yasaklayan ve belirsiz durumlarda netleştirici sorular sormasını (co-pilot clarifying questions) emreden ana sistem direktiflerini ekleyin.
+- **Sert Limitlerin Kodlanması:** `AbilityRegistrarService.php` ve `AIClientAdapter.php` katmanlarında arama için maks 20 sonuç, tam gövde okuma için maks 5 post sınırlarını uygulayın.
+- **"New Topic" Özelliği:** `ChatPanel.jsx` bileşenine oturumu/mesaj geçmişini sıfırlayan bir "New Topic" (Temizle) butonu ekleyin.
+- **Gelişmiş Arayüz Toggle Bileşeni (Context Scope Selector):** `Composer.jsx` üzerine kullanıcının AI'ın sitenin verilerini okuyup okuyamayacağını seçeceği bir toggle ekleyin. UI'da "Site Context (RAG)" ve "General Knowledge" seçenekleri açıkça belirtilmelidir.

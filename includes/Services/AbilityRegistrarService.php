@@ -14,6 +14,7 @@
 
 namespace AgentMod\Services;
 
+use AgentMod\Common\Constants;
 use WP_Error;
 
 defined('ABSPATH') || exit;
@@ -37,6 +38,9 @@ class AbilityRegistrarService
 	{
 		add_action('wp_abilities_api_categories_init', [$this, 'registerCategories']);
 		add_action('wp_abilities_api_init', [$this, 'registerAbilities']);
+
+		// Mark the demo write ability as requiring confirmation before execution.
+		add_filter('agent_mod_ability_requires_confirmation', [$this, 'requiresConfirmation'], 10, 2);
 	}
 
 	/**
@@ -99,6 +103,45 @@ class AbilityRegistrarService
 		);
 
 		wp_register_ability(
+			'agent-mod/create-draft-post',
+			[
+				'label'               => __('Create Draft Post', 'agent-mod'),
+				'description'         => __('Creates a new draft post with the given title and optional content. Requires user confirmation before execution.', 'agent-mod'),
+				'category'            => self::CATEGORY,
+				'execute_callback'    => [$this, 'executeCreateDraftPost'],
+				'permission_callback' => static function (): bool {
+					return current_user_can('edit_posts');
+				},
+				'input_schema'        => [
+					'type'       => 'object',
+					'properties' => [
+						'title'   => [
+							'type'        => 'string',
+							'description' => __('The post title.', 'agent-mod'),
+						],
+						'content' => [
+							'type'        => 'string',
+							'description' => __('The post content (optional).', 'agent-mod'),
+						],
+					],
+					'required'   => ['title'],
+				],
+				'output_schema'       => [
+					'type'       => 'object',
+					'properties' => [
+						'id'      => ['type' => 'integer'],
+						'title'   => ['type' => 'string'],
+						'edit_url'=> ['type' => 'string'],
+					],
+				],
+				'meta'                => [
+					'annotations'  => ['readonly' => false],
+					'show_in_rest' => true,
+				],
+			]
+		);
+
+		wp_register_ability(
 			'agent-mod/list-recent-posts',
 			[
 				'label'               => __('List Recent Posts', 'agent-mod'),
@@ -115,7 +158,7 @@ class AbilityRegistrarService
 							'type'        => 'integer',
 							'description' => __('How many posts to return (1-20).', 'agent-mod'),
 							'minimum'     => 1,
-							'maximum'     => 20,
+							'maximum'     => Constants::AI_MAX_SEARCH_RESULTS,
 						],
 					],
 				],
@@ -137,6 +180,62 @@ class AbilityRegistrarService
 				],
 			]
 		);
+	}
+
+	/**
+	 * Returns true for abilities that must be confirmed before execution.
+	 *
+	 * @param bool   $requires Current value.
+	 * @param string $name     Ability slug.
+	 *
+	 * @return bool
+	 * @since 1.0.0
+	 */
+	public function requiresConfirmation(bool $requires, string $name): bool
+	{
+		if ('agent-mod/create-draft-post' === $name) {
+			return true;
+		}
+
+		return $requires;
+	}
+
+	/**
+	 * Execute callback for agent-mod/create-draft-post.
+	 *
+	 * @param mixed $input Input data (expects 'title' and optional 'content').
+	 *
+	 * @return array<string, mixed>|WP_Error
+	 * @since 1.0.0
+	 */
+	public function executeCreateDraftPost($input = null)
+	{
+		if (! is_array($input) || empty($input['title'])) {
+			return new WP_Error('missing_title', __('A post title is required.', 'agent-mod'));
+		}
+
+		$title   = sanitize_text_field((string) $input['title']);
+		$content = isset($input['content']) ? wp_kses_post((string) $input['content']) : '';
+
+		$postId = wp_insert_post(
+			[
+				'post_title'   => $title,
+				'post_content' => $content,
+				'post_status'  => 'draft',
+				'post_type'    => 'post',
+			],
+			true
+		);
+
+		if (is_wp_error($postId)) {
+			return $postId;
+		}
+
+		return [
+			'id'       => (int) $postId,
+			'title'    => $title,
+			'edit_url' => (string) get_edit_post_link($postId, 'raw'),
+		];
 	}
 
 	/**
@@ -169,7 +268,7 @@ class AbilityRegistrarService
 		if (is_array($input) && isset($input['count'])) {
 			$count = (int) $input['count'];
 		}
-		$count = max(1, min(20, $count));
+		$count = max(1, min(Constants::AI_MAX_SEARCH_RESULTS, $count));
 
 		$posts = get_posts(
 			[

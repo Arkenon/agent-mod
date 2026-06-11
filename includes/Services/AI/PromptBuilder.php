@@ -66,6 +66,16 @@ class PromptBuilder
 		}
 
 		$sections[] = __(
+			'Never directly execute destructive operations (delete, trash, erase, or remove content or users). Instead, list the affected items and ask the user for explicit confirmation before any such action is taken. If no relevant tool exists to list them, describe what would be affected and request confirmation.',
+			'agent-mod'
+		);
+
+		$sections[] = __(
+			'When a user request is ambiguous or missing required details, ask one short clarifying question before calling any tools. Do not assume intent.',
+			'agent-mod'
+		);
+
+		$sections[] = __(
 			'When a tool can answer the user accurately, call it before responding. Base your answers on tool results rather than guessing.',
 			'agent-mod'
 		);

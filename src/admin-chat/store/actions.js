@@ -32,6 +32,98 @@ export function clearError() {
 	return { type: 'CLEAR_ERROR' };
 }
 
+export function clearMessages() {
+	return { type: 'CLEAR_MESSAGES' };
+}
+
+export function setSiteContext( enabled ) {
+	return { type: 'SET_SITE_CONTEXT', enabled };
+}
+
+export function setConversationId( conversationId ) {
+	return { type: 'SET_CONVERSATION_ID', conversationId };
+}
+
+export function setAgents( agents ) {
+	return { type: 'SET_AGENTS', agents };
+}
+
+export function selectAgent( agentId ) {
+	return { type: 'SELECT_AGENT', agentId };
+}
+
+export function setPendingConfirmation( data ) {
+	return { type: 'SET_PENDING_CONFIRMATION', data };
+}
+
+export function clearConfirmation() {
+	return { type: 'CLEAR_CONFIRMATION' };
+}
+
+/**
+ * Fetches the list of agents from the REST endpoint and updates the store.
+ */
+export const fetchAgents = () => async ( { dispatch } ) => {
+	try {
+		const config = window.agentModChat || {};
+		const agents = await apiFetch( { path: ( config.restNamespace || 'agent-mod/v1' ) + '/agents' } );
+		if ( Array.isArray( agents ) ) {
+			dispatch.setAgents( agents );
+		}
+	} catch {
+		// Silently ignore — agents list is optional
+	}
+};
+
+/**
+ * Executes a confirmed write action via the confirm-action REST endpoint.
+ *
+ * @param {string} token          Confirmation token.
+ * @param {number} conversationId Current conversation ID.
+ */
+export const confirmAction = ( token, conversationId ) => async ( { dispatch } ) => {
+	dispatch.setLoading( true );
+
+	try {
+		const config = window.agentModChat || {};
+		const data   = await apiFetch( {
+			path:   ( config.restNamespace || 'agent-mod/v1' ) + '/confirm-action',
+			method: 'POST',
+			data:   { token, conversationId },
+		} );
+
+		dispatch.clearConfirmation();
+
+		if ( data && data.success && ! data.pendingConfirmation ) {
+			dispatch.appendMessage( { role: 'assistant', text: data.text || '' } );
+
+			if ( data.conversationId ) {
+				dispatch.setConversationId( data.conversationId );
+			}
+		} else if ( data && data.pendingConfirmation ) {
+			dispatch.setPendingConfirmation( {
+				token:            data.confirmationToken,
+				actionName:       data.pendingAction?.name || '',
+				args:             data.pendingAction?.args || {},
+				pendingToolCalls: data.pendingToolCalls || [],
+			} );
+		} else {
+			const message =
+				( data?.error?.message ) ||
+				__( 'An unexpected error occurred.', 'agent-mod' );
+			dispatch.setError( message );
+		}
+	} catch ( err ) {
+		dispatch.clearConfirmation();
+		dispatch.setError(
+			( err && err.message ) ||
+			__( 'Request failed. Please try again.', 'agent-mod' )
+		);
+	} finally {
+		dispatch.setLoading( false );
+	}
+};
+
 /**
  * Maps a stored attachment to the minimal shape sent to the REST endpoint.
  *
@@ -70,6 +162,19 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 			attachments: ( turnFiles || [] ).map( toWireAttachment ),
 		} ) );
 
+	// Use the selected agent config if available; fall back to defaultAgent.
+	const selectedAgentId = select.getSelectedAgentId();
+	const agents          = select.getAgents();
+	const selectedAgent   = selectedAgentId
+		? agents.find( ( a ) => a.id === selectedAgentId )
+		: null;
+
+	const agent = {
+		...( config.defaultAgent || {} ),
+		...( selectedAgent || {} ),
+		autoIncludeSiteContext: select.isSiteContextEnabled(),
+	};
+
 	dispatch.clearError();
 	dispatch.appendMessage( { role: 'user', text: trimmed, attachments: files } );
 	dispatch.setLoading( true );
@@ -80,17 +185,32 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 			method: 'POST',
 			data: {
 				message: trimmed,
-				agent: config.defaultAgent || {},
+				agent,
 				history,
 				attachments: files.map( toWireAttachment ),
+				conversationId: select.getConversationId(),
 			},
 		} );
 
 		if ( data && data.success ) {
-			dispatch.appendMessage( {
-				role: 'assistant',
-				text: data.text || '',
-			} );
+			if ( data.pendingConfirmation ) {
+				// A write action needs user confirmation before executing.
+				dispatch.setPendingConfirmation( {
+					token:            data.confirmationToken,
+					actionName:       data.pendingAction?.name || '',
+					args:             data.pendingAction?.args || {},
+					pendingToolCalls: data.pendingToolCalls || [],
+				} );
+			} else {
+				dispatch.appendMessage( {
+					role: 'assistant',
+					text: data.text || '',
+				} );
+
+				if ( data.conversationId ) {
+					dispatch.setConversationId( data.conversationId );
+				}
+			}
 		} else {
 			const message =
 				( data && data.error && data.error.message ) ||

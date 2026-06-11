@@ -18,7 +18,10 @@ use WP_REST_Request;
 use WP_REST_Response;
 use AgentMod\Common\Constants;
 use AgentMod\Common\Helper;
+use AgentMod\Repositories\AgentRepository;
+use AgentMod\Repositories\ConversationRepository;
 use AgentMod\Services\AI\AIOrchestratorService;
+use AgentMod\Services\AI\ConfirmationStore;
 use AgentMod\Services\AI\DTO\AgentConfig;
 
 defined('ABSPATH') || exit;
@@ -34,15 +37,49 @@ final class AIChatRestController
 	private AIOrchestratorService $orchestrator;
 
 	/**
+	 * Agent repository.
+	 *
+	 * @var AgentRepository
+	 * @since 1.0.0
+	 */
+	private AgentRepository $agentRepository;
+
+	/**
+	 * Conversation repository.
+	 *
+	 * @var ConversationRepository
+	 * @since 1.0.0
+	 */
+	private ConversationRepository $conversationRepository;
+
+	/**
+	 * Confirmation state store.
+	 *
+	 * @var ConfirmationStore
+	 * @since 1.0.0
+	 */
+	private ConfirmationStore $confirmationStore;
+
+	/**
 	 * Constructor (PHP-DI autowired). Binds the REST route registration.
 	 *
-	 * @param AIOrchestratorService $orchestrator AI orchestrator service.
+	 * @param AIOrchestratorService  $orchestrator           AI orchestrator service.
+	 * @param AgentRepository        $agentRepository        Agent repository.
+	 * @param ConversationRepository $conversationRepository Conversation repository.
+	 * @param ConfirmationStore      $confirmationStore      Pending write-action store.
 	 *
 	 * @since 1.0.0
 	 */
-	public function __construct(AIOrchestratorService $orchestrator)
-	{
-		$this->orchestrator = $orchestrator;
+	public function __construct(
+		AIOrchestratorService $orchestrator,
+		AgentRepository $agentRepository,
+		ConversationRepository $conversationRepository,
+		ConfirmationStore $confirmationStore
+	) {
+		$this->orchestrator           = $orchestrator;
+		$this->agentRepository        = $agentRepository;
+		$this->conversationRepository = $conversationRepository;
+		$this->confirmationStore      = $confirmationStore;
 		add_action('rest_api_init', [$this, 'registerRoutes']);
 	}
 
@@ -54,17 +91,39 @@ final class AIChatRestController
 	 */
 	public function registerRoutes(): void
 	{
-		$args = [
+		$chatArgs = [
 			'methods'             => 'POST',
 			'callback'            => [$this, 'handleChat'],
 			'permission_callback' => [$this, 'checkPermission'],
 		];
 
 		// Temporary testing route (kept for backwards compatibility).
-		register_rest_route(Constants::REST_NAMESPACE, '/test-chat', $args);
+		register_rest_route(Constants::REST_NAMESPACE, '/test-chat', $chatArgs);
 
 		// Permanent chat route used by the admin chat widget.
-		register_rest_route(Constants::REST_NAMESPACE, '/chat', $args);
+		register_rest_route(Constants::REST_NAMESPACE, '/chat', $chatArgs);
+
+		// Returns the list of published agents for the agent selector.
+		register_rest_route(
+			Constants::REST_NAMESPACE,
+			'/agents',
+			[
+				'methods'             => 'GET',
+				'callback'            => [$this, 'handleAgents'],
+				'permission_callback' => [$this, 'checkPermission'],
+			]
+		);
+
+		// Resumes a pending write operation after user confirmation.
+		register_rest_route(
+			Constants::REST_NAMESPACE,
+			'/confirm-action',
+			[
+				'methods'             => 'POST',
+				'callback'            => [$this, 'handleConfirmAction'],
+				'permission_callback' => [$this, 'checkPermission'],
+			]
+		);
 	}
 
 	/**
@@ -88,8 +147,7 @@ final class AIChatRestController
 	 */
 	public function handleChat(WP_REST_Request $request)
 	{
-		$message = sanitize_textarea_field((string) $request->get_param('message'));
-
+		$message     = sanitize_textarea_field((string) $request->get_param('message'));
 		$attachments = $this->sanitizeAttachments($request->get_param('attachments'));
 
 		if ('' === trim($message) && empty($attachments)) {
@@ -104,8 +162,20 @@ final class AIChatRestController
 		$agentData = is_array($agentData) ? Helper::sanitizeArray($agentData) : [];
 		$agent     = AgentConfig::fromArray($agentData);
 
-		$history = $request->get_param('history');
-		$history = is_array($history) ? $this->sanitizeHistory($history) : [];
+		$conversationId = (int) $request->get_param('conversationId');
+
+		// Load history from DB when a conversationId is provided; otherwise use
+		// the client-supplied history for the first turn of a new conversation.
+		if ($conversationId > 0) {
+			$history = $this->conversationRepository->loadHistory($conversationId);
+		} else {
+			$history        = $request->get_param('history');
+			$history        = is_array($history) ? $this->sanitizeHistory($history) : [];
+			$conversationId = $this->conversationRepository->create(
+				(int) ($agentData['id'] ?? 0),
+				'admin_chat'
+			);
+		}
 
 		$response = $this->orchestrator->chat($agent, $message, $history, $attachments);
 
@@ -117,7 +187,98 @@ final class AIChatRestController
 			return new WP_REST_Response($response->toArray(), $status);
 		}
 
-		return rest_ensure_response($response->toArray());
+		// Persist the new turns when the response is a normal answer.
+		// Pending-confirmation responses are not persisted yet — only saved to
+		// the transient store by AIOrchestratorService until confirmed.
+		if (! $response->isPendingConfirmation && $conversationId > 0) {
+			$newTurns = [
+				['role' => 'user',      'text' => $message,       'attachments' => $attachments],
+				['role' => 'assistant', 'text' => $response->text, 'attachments' => []],
+			];
+			$this->conversationRepository->appendMessages($conversationId, $newTurns);
+		}
+
+		$payload                 = $response->toArray();
+		$payload['conversationId'] = $conversationId ?: null;
+
+		return rest_ensure_response($payload);
+	}
+
+	/**
+	 * Returns the list of published agents.
+	 *
+	 * @return WP_REST_Response
+	 * @since 1.0.0
+	 */
+	public function handleAgents(): WP_REST_Response
+	{
+		return rest_ensure_response($this->agentRepository->all());
+	}
+
+	/**
+	 * Resumes a write operation after the user has confirmed it.
+	 *
+	 * @param WP_REST_Request $request The REST request.
+	 *
+	 * @return WP_REST_Response|WP_Error
+	 * @since 1.0.0
+	 */
+	public function handleConfirmAction(WP_REST_Request $request)
+	{
+		$token          = sanitize_text_field((string) $request->get_param('token'));
+		$conversationId = (int) $request->get_param('conversationId');
+
+		if ('' === $token) {
+			return new WP_Error('missing_token', __('A confirmation token is required.', 'agent-mod'), ['status' => 400]);
+		}
+
+		$state = $this->confirmationStore->consume($token);
+
+		if (null === $state) {
+			return new WP_Error('invalid_token', __('The confirmation token is invalid or has expired.', 'agent-mod'), ['status' => 404]);
+		}
+
+		$agent       = $state['agent'];
+		$history     = $state['history'] ?? [];
+		$message     = $state['message'] ?? '';
+		$attachments = $state['attachments'] ?? [];
+		$pendingCall = $state['pendingCalls'][0] ?? [];
+
+		if (! $agent instanceof AgentConfig || empty($pendingCall)) {
+			return new WP_Error('corrupt_state', __('The pending confirmation state is invalid.', 'agent-mod'), ['status' => 500]);
+		}
+
+		// Inject a confirmation message so the AI re-requests and executes the
+		// approved tool on the next loop iteration.
+		$confirmInstruction = sprintf(
+			/* translators: 1: ability name, 2: JSON-encoded arguments. */
+			__('The user has confirmed this action. Please execute it now: %1$s with arguments: %2$s', 'agent-mod'),
+			esc_html($pendingCall['name'] ?? ''),
+			wp_json_encode($pendingCall['args'] ?? [])
+		);
+
+		$response = $this->orchestrator->chat($agent, $confirmInstruction, $history, $attachments);
+
+		if ($response->isError()) {
+			$error  = $response->error;
+			$data   = $error->get_error_data();
+			$status = is_array($data) && isset($data['status']) ? (int) $data['status'] : 500;
+
+			return new WP_REST_Response($response->toArray(), $status);
+		}
+
+		if (! $response->isPendingConfirmation && $conversationId > 0) {
+			$newTurns = [
+				['role' => 'user',      'text' => $message,        'attachments' => $attachments],
+				['role' => 'assistant', 'text' => $response->text,  'attachments' => []],
+			];
+			$this->conversationRepository->appendMessages($conversationId, $newTurns);
+		}
+
+		$payload                 = $response->toArray();
+		$payload['conversationId'] = $conversationId ?: null;
+
+		return rest_ensure_response($payload);
 	}
 
 	/**

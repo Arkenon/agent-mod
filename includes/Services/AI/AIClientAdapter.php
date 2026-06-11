@@ -163,8 +163,21 @@ class AIClientAdapter
 				);
 			}
 
+			// Intercept write operations before execution to allow user confirmation.
+			$requestedCalls = $this->extractToolCalls($message);
+			$writeCalls     = $this->filterWriteToolCalls($requestedCalls);
+
+			if (! empty($writeCalls)) {
+				return AgentResponse::pendingConfirmation(
+					wp_generate_uuid4(),
+					$writeCalls,
+					$history,
+					$tokenUsage
+				);
+			}
+
 			// Record the requested tool calls, then execute them and feed responses back.
-			$toolCalls = array_merge($toolCalls, $this->extractToolCalls($message));
+			$toolCalls = array_merge($toolCalls, $requestedCalls);
 			$history[] = $resolver->execute_abilities($message);
 		}
 
@@ -248,6 +261,33 @@ class AIClientAdapter
 		}
 
 		return $calls;
+	}
+
+	/**
+	 * Filters tool calls that require user confirmation before execution.
+	 *
+	 * Other plugins register write abilities via the agent_mod_ability_requires_confirmation
+	 * filter, returning true for ability names that must not be executed silently.
+	 *
+	 * @param array<int, array<string, mixed>> $toolCalls Extracted tool calls.
+	 *
+	 * @return array<int, array<string, mixed>> Only the calls that need confirmation.
+	 * @since 1.0.0
+	 */
+	private function filterWriteToolCalls(array $toolCalls): array
+	{
+		return array_values(
+			array_filter(
+				$toolCalls,
+				static function (array $call): bool {
+					return (bool) apply_filters(
+						'agent_mod_ability_requires_confirmation',
+						false,
+						$call['name']
+					);
+				}
+			)
+		);
 	}
 
 	/**

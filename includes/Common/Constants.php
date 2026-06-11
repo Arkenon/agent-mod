@@ -50,6 +50,20 @@ class Constants
 	public const AI_MAX_TOOL_CALLS = 10;
 
 	/**
+	 * Maximum results per ability call that returns a list of posts or items.
+	 *
+	 * @since 1.0.0
+	 */
+	public const AI_MAX_SEARCH_RESULTS = 20;
+
+	/**
+	 * Maximum posts whose full body content an agent may read in a single turn.
+	 *
+	 * @since 1.0.0
+	 */
+	public const AI_MAX_FULL_CONTENT_POSTS = 5;
+
+	/**
 	 * Maximum decoded size (in bytes) allowed for a single chat attachment.
 	 *
 	 * @since 1.0.0

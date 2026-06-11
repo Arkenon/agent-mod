@@ -62,6 +62,31 @@ final class AgentResponse
 	public ?WP_Error $error;
 
 	/**
+	 * Whether this response is paused waiting for user confirmation before
+	 * a write ability is executed.
+	 *
+	 * @var bool
+	 * @since 1.0.0
+	 */
+	public bool $isPendingConfirmation = false;
+
+	/**
+	 * UUID token that identifies the stored pending state in the transient store.
+	 *
+	 * @var string
+	 * @since 1.0.0
+	 */
+	public string $confirmationToken = '';
+
+	/**
+	 * Tool calls awaiting confirmation (each ['name' => string, 'args' => array]).
+	 *
+	 * @var array<int, array<string, mixed>>
+	 * @since 1.0.0
+	 */
+	public array $pendingToolCalls = [];
+
+	/**
 	 * Constructor.
 	 *
 	 * @param string                            $text       Final assistant text.
@@ -100,6 +125,31 @@ final class AgentResponse
 	}
 
 	/**
+	 * Creates a pending-confirmation response.
+	 *
+	 * @param string                           $token           UUID token for the transient store.
+	 * @param array<int, array<string, mixed>> $pendingToolCalls Tool calls awaiting approval.
+	 * @param Message[]                        $messages         Message history at the time of detection.
+	 * @param array<string, int>               $tokenUsage       Token usage so far.
+	 *
+	 * @return self
+	 * @since 1.0.0
+	 */
+	public static function pendingConfirmation(
+		string $token,
+		array $pendingToolCalls,
+		array $messages,
+		array $tokenUsage
+	): self {
+		$instance                       = new self('', [], $messages, $tokenUsage);
+		$instance->isPendingConfirmation = true;
+		$instance->confirmationToken    = $token;
+		$instance->pendingToolCalls     = $pendingToolCalls;
+
+		return $instance;
+	}
+
+	/**
 	 * Whether this response represents an error.
 	 *
 	 * @return bool
@@ -128,6 +178,21 @@ final class AgentResponse
 					'code'    => $this->error->get_error_code(),
 					'message' => $this->error->get_error_message(),
 				],
+			];
+		}
+
+		if ($this->isPendingConfirmation) {
+			$first = $this->pendingToolCalls[0] ?? [];
+
+			return [
+				'success'             => true,
+				'pendingConfirmation' => true,
+				'confirmationToken'   => $this->confirmationToken,
+				'pendingAction'       => [
+					'name' => $first['name'] ?? '',
+					'args' => $first['args'] ?? [],
+				],
+				'pendingToolCalls'    => $this->pendingToolCalls,
 			];
 		}
 
