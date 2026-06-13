@@ -5,7 +5,7 @@
  * which agent the chat session uses. Fetches the agent list from the REST API
  * on first render and dispatches selectAgent() on change.
  */
-import { useEffect } from '@wordpress/element';
+import { useEffect, useState } from '@wordpress/element';
 import { SelectControl, Spinner } from '@wordpress/components';
 import { useDispatch, useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
@@ -14,6 +14,10 @@ import { STORE_NAME } from '../store';
 
 export default function AgentSelector() {
 	const { fetchAgents, selectAgent } = useDispatch( STORE_NAME );
+
+	// Local fetch state so the selector's spinner reflects *its own* agent
+	// load, not the shared chat isLoading flag (which message sends also set).
+	const [ fetching, setFetching ] = useState( false );
 
 	const { agents, selectedAgentId, loading } = useSelect( ( select ) => {
 		const storeSelect = select( STORE_NAME );
@@ -26,12 +30,13 @@ export default function AgentSelector() {
 
 	useEffect( () => {
 		if ( 0 === agents.length ) {
-			fetchAgents();
+			setFetching( true );
+			Promise.resolve( fetchAgents() ).finally( () => setFetching( false ) );
 		}
 	}, [] ); // eslint-disable-line react-hooks/exhaustive-deps
 
 	if ( 0 === agents.length ) {
-		return loading ? <Spinner /> : null;
+		return fetching ? <Spinner /> : null;
 	}
 
 	const options = [

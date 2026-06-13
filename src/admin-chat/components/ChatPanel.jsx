@@ -6,24 +6,20 @@
  * can be dropped into a modal, a full admin page, a sidebar, or any other
  * container as-is — plug-and-play, no extra wiring required.
  */
-import { Button, Notice } from '@wordpress/components';
+import { Notice } from '@wordpress/components';
 import { useDispatch, useSelect } from '@wordpress/data';
-import { __ } from '@wordpress/i18n';
 
 import { STORE_NAME } from '../store';
-import AgentSelector from './AgentSelector';
 import ConfirmationModal from './ConfirmationModal';
 import MessageList from './MessageList';
 import Composer from './Composer';
 
 export default function ChatPanel( { className = '' } ) {
-	const { clearError, clearMessages, setConversationId } = useDispatch( STORE_NAME );
-	const { error, hasMessages, loading } = useSelect( ( select ) => {
+	const { clearError } = useDispatch( STORE_NAME );
+	const { error } = useSelect( ( select ) => {
 		const storeSelect = select( STORE_NAME );
 		return {
 			error: storeSelect.getError(),
-			hasMessages: storeSelect.getMessages().length > 0,
-			loading: storeSelect.isLoading(),
 		};
 	}, [] );
 
@@ -34,23 +30,6 @@ export default function ChatPanel( { className = '' } ) {
 					{ error }
 				</Notice>
 			) }
-
-				<div className="agent-mod-chat__toolbar">
-				<AgentSelector />
-
-				{ hasMessages && ! loading && (
-					<Button
-						variant="tertiary"
-						size="small"
-						onClick={ () => {
-							clearMessages();
-							setConversationId( null );
-						} }
-					>
-						{ __( 'New Topic', 'agent-mod' ) }
-					</Button>
-				) }
-			</div>
 
 			<ConfirmationModal />
 			<MessageList />

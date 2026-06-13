@@ -11,18 +11,22 @@ import { __ } from '@wordpress/i18n';
 
 import { STORE_NAME } from '../store';
 import AttachmentUploader from './AttachmentUploader';
+import AgentSelector from './AgentSelector';
+import ProviderModelSelector from './ProviderModelSelector';
 
 export default function Composer() {
 	const [ text, setText ]               = useState( '' );
 	const [ attachments, setAttachments ] = useState( [] );
 	const uploaderRef                     = useRef( null );
 
-	const { sendMessage, setSiteContext } = useDispatch( STORE_NAME );
-	const { loading, isSiteContext } = useSelect( ( select ) => {
+	const { sendMessage, setSiteContext, clearMessages, setConversationId } =
+		useDispatch( STORE_NAME );
+	const { loading, isSiteContext, hasMessages } = useSelect( ( select ) => {
 		const storeSelect = select( STORE_NAME );
 		return {
 			loading:       storeSelect.isLoading(),
 			isSiteContext: storeSelect.isSiteContextEnabled(),
+			hasMessages:   storeSelect.getMessages().length > 0,
 		};
 	}, [] );
 
@@ -83,12 +87,31 @@ export default function Composer() {
 			/>
 
 			<div className="agent-mod-chat__composer-actions">
-				<Button
-					icon="paperclip"
-					label={ strings.attach || __( 'Attach files', 'agent-mod' ) }
-					onClick={ () => uploaderRef.current?.open() }
-					disabled={ loading || attachments.length >= maxCount }
-				/>
+				<div className="agent-mod-chat__tools">
+					<AgentSelector />
+					<ProviderModelSelector />
+
+					<Button
+						icon="paperclip"
+						label={ strings.attach || __( 'Attach files', 'agent-mod' ) }
+						onClick={ () => uploaderRef.current?.open() }
+						disabled={ loading || attachments.length >= maxCount }
+					/>
+
+					{ hasMessages && ! loading && (
+						<Button
+							variant="tertiary"
+							size="small"
+							onClick={ () => {
+								clearMessages();
+								setConversationId( null );
+							} }
+						>
+							{ __( 'New Topic', 'agent-mod' ) }
+						</Button>
+					) }
+				</div>
+
 				<Button variant="primary" onClick={ submit } disabled={ ! canSend }>
 					{ strings.send || __( 'Send', 'agent-mod' ) }
 				</Button>

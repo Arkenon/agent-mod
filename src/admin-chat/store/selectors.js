@@ -37,3 +37,19 @@ export function getSelectedAgentId( state ) {
 export function getPendingConfirmation( state ) {
 	return state.pendingConfirmation;
 }
+
+export function getSelectedProvider( state ) {
+	return state.selectedProvider;
+}
+
+export function getSelectedModel( state ) {
+	return state.selectedModel;
+}
+
+export function getProviderModels( state, providerId ) {
+	return state.providerModels[ providerId ] || null;
+}
+
+export function getModelsLoading( state ) {
+	return state.modelsLoading;
+}

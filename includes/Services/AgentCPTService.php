@@ -58,11 +58,11 @@ class AgentCPTService
 					'edit_item'          => __('Edit Agent', 'agent-mod'),
 					'not_found'          => __('No agents found.', 'agent-mod'),
 				],
-				'public'             => false,
+				'public'             => true,
 				'show_ui'            => true,
 				'show_in_menu'       => false,
 				'show_in_rest'       => true,
-				'supports'           => ['title'],
+				'supports'           => ['title', 'editor'],
 				'menu_icon'          => 'dashicons-format-chat',
 				'capability_type'    => 'post',
 				'map_meta_cap'       => true,
@@ -127,7 +127,7 @@ class AgentCPTService
 				'public'      => false,
 				'show_ui'     => false,
 				'show_in_rest'=> false,
-				'supports'    => ['title'],
+				'supports'    => ['title', 'editor'],
 			]
 		);
 

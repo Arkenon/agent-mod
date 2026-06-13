@@ -29,7 +29,7 @@ final class App
 	 * @since 1.0.0
 	 */
 	private array $services = [
-		AgentCPTService::class,
+		//AgentCPTService::class,
 		BlockService::class,
 		AbilityRegistrarService::class,
 	];

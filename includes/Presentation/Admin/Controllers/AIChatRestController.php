@@ -22,6 +22,7 @@ use AgentMod\Repositories\AgentRepository;
 use AgentMod\Repositories\ConversationRepository;
 use AgentMod\Services\AI\AIOrchestratorService;
 use AgentMod\Services\AI\ConfirmationStore;
+use AgentMod\Services\AI\ProviderInfoService;
 use AgentMod\Services\AI\DTO\AgentConfig;
 
 defined('ABSPATH') || exit;
@@ -61,12 +62,21 @@ final class AIChatRestController
 	private ConfirmationStore $confirmationStore;
 
 	/**
+	 * Connected-provider info service.
+	 *
+	 * @var ProviderInfoService
+	 * @since 1.0.0
+	 */
+	private ProviderInfoService $providerInfo;
+
+	/**
 	 * Constructor (PHP-DI autowired). Binds the REST route registration.
 	 *
 	 * @param AIOrchestratorService  $orchestrator           AI orchestrator service.
 	 * @param AgentRepository        $agentRepository        Agent repository.
 	 * @param ConversationRepository $conversationRepository Conversation repository.
 	 * @param ConfirmationStore      $confirmationStore      Pending write-action store.
+	 * @param ProviderInfoService    $providerInfo           Connected-provider info service.
 	 *
 	 * @since 1.0.0
 	 */
@@ -74,12 +84,14 @@ final class AIChatRestController
 		AIOrchestratorService $orchestrator,
 		AgentRepository $agentRepository,
 		ConversationRepository $conversationRepository,
-		ConfirmationStore $confirmationStore
+		ConfirmationStore $confirmationStore,
+		ProviderInfoService $providerInfo
 	) {
 		$this->orchestrator           = $orchestrator;
 		$this->agentRepository        = $agentRepository;
 		$this->conversationRepository = $conversationRepository;
 		$this->confirmationStore      = $confirmationStore;
+		$this->providerInfo           = $providerInfo;
 		add_action('rest_api_init', [$this, 'registerRoutes']);
 	}
 
@@ -111,6 +123,23 @@ final class AIChatRestController
 				'methods'             => 'GET',
 				'callback'            => [$this, 'handleAgents'],
 				'permission_callback' => [$this, 'checkPermission'],
+			]
+		);
+
+		// Returns the text-generation models for a connected provider.
+		register_rest_route(
+			Constants::REST_NAMESPACE,
+			'/provider-models',
+			[
+				'methods'             => 'GET',
+				'callback'            => [$this, 'handleProviderModels'],
+				'permission_callback' => [$this, 'checkPermission'],
+				'args'                => [
+					'provider' => [
+						'type'     => 'string',
+						'required' => true,
+					],
+				],
 			]
 		);
 
@@ -213,6 +242,21 @@ final class AIChatRestController
 	public function handleAgents(): WP_REST_Response
 	{
 		return rest_ensure_response($this->agentRepository->all());
+	}
+
+	/**
+	 * Returns the text-generation models for a connected provider.
+	 *
+	 * @param WP_REST_Request $request The REST request.
+	 *
+	 * @return WP_REST_Response
+	 * @since 1.0.0
+	 */
+	public function handleProviderModels(WP_REST_Request $request): WP_REST_Response
+	{
+		$provider = sanitize_key((string) $request->get_param('provider'));
+
+		return rest_ensure_response($this->providerInfo->getTextModels($provider));
 	}
 
 	/**

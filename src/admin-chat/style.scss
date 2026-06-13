@@ -152,8 +152,19 @@
 .agent-mod-chat__composer-actions {
 	display: flex;
 	align-items: center;
-	justify-content: flex-end;
+	justify-content: space-between;
 	gap: 8px;
+	flex-wrap: wrap;
+}
+
+// All tools sit side by side here (agent selector, provider, attach, new topic).
+.agent-mod-chat__tools {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1 1 auto;
+	min-width: 0;
+	flex-wrap: wrap;
 }
 
 // Pending attachment previews above the textarea.
@@ -207,17 +218,7 @@
 	flex: 0 0 auto;
 }
 
-// Toolbar: agent selector + "New Topic" button.
-.agent-mod-chat__toolbar {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 8px;
-	min-height: 36px;
-}
-
 .agent-mod-chat__agent-selector {
-	flex: 1 1 auto;
 	min-width: 0;
 
 	.components-base-control {
@@ -226,8 +227,140 @@
 
 	select {
 		font-size: 13px;
-		max-width: 100%;
+		max-width: 180px;
 	}
+}
+
+// Connected AI provider indicator (read-only).
+.agent-mod-chat__provider {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	color: #50575e;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.agent-mod-chat__provider-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 8px;
+	background: #f0f0f1;
+	border-radius: 10px;
+}
+
+.agent-mod-chat__provider-logo {
+	width: 14px;
+	height: 14px;
+	object-fit: contain;
+	display: block;
+}
+
+.agent-mod-chat__provider-icon {
+	font-size: 14px;
+	width: 14px;
+	height: 14px;
+}
+
+.agent-mod-chat__provider--empty {
+	color: #b32d2e;
+
+	.dashicons {
+		font-size: 16px;
+		width: 16px;
+		height: 16px;
+	}
+}
+
+// Provider/model drop-up menu: providers on the left, models on the right.
+.agent-mod-chat__provider-menu {
+	display: flex;
+	min-width: 320px;
+	max-width: 460px;
+}
+
+.agent-mod-chat__provider-list {
+	flex: 0 0 45%;
+	margin: 0;
+	padding: 4px;
+	list-style: none;
+	border-right: 1px solid #e0e0e0;
+	max-height: 260px;
+	overflow-y: auto;
+
+	li {
+		margin: 0;
+	}
+
+	.components-button {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		width: 100%;
+		justify-content: flex-start;
+		height: auto;
+		padding: 6px 8px;
+		text-align: left;
+
+		.agent-mod-chat__provider-name {
+			flex: 1 1 auto;
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		.dashicons-arrow-right-alt2 {
+			color: #757575;
+		}
+
+		&.is-active {
+			background: #f0f0f1;
+		}
+
+		&.is-selected {
+			font-weight: 600;
+		}
+	}
+
+	.agent-mod-chat__provider-logo {
+		width: 16px;
+		height: 16px;
+		object-fit: contain;
+	}
+}
+
+.agent-mod-chat__model-list {
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 4px;
+	max-height: 260px;
+	overflow-y: auto;
+
+	.components-button {
+		display: block;
+		width: 100%;
+		justify-content: flex-start;
+		text-align: left;
+		height: auto;
+		padding: 6px 8px;
+		white-space: normal;
+		word-break: break-word;
+
+		&.is-selected {
+			background: #2271b1;
+			color: #fff;
+		}
+	}
+}
+
+.agent-mod-chat__model-hint {
+	color: #757575;
+	font-size: 12px;
+	margin: 8px;
 }
 
 // Site-context toggle row.

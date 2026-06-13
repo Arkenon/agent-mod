@@ -11,6 +11,10 @@ const DEFAULT_STATE = {
 	agents: [],
 	selectedAgentId: null,
 	pendingConfirmation: null, // { token, actionName, args, pendingToolCalls }
+	selectedProvider: null, // provider id chosen in the provider/model picker
+	selectedModel: null, // model id chosen for the selected provider
+	providerModels: {}, // providerId -> [{ id, name }] (lazily fetched)
+	modelsLoading: null, // providerId currently being fetched, or null
 };
 
 export default function reducer( state = DEFAULT_STATE, action ) {
@@ -50,6 +54,25 @@ export default function reducer( state = DEFAULT_STATE, action ) {
 
 		case 'SELECT_AGENT':
 			return { ...state, selectedAgentId: action.agentId };
+
+		case 'SET_PROVIDER_MODELS':
+			return {
+				...state,
+				providerModels: {
+					...state.providerModels,
+					[ action.providerId ]: action.models,
+				},
+			};
+
+		case 'SET_MODELS_LOADING':
+			return { ...state, modelsLoading: action.providerId };
+
+		case 'SELECT_PROVIDER_MODEL':
+			return {
+				...state,
+				selectedProvider: action.provider,
+				selectedModel: action.model,
+			};
 
 		case 'SET_PENDING_CONFIRMATION':
 			return { ...state, pendingConfirmation: action.data, isLoading: false };

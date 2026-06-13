@@ -16,6 +16,7 @@ namespace AgentMod\Presentation\Admin\Controllers;
 
 use WP_Admin_Bar;
 use AgentMod\Common\Constants;
+use AgentMod\Services\AI\ProviderInfoService;
 
 defined('ABSPATH') || exit;
 
@@ -38,12 +39,24 @@ final class AIChatWidgetController
 	private const NODE_ID = 'agent-mod-chat';
 
 	/**
-	 * Constructor. Binds the admin hooks.
+	 * Connected-provider info service.
+	 *
+	 * @var ProviderInfoService
+	 * @since 1.0.0
+	 */
+	private ProviderInfoService $providerInfo;
+
+	/**
+	 * Constructor (PHP-DI autowired). Binds the admin hooks.
+	 *
+	 * @param ProviderInfoService $providerInfo Connected-provider info service.
 	 *
 	 * @since 1.0.0
 	 */
-	public function __construct()
+	public function __construct(ProviderInfoService $providerInfo)
 	{
+		$this->providerInfo = $providerInfo;
+
 		add_action('admin_bar_menu', [$this, 'addToolbarNode'], 100);
 		add_action('admin_enqueue_scripts', [$this, 'enqueueAssets']);
 		add_action('admin_footer', [$this, 'renderRoot']);
@@ -127,11 +140,13 @@ final class AIChatWidgetController
 			self::HANDLE,
 			'agentModChat',
 			[
-				'restPath'     => Constants::REST_NAMESPACE . '/chat',
-				'defaultAgent' => [
+				'restPath'      => Constants::REST_NAMESPACE . '/chat',
+				'defaultAgent'  => [
 					'provider'      => Constants::AI_PROVIDER_DEFAULT,
 					'abilitySource' => 'all',
 				],
+				'providers'     => $this->providerInfo->getConnectedProviders(),
+				'connectorsUrl' => admin_url('options-connectors.php'),
 				'attachments'  => [
 					'maxBytes'  => Constants::AI_ATTACHMENT_MAX_BYTES,
 					'maxCount'  => Constants::AI_ATTACHMENT_MAX_COUNT,

@@ -56,6 +56,54 @@ export function setPendingConfirmation( data ) {
 	return { type: 'SET_PENDING_CONFIRMATION', data };
 }
 
+export function setProviderModels( providerId, models ) {
+	return { type: 'SET_PROVIDER_MODELS', providerId, models };
+}
+
+export function setModelsLoading( providerId ) {
+	return { type: 'SET_MODELS_LOADING', providerId };
+}
+
+/**
+ * Selects a provider + model for the next chat requests. Pass ( null, null ) to
+ * clear the selection and let the AI Client auto-select.
+ *
+ * @param {string|null} provider Provider id.
+ * @param {string|null} model    Model id.
+ */
+export function selectProviderModel( provider, model ) {
+	return { type: 'SELECT_PROVIDER_MODEL', provider, model };
+}
+
+/**
+ * Lazily fetches the text-generation models for a provider and caches them in
+ * the store. No-op when the models are already loaded.
+ *
+ * @param {string} providerId Provider id.
+ */
+export const fetchProviderModels = ( providerId ) => async ( { dispatch, select } ) => {
+	if ( ! providerId || null !== select.getProviderModels( providerId ) ) {
+		return;
+	}
+
+	dispatch.setModelsLoading( providerId );
+
+	try {
+		const config = window.agentModChat || {};
+		const models = await apiFetch( {
+			path:
+				( config.restNamespace || 'agent-mod/v1' ) +
+				'/provider-models?provider=' +
+				encodeURIComponent( providerId ),
+		} );
+		dispatch.setProviderModels( providerId, Array.isArray( models ) ? models : [] );
+	} catch {
+		dispatch.setProviderModels( providerId, [] );
+	} finally {
+		dispatch.setModelsLoading( null );
+	}
+};
+
 export function clearConfirmation() {
 	return { type: 'CLEAR_CONFIRMATION' };
 }
@@ -174,6 +222,14 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 		...( selectedAgent || {} ),
 		autoIncludeSiteContext: select.isSiteContextEnabled(),
 	};
+
+	// A provider/model picked in the picker overrides the agent defaults so the
+	// WP AI Client uses exactly that provider and model for this request.
+	const pickedProvider = select.getSelectedProvider();
+	if ( pickedProvider ) {
+		agent.provider = pickedProvider;
+		agent.model    = select.getSelectedModel() || null;
+	}
 
 	dispatch.clearError();
 	dispatch.appendMessage( { role: 'user', text: trimmed, attachments: files } );
