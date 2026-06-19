@@ -38,22 +38,6 @@ final class AIChatRestController
 	private AIOrchestratorService $orchestrator;
 
 	/**
-	 * Agent repository.
-	 *
-	 * @var AgentRepository
-	 * @since 1.0.0
-	 */
-	private AgentRepository $agentRepository;
-
-	/**
-	 * Conversation repository.
-	 *
-	 * @var ConversationRepository
-	 * @since 1.0.0
-	 */
-	private ConversationRepository $conversationRepository;
-
-	/**
 	 * Confirmation state store.
 	 *
 	 * @var ConfirmationStore
@@ -73,8 +57,6 @@ final class AIChatRestController
 	 * Constructor (PHP-DI autowired). Binds the REST route registration.
 	 *
 	 * @param AIOrchestratorService  $orchestrator           AI orchestrator service.
-	 * @param AgentRepository        $agentRepository        Agent repository.
-	 * @param ConversationRepository $conversationRepository Conversation repository.
 	 * @param ConfirmationStore      $confirmationStore      Pending write-action store.
 	 * @param ProviderInfoService    $providerInfo           Connected-provider info service.
 	 *
@@ -82,14 +64,10 @@ final class AIChatRestController
 	 */
 	public function __construct(
 		AIOrchestratorService $orchestrator,
-		AgentRepository $agentRepository,
-		ConversationRepository $conversationRepository,
 		ConfirmationStore $confirmationStore,
 		ProviderInfoService $providerInfo
 	) {
 		$this->orchestrator           = $orchestrator;
-		$this->agentRepository        = $agentRepository;
-		$this->conversationRepository = $conversationRepository;
 		$this->confirmationStore      = $confirmationStore;
 		$this->providerInfo           = $providerInfo;
 		add_action('rest_api_init', [$this, 'registerRoutes']);

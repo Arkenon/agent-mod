@@ -17,7 +17,7 @@ const baseEntry =
 module.exports = {
 	...defaultConfig,
 	entry: {
-		...baseEntry, // first-block + other block.json entries are preserved.
+		...baseEntry,
 		'admin-chat/index': path.resolve(
 			process.cwd(),
 			'src/admin-chat',

@@ -1,10 +1,18 @@
 {
-	"require": {
-		"php-di/php-di": "^7.1.1"
-	},
-	"autoload": {
-		"psr-4": {
-			"AgentMod\\": "includes/"
-		}
-	}
+    "name": "agent-mod/agent-mod",
+    "description": "A WordPress plugin for creating AI agents",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "autoload": {
+        "psr-4": {
+            "AgentMod\\": "includes/"
+        }
+    },
+    "require": {
+        "php-di/php-di": "^7.1.1",
+        "php": ">=7.4"
+    },
+    "config": {
+        "autoloader-suffix": "AgentMod"
+    }
 }

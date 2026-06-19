@@ -12,8 +12,6 @@ namespace AgentMod;
 use DI\DependencyException;
 use DI\NotFoundException;
 use Exception;
-use AgentMod\Services\AgentCPTService;
-use AgentMod\Services\BlockService;
 use AgentMod\Services\AbilityRegistrarService;
 use AgentMod\Common\DI;
 use AgentMod\Presentation\ControllerInit;
@@ -29,8 +27,6 @@ final class App
 	 * @since 1.0.0
 	 */
 	private array $services = [
-		//AgentCPTService::class,
-		BlockService::class,
 		AbilityRegistrarService::class,
 	];
 

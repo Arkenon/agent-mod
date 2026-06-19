@@ -1,20 +1,20 @@
 <?php return array(
     'root' => array(
-        'name' => '__root__',
+        'name' => 'agent-mod/agent-mod',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '2dec1bcf301a1e5b4524ec8acee443cad5e83cde',
-        'type' => 'library',
+        'reference' => '13f0945839a33b3f47bcad65daa37bba78cff9a1',
+        'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
         'dev' => true,
     ),
     'versions' => array(
-        '__root__' => array(
+        'agent-mod/agent-mod' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '2dec1bcf301a1e5b4524ec8acee443cad5e83cde',
-            'type' => 'library',
+            'reference' => '13f0945839a33b3f47bcad65daa37bba78cff9a1',
+            'type' => 'wordpress-plugin',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
             'dev_requirement' => false,
