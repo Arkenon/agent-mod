@@ -1,4 +1,5 @@
 import { __ } from '@wordpress/i18n';
+import { dispatch } from '@wordpress/data';
 import {
 	Card,
 	CardHeader,
@@ -85,8 +86,30 @@ export default function Dashboard() {
 							<div className="agent-mod-dashboard__main">
 								<div className="agent-mod-dashboard__description">
 									<p>
-										{ __( 'AgentMod is a WordPress AI agent platform that lets you configure AI assistants, connect to multiple AI providers, and extend functionality through a hook-based architecture. The free version provides the core AI chat infrastructure; AgentMod Pro adds conversation persistence, agent management, and advanced workspace features.', 'agent-mod' ) }
+										{ __( 'AgentMod is a WordPress AI Agent Platform. Unlike ordinary chatbot plugins, it acts as an orchestration layer built on WordPress\'s native AI infrastructure — connecting your site to AI providers through a clean, extensible architecture.', 'agent-mod' ) }
 									</p>
+
+									<h3 style={ { marginTop: '24px', marginBottom: '12px', fontSize: '14px', fontWeight: 600, color: '#1e1e1e' } }>
+										{ __( 'What\'s included in the Free version:', 'agent-mod' ) }
+									</h3>
+
+									<ul style={ { margin: '0 0 24px', paddingLeft: '20px', color: '#646970', fontSize: '14px', lineHeight: 1.8 } }>
+										<li>{ __( 'AI Engine — Stateless, model-agnostic orchestration layer built on WordPress native AI Client.', 'agent-mod' ) }</li>
+										<li>{ __( 'Multiple Tool Calls — Sequential and parallel ability execution in a single conversation turn.', 'agent-mod' ) }</li>
+										<li>{ __( 'Admin Chat Widget — React-based modal, triggered from the Admin Bar.', 'agent-mod' ) }</li>
+										<li>{ __( 'Read-only Abilities — Built-in site info and recent posts abilities for safe data retrieval.', 'agent-mod' ) }</li>
+										<li>{ __( 'Context Scope Selector — Switch between "Site Context" (RAG) and "General Knowledge" per message.', 'agent-mod' ) }</li>
+										<li>{ __( 'New Topic — Clear the conversation and start fresh at any time.', 'agent-mod' ) }</li>
+										<li>{ __( 'Safety Guardrails — Destructive actions are blocked; the agent asks clarifying questions when unsure.', 'agent-mod' ) }</li>
+										<li>{ __( 'Hard Limits — Max 20 results per search query, max 5 posts for full content reading, max 10 tool calls per turn.', 'agent-mod' ) }</li>
+									</ul>
+
+									<Button
+										variant="primary"
+										onClick={ () => dispatch( 'agent-mod/chat' ).openChat() }
+									>
+										{ __( 'Chat with Your Agent', 'agent-mod' ) }
+									</Button>
 								</div>
 							</div>
 							<DashboardSidebar />
