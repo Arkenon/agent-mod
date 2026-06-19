@@ -23,5 +23,10 @@ module.exports = {
 			'src/admin-chat',
 			'index.js'
 		),
+		'dashboard/index': path.resolve(
+			process.cwd(),
+			'src/dashboard',
+			'index.js'
+		),
 	},
 };

@@ -17,28 +17,18 @@ use AgentMod\Common\DI;
 use AgentMod\Presentation\Admin\Controllers\AdminController;
 use AgentMod\Presentation\Admin\Controllers\AIChatRestController;
 use AgentMod\Presentation\Admin\Controllers\AIChatWidgetController;
-use AgentMod\Presentation\Client\Controllers\ClientController;
 
 final class ControllerInit
 {
 
 	/**
-	 * List of controllers to be initialized for Admin
+	 * List of controllers to be initialized for Admin area
 	 * @var array
 	 * @since 1.0.0
 	 */
 	private array $adminControllers =  [
 		AdminController::class,
 		AIChatWidgetController::class,
-	];
-
-	/**
-	 * List of controllers to be initialized for Client
-	 * @var array
-	 * @since 1.0.0
-	 */
-	private array $clientControllers  = [
-		ClientController::class,
 		AIChatRestController::class,
 	];
 
@@ -60,16 +50,11 @@ final class ControllerInit
 	 */
 	public function initControllers()
 	{
-		// Initialize controllers for admin area
+		// Initialize controllers
 		if (is_admin()) {
 			foreach ($this->adminControllers as $controller) {
 				DI::container()->get($controller);
 			}
-		}
-
-		// Initialize controllers for client area
-		foreach ($this->clientControllers as $controller) {
-			DI::container()->get($controller);
 		}
 	}
 }

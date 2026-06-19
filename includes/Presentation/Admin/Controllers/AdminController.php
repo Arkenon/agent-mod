@@ -19,31 +19,48 @@ final class AdminController
 {
 	public function __construct()
 	{
-		add_action('admin_enqueue_scripts', [$this, 'enqueueScripts']);
-		add_action('admin_enqueue_scripts', [$this, 'enqueueStyles']);
+		add_action('admin_enqueue_scripts', [$this, 'enqueueDashboardAssets']);
 		add_action('admin_menu', [$this, 'addMenu']);
 	}
 
 	/**
-	 * Enqueue scripts for the admin area
+	 * Enqueues the dashboard React bundle. Runs only on the agent-mod admin page.
+	 *
+	 * @param string $hookSuffix Current admin page hook suffix.
+	 *
 	 * @return void
 	 * @since 1.0.0
 	 */
-	public function enqueueScripts(): void
+	public function enqueueDashboardAssets(string $hookSuffix): void
 	{
-		//Admin scripts
-		wp_enqueue_script('agent-mod-admin', Constants::INCLUDES_URL . '/Presentation/Admin/Assets/Js/agent-mod-admin.js', array('jquery'), AGENT_MOD_VERSION, true);
-	}
+		if ('toplevel_page_agent-mod' !== $hookSuffix) {
+			return;
+		}
 
-	/**
-	 * Enqueue styles for the admin area
-	 * @return void
-	 * @since 1.0.0
-	 */
-	public function enqueueStyles(): void
-	{
-		//Admin styles
-		wp_enqueue_style('agent-mod-admin', Constants::INCLUDES_URL . '/Presentation/Admin/Assets/Css/agent-mod-admin.css', array(), AGENT_MOD_VERSION);
+		$assetFile = AGENT_MOD_PATH . 'build/dashboard/index.asset.php';
+
+		if (! is_readable($assetFile)) {
+			return;
+		}
+
+		$asset = require $assetFile;
+
+		wp_enqueue_script(
+			'agent-mod-dashboard',
+			AGENT_MOD_URL . 'build/dashboard/index.js',
+			$asset['dependencies'],
+			$asset['version'],
+			true
+		);
+
+		wp_enqueue_style('wp-components');
+
+		wp_enqueue_style(
+			'agent-mod-dashboard',
+			AGENT_MOD_URL . 'build/dashboard/style-index.css',
+			['wp-components'],
+			$asset['version']
+		);
 	}
 
 	/**

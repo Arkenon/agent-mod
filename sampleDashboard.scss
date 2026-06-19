@@ -1,0 +1,68 @@
+.native-custom-fields-dashboard-container {
+    background: #f0f2f5;
+    width: 70%;
+    padding: 10px;
+
+    .native-custom-fields-dashboard {
+        .native-custom-fields-dashboard-header {
+            margin-bottom: 32px;
+        }
+
+        .native-custom-fields-dashboard-layout {
+            display: flex;
+            align-items: flex-start;
+            gap: 24px;
+        }
+
+        .native-custom-fields-dashboard-main {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .native-custom-fields-dashboard-card {
+
+            .native-custom-fields-card-title {
+                margin: 0;
+                font-size: 15px;
+                font-weight: 600;
+            }
+        }
+
+        .native-custom-fields-components-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 8px;
+        }
+
+        .native-custom-fields-component-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: #f6f7f7;
+            border: 1px solid #e2e4e7;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #1e1e1e;
+            line-height: 1.4;
+
+            svg {
+                flex-shrink: 0;
+            }
+        }
+    }
+
+    @media (max-width: 960px) {
+        .native-custom-fields-dashboard-layout {
+            flex-direction: column;
+
+            > div[style] {
+                width: 100% !important;
+            }
+        }
+    }
+
+    @media (max-width: 1400px) {
+        width: 100%;
+    }
+}
