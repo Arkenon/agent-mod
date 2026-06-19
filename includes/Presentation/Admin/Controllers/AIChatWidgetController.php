@@ -77,6 +77,7 @@ final class AIChatWidgetController
 		}
 
 		// Hide the icon on the AgentMod admin page itself.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only URL parameter check to determine current admin page; no form data is processed.
 		$current_page = isset($_GET['page']) ? sanitize_key(wp_unslash($_GET['page'])) : '';
 
 		if ('agent-mod' === $current_page) {
@@ -160,8 +161,11 @@ final class AIChatWidgetController
 					'error'             => __('An unexpected error occurred.', 'agent-mod'),
 					'attach'            => __('Attach files', 'agent-mod'),
 					'removeAttachment'  => __('Remove attachment', 'agent-mod'),
+					/* translators: %s: file name. */
 					'fileTooLarge'      => __('"%s" is too large.', 'agent-mod'),
+					/* translators: %s: file name. */
 					'fileTypeNotAllowed' => __('"%s" is not an allowed file type.', 'agent-mod'),
+					/* translators: %d: maximum number of files allowed. */
 					'tooManyFiles'      => __('You can attach up to %d files.', 'agent-mod'),
 				],
 			]

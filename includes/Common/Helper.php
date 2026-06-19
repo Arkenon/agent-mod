@@ -30,7 +30,7 @@ class Helper
 		$value  = "";
 		$method = strtolower($method);
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- This is a helper method for sanitization, not directly processing form data
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing -- Generic sanitization helper; nonce verification is the caller's responsibility.
 		$input = $method === 'post' ? $_POST : ($method === 'get' ? $_GET : $_REQUEST);
 
 		if (isset($input[$name])) {

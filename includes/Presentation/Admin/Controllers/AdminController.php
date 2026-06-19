@@ -120,7 +120,7 @@ final class AdminController
 		ob_start();
 		try {
 			include Constants::INCLUDES_PATH . 'Presentation/Admin/Views/admin-menu-content.php';
-			echo ob_get_clean();
+			echo ob_get_clean(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Trusted internal admin view template; output is escaped within the template.
 		} catch (Exception $e) {
 			ob_end_clean();
 		}
