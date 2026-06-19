@@ -147,7 +147,7 @@ final class AgentConfig
 		$this->model                  = $model;
 		$this->abilitySource          = in_array($abilitySource, ['all', 'selected'], true) ? $abilitySource : 'all';
 		$this->allowedAbilities       = $allowedAbilities;
-		$this->maxToolCalls           = $maxToolCalls > 0 ? $maxToolCalls : Constants::AI_MAX_TOOL_CALLS;
+		$this->maxToolCalls           = $maxToolCalls > 0 ? $maxToolCalls : Constants::aiMaxToolCalls();
 		$this->autoIncludeSiteContext = $autoIncludeSiteContext;
 	}
 
@@ -183,7 +183,7 @@ final class AgentConfig
 			isset($data['model']) && '' !== $data['model'] ? (string) $data['model'] : null,
 			(string) ($data['abilitySource'] ?? ($data['ability_source'] ?? 'all')),
 			array_values((array) $allowed),
-			(int) ($data['maxToolCalls'] ?? ($data['max_tool_calls'] ?? Constants::AI_MAX_TOOL_CALLS)),
+			(int) ($data['maxToolCalls'] ?? ($data['max_tool_calls'] ?? Constants::aiMaxToolCalls())),
 			(bool) ($data['autoIncludeSiteContext'] ?? ($data['auto_include_site_context'] ?? true))
 		);
 	}

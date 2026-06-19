@@ -97,4 +97,81 @@ class Constants
 		'text/markdown',
 		'text/csv',
 	];
+
+	// -------------------------------------------------------------------------
+	// Filtered getters — use these instead of the raw constants so that
+	// agent-mod-pro (or any third party) can override values via hooks.
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Returns the effective maximum tool-call iterations, after applying the
+	 * `agent_mod_max_tool_calls` filter.
+	 *
+	 * @return int
+	 * @since 1.0.0
+	 */
+	public static function aiMaxToolCalls(): int
+	{
+		return (int) apply_filters('agent_mod_max_tool_calls', self::AI_MAX_TOOL_CALLS);
+	}
+
+	/**
+	 * Returns the effective maximum search results, after applying the
+	 * `agent_mod_max_search_results` filter.
+	 *
+	 * @return int
+	 * @since 1.0.0
+	 */
+	public static function aiMaxSearchResults(): int
+	{
+		return (int) apply_filters('agent_mod_max_search_results', self::AI_MAX_SEARCH_RESULTS);
+	}
+
+	/**
+	 * Returns the effective maximum full-content posts, after applying the
+	 * `agent_mod_max_full_content_posts` filter.
+	 *
+	 * @return int
+	 * @since 1.0.0
+	 */
+	public static function aiMaxFullContentPosts(): int
+	{
+		return (int) apply_filters('agent_mod_max_full_content_posts', self::AI_MAX_FULL_CONTENT_POSTS);
+	}
+
+	/**
+	 * Returns the effective maximum attachment size in bytes, after applying the
+	 * `agent_mod_attachment_max_bytes` filter.
+	 *
+	 * @return int
+	 * @since 1.0.0
+	 */
+	public static function aiAttachmentMaxBytes(): int
+	{
+		return (int) apply_filters('agent_mod_attachment_max_bytes', self::AI_ATTACHMENT_MAX_BYTES);
+	}
+
+	/**
+	 * Returns the effective maximum attachment count per turn, after applying the
+	 * `agent_mod_attachment_max_count` filter.
+	 *
+	 * @return int
+	 * @since 1.0.0
+	 */
+	public static function aiAttachmentMaxCount(): int
+	{
+		return (int) apply_filters('agent_mod_attachment_max_count', self::AI_ATTACHMENT_MAX_COUNT);
+	}
+
+	/**
+	 * Returns the effective list of allowed attachment MIME types, after applying
+	 * the `agent_mod_attachment_mime_types` filter.
+	 *
+	 * @return string[]
+	 * @since 1.0.0
+	 */
+	public static function aiAttachmentMimeTypes(): array
+	{
+		return (array) apply_filters('agent_mod_attachment_mime_types', self::AI_ATTACHMENT_MIME_TYPES);
+	}
 }

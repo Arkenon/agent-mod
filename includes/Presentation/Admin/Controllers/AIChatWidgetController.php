@@ -148,9 +148,9 @@ final class AIChatWidgetController
 				'providers'     => $this->providerInfo->getConnectedProviders(),
 				'connectorsUrl' => admin_url('options-connectors.php'),
 				'attachments'  => [
-					'maxBytes'  => Constants::AI_ATTACHMENT_MAX_BYTES,
-					'maxCount'  => Constants::AI_ATTACHMENT_MAX_COUNT,
-					'mimeTypes' => array_values(Constants::AI_ATTACHMENT_MIME_TYPES),
+					'maxBytes'  => Constants::aiAttachmentMaxBytes(),
+					'maxCount'  => Constants::aiAttachmentMaxCount(),
+					'mimeTypes' => array_values(Constants::aiAttachmentMimeTypes()),
 				],
 				'strings'      => [
 					'title'             => __('AgentMod Assistant', 'agent-mod'),

@@ -158,7 +158,7 @@ class AbilityRegistrarService
 							'type'        => 'integer',
 							'description' => __('How many posts to return (1-20).', 'agent-mod'),
 							'minimum'     => 1,
-							'maximum'     => Constants::AI_MAX_SEARCH_RESULTS,
+							'maximum'     => Constants::aiMaxSearchResults(),
 						],
 					],
 				],
@@ -268,7 +268,7 @@ class AbilityRegistrarService
 		if (is_array($input) && isset($input['count'])) {
 			$count = (int) $input['count'];
 		}
-		$count = max(1, min(Constants::AI_MAX_SEARCH_RESULTS, $count));
+		$count = max(1, min(Constants::aiMaxSearchResults(), $count));
 
 		$posts = get_posts(
 			[

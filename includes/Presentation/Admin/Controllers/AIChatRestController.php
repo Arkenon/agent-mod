@@ -18,8 +18,6 @@ use WP_REST_Request;
 use WP_REST_Response;
 use AgentMod\Common\Constants;
 use AgentMod\Common\Helper;
-use AgentMod\Repositories\AgentRepository;
-use AgentMod\Repositories\ConversationRepository;
 use AgentMod\Services\AI\AIOrchestratorService;
 use AgentMod\Services\AI\ConfirmationStore;
 use AgentMod\Services\AI\ProviderInfoService;
@@ -171,20 +169,21 @@ final class AIChatRestController
 
 		$conversationId = (int) $request->get_param('conversationId');
 
-		// Load history from DB when a conversationId is provided; otherwise use
-		// the client-supplied history for the first turn of a new conversation.
+		// Load history from DB when a conversationId is provided (pro); otherwise
+		// use the client-supplied history for the first turn of a new conversation.
 		if ($conversationId > 0) {
-			$history = $this->conversationRepository->loadHistory($conversationId);
+			$history = (array) apply_filters('agent_mod_load_conversation_history', [], $conversationId);
 		} else {
 			$history        = $request->get_param('history');
 			$history        = is_array($history) ? $this->sanitizeHistory($history) : [];
-			$conversationId = $this->conversationRepository->create(
-				(int) ($agentData['id'] ?? 0),
-				'admin_chat'
-			);
+			$conversationId = (int) apply_filters('agent_mod_create_conversation', 0, (int) ($agentData['id'] ?? 0), 'admin_chat');
 		}
 
+		do_action('agent_mod_before_chat', $agent, $message, $history);
+
 		$response = $this->orchestrator->chat($agent, $message, $history, $attachments);
+
+		do_action('agent_mod_after_chat', $agent, $response, $conversationId);
 
 		if ($response->isError()) {
 			$error  = $response->error;
@@ -202,7 +201,7 @@ final class AIChatRestController
 				['role' => 'user',      'text' => $message,       'attachments' => $attachments],
 				['role' => 'assistant', 'text' => $response->text, 'attachments' => []],
 			];
-			$this->conversationRepository->appendMessages($conversationId, $newTurns);
+			do_action('agent_mod_append_messages', $conversationId, $newTurns);
 		}
 
 		$payload                 = $response->toArray();
@@ -219,7 +218,7 @@ final class AIChatRestController
 	 */
 	public function handleAgents(): WP_REST_Response
 	{
-		return rest_ensure_response($this->agentRepository->all());
+		return rest_ensure_response((array) apply_filters('agent_mod_get_agents', []));
 	}
 
 	/**
@@ -294,7 +293,7 @@ final class AIChatRestController
 				['role' => 'user',      'text' => $message,        'attachments' => $attachments],
 				['role' => 'assistant', 'text' => $response->text,  'attachments' => []],
 			];
-			$this->conversationRepository->appendMessages($conversationId, $newTurns);
+			do_action('agent_mod_append_messages', $conversationId, $newTurns);
 		}
 
 		$payload                 = $response->toArray();
@@ -360,7 +359,7 @@ final class AIChatRestController
 		$clean = [];
 
 		foreach ($raw as $item) {
-			if (count($clean) >= Constants::AI_ATTACHMENT_MAX_COUNT) {
+			if (count($clean) >= Constants::aiAttachmentMaxCount()) {
 				break;
 			}
 
@@ -376,14 +375,14 @@ final class AIChatRestController
 
 			[$mimeType, $base64] = $parsed;
 
-			if (! in_array($mimeType, Constants::AI_ATTACHMENT_MIME_TYPES, true)) {
+			if (! in_array($mimeType, Constants::aiAttachmentMimeTypes(), true)) {
 				continue;
 			}
 
 			// Approximate the decoded size from the base64 length (4 chars -> 3 bytes).
 			$decodedSize = (int) (strlen($base64) * 3 / 4);
 
-			if ($decodedSize > Constants::AI_ATTACHMENT_MAX_BYTES) {
+			if ($decodedSize > Constants::aiAttachmentMaxBytes()) {
 				continue;
 			}
 

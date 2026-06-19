@@ -80,7 +80,9 @@ class PromptBuilder
 			'agent-mod'
 		);
 
-		return implode("\n\n", array_filter($sections));
+		$instruction = implode("\n\n", array_filter($sections));
+
+		return (string) apply_filters('agent_mod_system_prompt', $instruction, $agent);
 	}
 
 	/**

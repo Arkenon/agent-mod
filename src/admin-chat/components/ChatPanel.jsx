@@ -6,7 +6,7 @@
  * can be dropped into a modal, a full admin page, a sidebar, or any other
  * container as-is — plug-and-play, no extra wiring required.
  */
-import { Notice } from '@wordpress/components';
+import { Notice, Slot, SlotFillProvider } from '@wordpress/components';
 import { useDispatch, useSelect } from '@wordpress/data';
 
 import { STORE_NAME } from '../store';
@@ -24,16 +24,22 @@ export default function ChatPanel( { className = '' } ) {
 	}, [] );
 
 	return (
-		<div className={ `agent-mod-chat__body ${ className }`.trim() }>
-			{ error && (
-				<Notice status="error" isDismissible onRemove={ clearError }>
-					{ error }
-				</Notice>
-			) }
+		<SlotFillProvider>
+			<div className={ `agent-mod-chat__body ${ className }`.trim() }>
+				<Slot name="AgentModChatHeader" />
 
-			<ConfirmationModal />
-			<MessageList />
-			<Composer />
-		</div>
+				{ error && (
+					<Notice status="error" isDismissible onRemove={ clearError }>
+						{ error }
+					</Notice>
+				) }
+
+				<ConfirmationModal />
+				<MessageList />
+				<Composer />
+
+				<Slot name="AgentModComposerToolbar" />
+			</div>
+		</SlotFillProvider>
 	);
 }

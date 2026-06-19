@@ -6,6 +6,7 @@
  * @wordpress/data stores.
  */
 import apiFetch from '@wordpress/api-fetch';
+import { applyFilters, doAction } from '@wordpress/hooks';
 import { __ } from '@wordpress/i18n';
 
 export function openChat() {
@@ -33,6 +34,7 @@ export function clearError() {
 }
 
 export function clearMessages() {
+	doAction( 'agent_mod.new_conversation' );
 	return { type: 'CLEAR_MESSAGES' };
 }
 
@@ -53,6 +55,7 @@ export function selectAgent( agentId ) {
 }
 
 export function setPendingConfirmation( data ) {
+	doAction( 'agent_mod.confirmation_requested', data );
 	return { type: 'SET_PENDING_CONFIRMATION', data };
 }
 
@@ -236,19 +239,27 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 	dispatch.setLoading( true );
 
 	try {
-		const data = await apiFetch( {
+		const basePayload = {
+			message: trimmed,
+			agent,
+			history,
+			attachments: files.map( toWireAttachment ),
+			conversationId: select.getConversationId(),
+		};
+
+		const payload = applyFilters( 'agent_mod.send_message_payload', basePayload );
+
+		const rawData = await apiFetch( {
 			path: config.restPath,
 			method: 'POST',
-			data: {
-				message: trimmed,
-				agent,
-				history,
-				attachments: files.map( toWireAttachment ),
-				conversationId: select.getConversationId(),
-			},
+			data: payload,
 		} );
 
+		const data = applyFilters( 'agent_mod.receive_message_response', rawData );
+
 		if ( data && data.success ) {
+			doAction( 'agent_mod.after_message_sent', data, agent );
+
 			if ( data.pendingConfirmation ) {
 				// A write action needs user confirmation before executing.
 				dispatch.setPendingConfirmation( {

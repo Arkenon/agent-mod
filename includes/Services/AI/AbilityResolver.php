@@ -34,11 +34,11 @@ class AbilityResolver
 			return [];
 		}
 
-		if ('selected' === $agent->abilitySource) {
-			return $this->resolveSelected($agent->allowedAbilities);
-		}
+		$abilities = 'selected' === $agent->abilitySource
+			? $this->resolveSelected($agent->allowedAbilities)
+			: array_values(wp_get_abilities());
 
-		return array_values(wp_get_abilities());
+		return (array) apply_filters('agent_mod_resolved_abilities', $abilities, $agent);
 	}
 
 	/**

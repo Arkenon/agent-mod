@@ -17,6 +17,9 @@ import { dispatch } from '@wordpress/data';
 import { STORE_NAME } from './store';
 import ChatApp from './components/ChatApp';
 import ChatPanel from './components/ChatPanel';
+import Composer from './components/Composer';
+import MessageList from './components/MessageList';
+import ConfirmationModal from './components/ConfirmationModal';
 import './style.scss';
 
 /**
@@ -80,4 +83,16 @@ function bindToolbar() {
 document.addEventListener( 'DOMContentLoaded', () => {
 	mountApp();
 	bindToolbar();
+} );
+
+// Public API — exposes components and store name for agent-mod-pro and third-party
+// plugins. Import with `import { ChatPanel } from '@agent-mod/components'` (after
+// configuring the webpack external) or access via `window.agentMod` directly.
+window.agentMod = window.agentMod || {};
+Object.assign( window.agentMod, {
+	ChatPanel,
+	Composer,
+	MessageList,
+	ConfirmationModal,
+	storeName: STORE_NAME,
 } );
