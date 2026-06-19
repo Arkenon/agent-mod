@@ -1,6 +1,8 @@
 /**
  * AgentMod global admin styles.
- *
- * Page-specific styles live in the webpack build (build/dashboard/style-index.css,
- * build/admin-chat/style-index.css) and are enqueued conditionally per page.
  */
+
+#adminmenu .wp-menu-image img {
+	height: 22px !important;
+	padding: 6px 0 0 !important;
+}

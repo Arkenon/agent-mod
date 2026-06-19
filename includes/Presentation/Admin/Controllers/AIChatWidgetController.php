@@ -83,7 +83,8 @@ final class AIChatWidgetController
 			return;
 		}
 
-		$title = '<span class="ab-icon" aria-hidden="true"></span>'
+		$iconUrl = esc_url(AGENT_MOD_URL . 'includes/Presentation/Admin/Assets/img/agent_mod_icon.png');
+		$title = '<img src="' . $iconUrl . '" alt="" aria-hidden="true" style="width:20px;height:20px;vertical-align:middle;margin-right:4px;margin-top:-1px;" />'
 			. '<span class="ab-label">' . esc_html__('Assistant', 'agent-mod') . '</span>';
 
 		$wp_admin_bar->add_node(

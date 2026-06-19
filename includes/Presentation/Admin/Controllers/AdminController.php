@@ -19,8 +19,30 @@ final class AdminController
 {
 	public function __construct()
 	{
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueueScripts' ] );
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueueStyles' ] );
 		add_action('admin_enqueue_scripts', [$this, 'enqueueDashboardAssets']);
 		add_action('admin_menu', [$this, 'addMenu']);
+	}
+
+	/**
+	 * Enqueue scripts for the admin area
+	 * @return void
+	 * @since 1.0.0
+	 */
+	public function enqueueScripts(): void {
+		//Admin scripts
+		wp_enqueue_script( 'agent-mod-admin', Constants::INCLUDES_URL . '/Presentation/Admin/Assets/Js/agent-mod-admin.js', array( 'jquery' ), AGENT_MOD_VERSION, true );
+	}
+
+	/**
+	 * Enqueue styles for the admin area
+	 * @return void
+	 * @since 1.0.0
+	 */
+	public function enqueueStyles(): void {
+		//Admin styles
+		wp_enqueue_style( 'agent-mod-admin', Constants::INCLUDES_URL . '/Presentation/Admin/Assets/Css/agent-mod-admin.css', array(), AGENT_MOD_VERSION );
 	}
 
 	/**
@@ -61,6 +83,14 @@ final class AdminController
 			['wp-components'],
 			$asset['version']
 		);
+
+		wp_localize_script(
+			'agent-mod-dashboard',
+			'agentModDashboard',
+			[
+				'logoUrl' => AGENT_MOD_URL . 'includes/Presentation/Admin/Assets/img/agent_mod_logo.jpg',
+			]
+		);
 	}
 
 	/**
@@ -76,7 +106,7 @@ final class AdminController
 			'manage_options',
 			'agent-mod',
 			[$this, 'renderDashboard'],
-			'dashicons-admin-generic',
+			AGENT_MOD_URL . 'includes/Presentation/Admin/Assets/img/agent_mod_colored_icon.png'
 		);
 	}
 

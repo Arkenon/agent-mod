@@ -23,7 +23,11 @@ function DashboardSidebar() {
 				<CardBody>
 					<VStack spacing={ 3 }>
 						<div style={ { textAlign: 'center', padding: '8px 0' } }>
-							<div className="agent-mod-dashboard__logo-placeholder" />
+							<img
+								src={ window.agentModDashboard?.logoUrl || '' }
+								alt="AgentMod"
+								style={ { maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto', borderRadius: '6px' } }
+							/>
 						</div>
 						<p style={ { margin: 0, fontSize: '13px', color: '#646970', lineHeight: 1.6 } }>
 							{ __( 'AgentMod brings AI-powered assistant capabilities to WordPress, connecting your site to AI providers through a clean, extensible hook system.', 'agent-mod' ) }
