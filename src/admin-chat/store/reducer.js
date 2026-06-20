@@ -1,6 +1,8 @@
 /**
  * Pure reducer for the admin-chat store.
  */
+import { loadProviderModels } from './persistence';
+
 const DEFAULT_STATE = {
 	isOpen: false,
 	messages: [],
@@ -13,7 +15,9 @@ const DEFAULT_STATE = {
 	pendingConfirmation: null, // { token, actionName, args, pendingToolCalls }
 	selectedProvider: null, // provider id chosen in the provider/model picker
 	selectedModel: null, // model id chosen for the selected provider
-	providerModels: {}, // providerId -> [{ id, name }] (lazily fetched)
+	// providerId -> [{ id, name }]. Hydrated from localStorage so the picker is
+	// populated instantly across page loads; refreshed by the background prefetch.
+	providerModels: loadProviderModels(),
 	modelsLoading: null, // providerId currently being fetched, or null
 };
 

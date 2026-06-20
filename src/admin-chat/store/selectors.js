@@ -50,6 +50,10 @@ export function getProviderModels( state, providerId ) {
 	return state.providerModels[ providerId ] || null;
 }
 
+export function getProviderModelsMap( state ) {
+	return state.providerModels;
+}
+
 export function getModelsLoading( state ) {
 	return state.modelsLoading;
 }

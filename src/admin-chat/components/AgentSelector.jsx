@@ -13,49 +13,49 @@ import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 
 export default function AgentSelector() {
-	const { fetchAgents, selectAgent } = useDispatch( STORE_NAME );
+	const { fetchAgents, selectAgent } = useDispatch(STORE_NAME);
 
 	// Local fetch state so the selector's spinner reflects *its own* agent
 	// load, not the shared chat isLoading flag (which message sends also set).
-	const [ fetching, setFetching ] = useState( false );
+	const [fetching, setFetching] = useState(false);
 
-	const { agents, selectedAgentId, loading } = useSelect( ( select ) => {
-		const storeSelect = select( STORE_NAME );
+	const { agents, selectedAgentId, loading } = useSelect((select) => {
+		const storeSelect = select(STORE_NAME);
 		return {
-			agents:          storeSelect.getAgents(),
+			agents: storeSelect.getAgents(),
 			selectedAgentId: storeSelect.getSelectedAgentId(),
-			loading:         storeSelect.isLoading(),
+			loading: storeSelect.isLoading(),
 		};
-	}, [] );
+	}, []);
 
-	useEffect( () => {
-		if ( 0 === agents.length ) {
-			setFetching( true );
-			Promise.resolve( fetchAgents() ).finally( () => setFetching( false ) );
+	useEffect(() => {
+		if (0 === agents.length) {
+			setFetching(true);
+			Promise.resolve(fetchAgents()).finally(() => setFetching(false));
 		}
-	}, [] ); // eslint-disable-line react-hooks/exhaustive-deps
+	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-	if ( 0 === agents.length ) {
-		return fetching ? <Spinner /> : null;
+	if (0 === agents.length) {
+		return fetching ? "" : null;
 	}
 
 	const options = [
-		{ label: __( '— Default Agent —', 'agent-mod' ), value: '' },
-		...agents.map( ( agent ) => ( {
+		{ label: __('— Default Agent —', 'agent-mod'), value: '' },
+		...agents.map((agent) => ({
 			label: agent.name,
-			value: String( agent.id ),
-		} ) ),
+			value: String(agent.id),
+		})),
 	];
 
 	return (
 		<div className="agent-mod-chat__agent-selector">
 			<SelectControl
-				label={ __( 'Agent', 'agent-mod' ) }
+				label={__('Agent', 'agent-mod')}
 				hideLabelFromVision
-				value={ selectedAgentId ? String( selectedAgentId ) : '' }
-				options={ options }
-				onChange={ ( value ) => selectAgent( value ? parseInt( value, 10 ) : null ) }
-				disabled={ loading }
+				value={selectedAgentId ? String(selectedAgentId) : ''}
+				options={options}
+				onChange={(value) => selectAgent(value ? parseInt(value, 10) : null)}
+				disabled={loading}
 				__nextHasNoMarginBottom
 			/>
 		</div>

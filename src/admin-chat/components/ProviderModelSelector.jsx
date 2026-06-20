@@ -8,8 +8,8 @@
  *
  * An "Auto" entry clears the selection and lets the AI Client auto-select.
  */
-import { useState } from '@wordpress/element';
-import { Dropdown, Button, Spinner } from '@wordpress/components';
+import { useEffect, useState } from '@wordpress/element';
+import { Dropdown, Button } from '@wordpress/components';
 import { useDispatch, useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
 
@@ -39,6 +39,15 @@ export default function ProviderModelSelector() {
 			loading: activeProvider === storeSelect.getModelsLoading(),
 		};
 	}, [ activeProvider ] );
+
+	// Warm the cache in the background as soon as the panel mounts, so the picker
+	// shows models instantly (no spinner) when the user opens it. Providers whose
+	// models are already cached (in the store or hydrated from localStorage) are a
+	// no-op inside the thunk, so this is cheap to run on every open.
+	useEffect( () => {
+		providers.forEach( ( provider ) => fetchProviderModels( provider.id ) );
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [] );
 
 	// No provider connected: link to the Connectors settings screen.
 	if ( 0 === providers.length ) {
@@ -134,8 +143,6 @@ export default function ProviderModelSelector() {
 							</p>
 						) }
 
-						{ activeProvider && loading && <Spinner /> }
-
 						{ activeProvider && ! loading && Array.isArray( models ) &&
 							0 === models.length && (
 								<p className="agent-mod-chat__model-hint">
@@ -143,7 +150,7 @@ export default function ProviderModelSelector() {
 								</p>
 							) }
 
-						{ activeProvider && ! loading && Array.isArray( models ) &&
+						{ activeProvider && Array.isArray( models ) &&
 							models.map( ( model ) => (
 								<Button
 									key={ model.id }
