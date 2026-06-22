@@ -1,13 +1,20 @@
 /**
  * A single chat message bubble, styled by role (user/assistant).
  *
- * Renders any attachments above the text: images as thumbnails, other files as
- * labelled chips. A message with attachments but no text shows no empty bubble.
+ * Renders any attachments above the message content. Text is rendered via
+ * MessageContent (markdown-aware for assistant messages) and action buttons
+ * (copy, create draft) via MessageActions.
+ *
+ * @package    AgentMod
+ * @subpackage AdminChat/Components
+ * @since      1.0.0
  */
+import MessageContent from './MessageContent';
+import MessageActions from './MessageActions';
+
 export default function MessageItem( { message } ) {
 	const role = 'assistant' === message.role ? 'assistant' : 'user';
 	const attachments = message.attachments || [];
-	const hasText = '' !== ( message.text || '' );
 
 	return (
 		<div
@@ -41,11 +48,11 @@ export default function MessageItem( { message } ) {
 					</ul>
 				) }
 
-				{ hasText && (
-					<div className="agent-mod-chat__bubble">
-						{ message.text }
-					</div>
+				{ !! ( message.text || '' ) && (
+					<MessageContent message={ message } />
 				) }
+
+				<MessageActions message={ message } />
 			</div>
 		</div>
 	);

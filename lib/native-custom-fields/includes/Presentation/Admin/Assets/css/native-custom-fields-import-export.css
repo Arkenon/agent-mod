@@ -1,0 +1,199 @@
+/**
+ * @package NativeCustomFields
+ * @subpackage Presentation\Admin\Assets
+ * @since 1.0.5
+ */
+
+.native-custom-fields-import-export-container {
+	max-width: 1200px;
+	margin: 20px 20px 0 0;
+	background: #fff;
+	padding: 20px;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.native-custom-fields-import-export-container h1 {
+	font-size: 23px;
+	font-weight: 400;
+	margin: 0 0 15px 0;
+	padding: 0;
+	line-height: 1.3;
+	color: #23282d;
+}
+
+.native-custom-fields-import-export-container > p {
+	margin: 0 0 20px 0;
+	color: #646970;
+	font-size: 13px;
+}
+
+.native-custom-fields-import-export-options {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 30px;
+	margin-top: 25px;
+}
+
+@media screen and (max-width: 782px) {
+	.native-custom-fields-import-export-options {
+		grid-template-columns: 1fr;
+	}
+}
+
+.native-custom-fields-export-section,
+.native-custom-fields-import-section {
+	border: 1px solid #c3c4c7;
+	background: #fff;
+	padding: 20px;
+	border-radius: 3px;
+}
+
+.native-custom-fields-export-section h2,
+.native-custom-fields-import-section h2 {
+	margin: 0 0 15px 0;
+	font-size: 18px;
+	font-weight: 600;
+	color: #1d2327;
+	padding-bottom: 10px;
+	border-bottom: 1px solid #dcdcde;
+}
+
+.native-custom-fields-export-section form,
+.native-custom-fields-import-section form {
+	display: flex;
+	flex-direction: column;
+	gap: 15px;
+}
+
+.native-custom-fields-export-section label,
+.native-custom-fields-import-section label {
+	font-weight: 600;
+	color: #1d2327;
+	font-size: 14px;
+	margin: 0;
+}
+
+#native_custom_fields_export_forms {
+	width: 100%;
+	min-height: 120px;
+	padding: 8px;
+	border: 1px solid #8c8f94;
+	border-radius: 3px;
+	font-size: 14px;
+	line-height: 1.5;
+	background-color: #fff;
+	color: #2c3338;
+	box-shadow: inset 0 0 0 transparent;
+	transition: border-color 0.05s ease-in-out;
+}
+
+#native_custom_fields_export_forms:focus {
+	border-color: #2271b1;
+	outline: 2px solid transparent;
+	box-shadow: 0 0 0 1px #2271b1;
+}
+
+#native_custom_fields_export_forms option {
+	padding: 6px 8px;
+}
+
+#native_custom_fields_export_forms option:hover {
+	background-color: #f0f0f1;
+}
+
+input[type="file"] {
+	width: 100%;
+	padding: 10px;
+	border: 2px dashed #c3c4c7;
+	border-radius: 3px;
+	background-color: #f6f7f7;
+	cursor: pointer;
+	font-size: 14px;
+	transition: all 0.2s ease;
+}
+
+input[type="file"]:hover {
+	border-color: #2271b1;
+	background-color: #f0f6fc;
+}
+
+input[type="file"]:focus {
+	outline: 2px solid #2271b1;
+	outline-offset: 2px;
+}
+
+.button {
+	display: inline-block;
+	text-decoration: none;
+	font-size: 13px;
+	line-height: 2.15384615;
+	min-height: 30px;
+	margin: 0;
+	padding: 0 10px;
+	cursor: pointer;
+	border-width: 1px;
+	border-style: solid;
+	border-radius: 3px;
+	white-space: nowrap;
+	box-sizing: border-box;
+	align-self: flex-start;
+}
+
+.button-primary {
+	background: #2271b1;
+	border-color: #2271b1;
+	color: #fff;
+	font-weight: 600;
+}
+
+.button-primary:hover {
+	background: #135e96;
+	border-color: #135e96;
+	color: #fff;
+}
+
+.button-primary:focus {
+	background: #135e96;
+	border-color: #0a4b78;
+	color: #fff;
+	box-shadow: 0 0 0 1px #fff, 0 0 0 3px #2271b1;
+	outline: 2px solid transparent;
+}
+
+.button-secondary {
+	background: #f6f7f7;
+	border-color: #2c3338;
+	color: #2c3338;
+}
+
+.button-secondary:hover {
+	background: #f0f0f1;
+	border-color: #1d2327;
+	color: #000;
+}
+
+.button-secondary:focus {
+	background: #f6f7f7;
+	border-color: #2271b1;
+	color: #0a4b78;
+	box-shadow: 0 0 0 1px #fff, 0 0 0 3px #2271b1;
+	outline: 2px solid transparent;
+}
+
+/* Hide hidden inputs */
+input[type="hidden"] {
+	display: none;
+}
+
+/* Responsive layout */
+@media screen and (max-width: 600px) {
+	.native-custom-fields-import-export-container {
+		margin: 10px 10px 0 0;
+		padding: 15px;
+	}
+
+	.native-custom-fields-export-section,
+	.native-custom-fields-import-section {
+		padding: 15px;
+	}
+}

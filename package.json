@@ -15,6 +15,12 @@
 		"start": "wp-scripts start"
 	},
 	"devDependencies": {
+		"@wordpress/dataviews": "^16.0.1",
 		"@wordpress/scripts": "^32.4.0"
+	},
+	"dependencies": {
+		"react-markdown": "^8.0.7",
+		"react-syntax-highlighter": "^15.6.6",
+		"remark-gfm": "^3.0.1"
 	}
 }

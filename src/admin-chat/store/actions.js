@@ -205,12 +205,15 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 	const config = window.agentModChat || {};
 
 	// Build history from the messages present *before* this new turn.
+	// Spread `...rest` so Pro can persist extra fields (e.g. structured_data)
+	// that survive the round-trip through the DB and the sanitizeHistory filter.
 	const history = select
 		.getMessages()
-		.map( ( { role, text: messageText, attachments: turnFiles } ) => ( {
+		.map( ( { role, text: messageText, attachments: turnFiles, ...rest } ) => ( {
 			role,
 			text: messageText,
 			attachments: ( turnFiles || [] ).map( toWireAttachment ),
+			...rest,
 		} ) );
 
 	// Use the selected agent config if available; fall back to defaultAgent.

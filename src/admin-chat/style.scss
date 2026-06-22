@@ -58,8 +58,12 @@
 	padding: 10px 14px;
 	border-radius: 14px;
 	line-height: 1.5;
-	white-space: pre-wrap;
 	word-break: break-word;
+}
+
+// User messages keep pre-wrap (plain text, no markdown parsing).
+.agent-mod-chat__bubble--user {
+	white-space: pre-wrap;
 }
 
 .agent-mod-chat__message--user .agent-mod-chat__bubble {
@@ -72,6 +76,211 @@
 	background: #f0f0f1;
 	color: #1e1e1e;
 	border-bottom-left-radius: 4px;
+}
+
+// Markdown content styles inside assistant bubbles.
+.agent-mod-chat__bubble--markdown {
+	> * {
+		&:first-child {
+			margin-top: 0;
+		}
+
+		&:last-child {
+			margin-bottom: 0;
+		}
+	}
+
+	p {
+		margin: 0 0 0.65em;
+	}
+
+	h1, h2, h3, h4, h5, h6 {
+		margin: 0.8em 0 0.4em;
+		font-weight: 600;
+		line-height: 1.3;
+	}
+
+	h1 { font-size: 1.25em; }
+	h2 { font-size: 1.15em; }
+	h3 { font-size: 1.05em; }
+
+	ul, ol {
+		margin: 0 0 0.65em;
+		padding-left: 1.5em;
+	}
+
+	li {
+		margin-bottom: 0.2em;
+	}
+
+	blockquote {
+		margin: 0.5em 0;
+		padding: 4px 12px;
+		border-left: 3px solid #a0aab4;
+		color: #50575e;
+	}
+
+	a {
+		color: #2271b1;
+		text-decoration: underline;
+	}
+
+	// Inline code — scoped to the .agent-mod-inline-code class so the `code`
+	// element inside SyntaxHighlighter blocks is never accidentally restyled.
+	// (SyntaxHighlighter applies its theme via inline styles; CSS class rules
+	// with lower specificity would still cascade and conflict with background/color.)
+	.agent-mod-inline-code {
+		padding: 1px 5px;
+		background: #e4e6ea;
+		border-radius: 4px;
+		font-family: monospace;
+		font-size: 0.9em;
+	}
+
+	// Tables (GFM).
+	table {
+		border-collapse: collapse;
+		width: 100%;
+		margin: 0.65em 0;
+		font-size: 0.9em;
+	}
+
+	th, td {
+		padding: 5px 10px;
+		border: 1px solid #dcdcde;
+		text-align: left;
+	}
+
+	th {
+		background: #e4e6ea;
+		font-weight: 600;
+	}
+
+	tr:nth-child(even) td {
+		background: #f6f7f7;
+	}
+
+	// Strikethrough (GFM).
+	del {
+		color: #757575;
+	}
+}
+
+// Fenced code block container (rendered by CodeBlock.jsx).
+.agent-mod-code-block {
+	margin: 0.65em 0;
+	border-radius: 6px;
+	overflow: hidden;
+	font-size: 0.9em;
+
+	&__header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 5px 12px;
+		// Matches Dracula theme background (#282a36) for a seamless header.
+		background: #21222c;
+	}
+
+	&__lang {
+		color: #6272a4;
+		font-family: monospace;
+		font-size: 11px;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	&__copy {
+		background: transparent;
+		border: 1px solid #44475a;
+		color: #f8f8f2;
+		padding: 2px 8px;
+		border-radius: 4px;
+		font-size: 11px;
+		cursor: pointer;
+		transition: background 0.15s;
+
+		&:hover {
+			background: #44475a;
+		}
+	}
+}
+
+// Icon action buttons below assistant messages.
+.agent-mod-message-actions {
+	margin-top: 4px;
+
+	&__buttons {
+		display: flex;
+		gap: 2px;
+	}
+
+	// Icon-only square button — label shown via WP Tooltip on hover.
+	&__btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 26px;
+		height: 26px;
+		padding: 0;
+		background: transparent;
+		border: 1px solid transparent;
+		border-radius: 4px;
+		color: #8c8f94;
+		cursor: pointer;
+		transition: background 0.12s, border-color 0.12s, color 0.12s;
+
+		.dashicons {
+			font-size: 15px;
+			width: 15px;
+			height: 15px;
+			line-height: 1;
+		}
+
+		&:hover:not(:disabled) {
+			background: #e8e8e8;
+			border-color: #c8c8c8;
+			color: #1e1e1e;
+		}
+
+		&:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
+		}
+	}
+
+	&__notice {
+		margin-top: 5px;
+		padding: 4px 9px;
+		border-radius: 4px;
+		font-size: 12px;
+
+		&.is-success {
+			background: #d1e7dd;
+			color: #0a3622;
+
+			a {
+				color: #0a3622;
+				font-weight: 600;
+			}
+		}
+
+		&.is-error {
+			background: #f8d7da;
+			color: #58151c;
+		}
+	}
+}
+
+// Spin animation for the loading dashicon in MessageActions.
+@keyframes agent-mod-spin {
+	from { transform: rotate( 0deg ); }
+	to   { transform: rotate( 360deg ); }
+}
+
+.agent-mod-spin {
+	display: inline-block;
+	animation: agent-mod-spin 1s linear infinite;
 }
 
 .agent-mod-chat__loading {

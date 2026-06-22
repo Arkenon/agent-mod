@@ -15,6 +15,7 @@ use Exception;
 use AgentMod\Services\AbilityRegistrarService;
 use AgentMod\Common\DI;
 use AgentMod\Presentation\ControllerInit;
+use AgentMod\Services\LibraryService;
 
 defined('ABSPATH') || exit;
 
@@ -28,6 +29,7 @@ final class App
 	 */
 	private array $services = [
 		AbilityRegistrarService::class,
+		LibraryService::class
 	];
 
 	/**

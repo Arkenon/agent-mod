@@ -326,11 +326,22 @@ final class AIChatRestController
 				continue;
 			}
 
-			$turns[] = [
+			$sanitizedTurn = [
 				'role'        => sanitize_key($turn['role'] ?? 'user'),
 				'text'        => $text,
 				'attachments' => $attachments,
 			];
+
+			/**
+			 * Allows Pro to merge extra sanitized fields (e.g. structured_data) into
+			 * a history turn before it enters the orchestration pipeline.
+			 *
+			 * @param array $sanitizedTurn Sanitized turn with role/text/attachments.
+			 * @param array $turn          Raw turn from the request payload.
+			 *
+			 * @since 1.0.0
+			 */
+			$turns[] = apply_filters('agent_mod_sanitize_history_turn', $sanitizedTurn, $turn);
 		}
 
 		return $turns;

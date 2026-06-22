@@ -28,5 +28,10 @@ module.exports = {
 			'src/dashboard',
 			'index.js'
 		),
+		'ability-list/index': path.resolve(
+			process.cwd(),
+			'src/ability-list',
+			'index.js'
+		),
 	},
 };

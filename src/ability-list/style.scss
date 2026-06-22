@@ -1,0 +1,175 @@
+/**
+ * Abilities admin page styles.
+ *
+ * The @wordpress/dataviews CSS is pulled in via sass-loader so it ends up in
+ * the same extracted CSS bundle (build/ability-list/style-index.css).
+ */
+@import "~@wordpress/dataviews/build-style/style";
+
+.agent-mod-abilities {
+	max-width: 1200px;
+	padding: 20px 0;
+
+	&__title {
+		margin-bottom: 16px;
+	}
+
+	&__notice {
+		margin: 0 0 16px;
+	}
+
+	&__badge {
+		display: inline-block;
+		padding: 2px 7px;
+		border-radius: 10px;
+		font-size: 11px;
+		font-weight: 600;
+
+		&--danger {
+			background: #fce7e7;
+			color: #8a1515;
+		}
+	}
+
+	// Primary-style override for DataViews action buttons (Details).
+	// DataViews renders isPrimary actions via ButtonTrigger without a variant prop,
+	// so the WP Button defaults to ghost style. Force blue filled appearance here.
+	// DataViews also hides action buttons (opacity:0) until row hover — override
+	// that so the Details button is always visible.
+	.dataviews-item-actions .components-button.is-compact {
+		background: #2271b1;
+		border: 1px solid #2271b1;
+		color: #fff;
+		opacity: 1 !important;
+
+		&:hover:not( :disabled ) {
+			background: #135e96;
+			border-color: #135e96;
+			color: #fff;
+		}
+
+		&:focus-visible {
+			box-shadow: 0 0 0 2px #fff, 0 0 0 4px #2271b1;
+			color: #fff;
+		}
+	}
+
+	// Truncate long description text so it doesn't bleed into adjacent columns.
+	&__description {
+		display: block;
+		overflow: hidden;
+		white-space: pre-wrap;
+		max-width: 500px;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Details modal
+// ---------------------------------------------------------------------------
+.agent-mod-ability-details {
+	padding: 4px 0 8px;
+
+	&__section {
+		margin-bottom: 24px;
+
+		&:last-child {
+			margin-bottom: 0;
+		}
+	}
+
+	&__lead {
+		color: #50575e;
+		margin: 0 0 16px;
+		line-height: 1.6;
+	}
+
+	&__heading {
+		font-size: 13px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: #50575e;
+		margin: 0 0 10px;
+		padding-bottom: 6px;
+		border-bottom: 1px solid #e0e0e0;
+	}
+
+	// Simple definition list for name/category and annotations.
+	&__dl {
+		margin: 0;
+		display: grid;
+		grid-template-columns: max-content 1fr;
+		column-gap: 16px;
+		row-gap: 6px;
+
+		dt {
+			font-weight: 600;
+			color: #1e1e1e;
+			white-space: nowrap;
+		}
+
+		dd {
+			margin: 0;
+			color: #3c434a;
+
+			code {
+				background: #f0f0f1;
+				padding: 1px 6px;
+				border-radius: 3px;
+				font-size: 12px;
+			}
+		}
+
+		// 2-column layout for annotations (label : value pairs side by side).
+		&--grid {
+			grid-template-columns: 120px 1fr;
+		}
+	}
+
+	// Schema properties table.
+	&__schema-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 13px;
+
+		th {
+			text-align: left;
+			padding: 6px 10px;
+			background: #f6f7f7;
+			border: 1px solid #dcdcde;
+			font-weight: 600;
+			color: #1e1e1e;
+		}
+
+		td {
+			padding: 6px 10px;
+			border: 1px solid #dcdcde;
+			vertical-align: top;
+			color: #3c434a;
+
+			code {
+				background: #f0f0f1;
+				padding: 1px 5px;
+				border-radius: 3px;
+				font-size: 12px;
+			}
+		}
+
+		tr:nth-child(even) td {
+			background: #f9f9f9;
+		}
+	}
+
+	// Raw JSON fallback for schemas without named properties.
+	&__json {
+		background: #f6f7f7;
+		border: 1px solid #dcdcde;
+		border-radius: 4px;
+		padding: 12px;
+		font-size: 12px;
+		line-height: 1.6;
+		overflow-x: auto;
+		white-space: pre;
+		margin: 0;
+	}
+}

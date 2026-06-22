@@ -15,6 +15,7 @@ defined('ABSPATH') || exit;
 use Exception;
 use AgentMod\Common\DI;
 use AgentMod\Presentation\Admin\Controllers\AdminController;
+use AgentMod\Presentation\Admin\Controllers\AbilitiesController;
 use AgentMod\Presentation\Admin\Controllers\AIChatRestController;
 use AgentMod\Presentation\Admin\Controllers\AIChatWidgetController;
 
@@ -29,6 +30,7 @@ final class ControllerInit
 	private array $adminControllers =  [
 		AdminController::class,
 		AIChatWidgetController::class,
+		AbilitiesController::class,
 	];
 
 	/**
