@@ -296,15 +296,26 @@ class OptionsController
             $menuModel = OptionMenuModel::fromArray($menu, $menu_slug);
 
             //Add menu pages into admin menu
-            add_menu_page(
-                $menuModel->page_title,
-                $menuModel->menu_title,
-                $menuModel->capability,
-                $menu_slug,
-                [$this, 'renderPage'], //Always use default callback
-                $menuModel->icon_url,
-                $menuModel->position
-            );
+            if (!empty($menuModel->parent_slug)) {
+                add_submenu_page(
+                    $menuModel->parent_slug,
+                    $menuModel->page_title,
+                    $menuModel->menu_title ?: $menuModel->page_title,
+                    $menuModel->capability,
+                    $menu_slug,
+                    [$this, 'renderPage']
+                );
+            } else {
+                add_menu_page(
+                    $menuModel->page_title,
+                    $menuModel->menu_title,
+                    $menuModel->capability,
+                    $menu_slug,
+                    [$this, 'renderPage'],
+                    $menuModel->icon_url,
+                    $menuModel->position
+                );
+            }
         }
     }
 
@@ -316,8 +327,7 @@ class OptionsController
      */
     public function renderPage()
     {
-        $screen = get_current_screen();
-        $menu_slug = str_replace('toplevel_page_', '', $screen->id);
+        $menu_slug = Helper::sanitize('page', 'get');
 
         $html = '<div class="native-custom-fields-wrapper" data-menu="' . esc_attr($menu_slug) . '" data-page-title="' . esc_attr(get_admin_page_title()) . '"></div>';
         echo wp_kses_post($html);

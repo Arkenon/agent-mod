@@ -77,7 +77,14 @@ class TermMetaFieldsAbilitiesService
             'input_schema'        => $save_schema,
             'output_schema'       => $response_schema,
             'permission_callback' => $permission,
-            'meta'                => ['show_in_rest' => true, 'mcp' => ['public' => true]],
+            'meta'                => [
+                'show_in_rest' => true,
+                'mcp'          => ['public' => true],
+                'annotations'  => [
+                    'destructive' => false,
+                    'idempotent'  => true,
+                ],
+            ],
         ]);
     }
 

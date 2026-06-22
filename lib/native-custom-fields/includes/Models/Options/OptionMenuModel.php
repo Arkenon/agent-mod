@@ -23,6 +23,7 @@ class OptionMenuModel
 	public string $layout = '';
 	/**@var ?int|?float $position */
 	public $position = 60;
+	public string $parent_slug = '';
 	public string $created_by = 'external_plugin';
 	public array $sections = [];
 	public array $values = [];
@@ -47,6 +48,7 @@ class OptionMenuModel
 		$model->icon_url     = $data['icon_url'] ?? 'dashicons-admin-generic';
 		$model->layout       = $data['layout'] ?? '';
 		$model->position     = $data['position'] ?? 60;
+		$model->parent_slug  = $data['parent_slug'] ?? '';
 		$model->created_by   = $data['created_by'] ?? 'external_plugin';
 		$model->sections     = $data['sections'] ?? [];
 		$model->values       = $data['values'] ?? [];

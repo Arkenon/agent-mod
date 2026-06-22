@@ -6,7 +6,7 @@
  */
 import { useRef, useState } from '@wordpress/element';
 import { useDispatch, useSelect } from '@wordpress/data';
-import { Button, TextareaControl, ToggleControl } from '@wordpress/components';
+import { Button, TextareaControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 
 import { STORE_NAME } from '../store';
@@ -19,14 +19,13 @@ export default function Composer() {
 	const [ attachments, setAttachments ] = useState( [] );
 	const uploaderRef                     = useRef( null );
 
-	const { sendMessage, setSiteContext, clearMessages, setConversationId } =
+	const { sendMessage, clearMessages, setConversationId } =
 		useDispatch( STORE_NAME );
-	const { loading, isSiteContext, hasMessages } = useSelect( ( select ) => {
+	const { loading, hasMessages } = useSelect( ( select ) => {
 		const storeSelect = select( STORE_NAME );
 		return {
-			loading:       storeSelect.isLoading(),
-			isSiteContext: storeSelect.isSiteContextEnabled(),
-			hasMessages:   storeSelect.getMessages().length > 0,
+			loading:     storeSelect.isLoading(),
+			hasMessages: storeSelect.getMessages().length > 0,
 		};
 	}, [] );
 
@@ -60,19 +59,6 @@ export default function Composer() {
 				disabled={ loading }
 			/>
 
-			<div className="agent-mod-chat__context-scope">
-				<ToggleControl
-					label={ __( 'Site Context (RAG)', 'agent-mod' ) }
-					help={ isSiteContext
-						? __( 'Agent reads your site data.', 'agent-mod' )
-						: __( 'General knowledge only.', 'agent-mod' )
-					}
-					checked={ isSiteContext }
-					onChange={ setSiteContext }
-					__nextHasNoMarginBottom
-				/>
-			</div>
-
 			<TextareaControl
 				className="agent-mod-chat__input"
 				value={ text }
@@ -83,7 +69,6 @@ export default function Composer() {
 				}
 				rows={ 2 }
 				disabled={ loading }
-				__nextHasNoMarginBottom
 			/>
 
 			<div className="agent-mod-chat__composer-actions">

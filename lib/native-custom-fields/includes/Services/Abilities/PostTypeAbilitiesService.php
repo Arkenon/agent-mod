@@ -90,7 +90,14 @@ class PostTypeAbilitiesService
             'input_schema'        => $post_type_schema,
             'output_schema'       => $response_schema,
             'permission_callback' => $permission,
-            'meta'                => ['show_in_rest' => true, 'mcp' => ['public' => true]],
+            'meta'                => [
+                'show_in_rest' => true,
+                'mcp'          => ['public' => true],
+                'annotations'  => [
+                    'destructive' => false,
+                    'idempotent'  => true,
+                ],
+            ],
         ]);
 
         wp_register_ability('native-custom-fields/update-post-type', [
@@ -101,7 +108,14 @@ class PostTypeAbilitiesService
             'input_schema'        => $post_type_schema,
             'output_schema'       => $response_schema,
             'permission_callback' => $permission,
-            'meta'                => ['show_in_rest' => true, 'mcp' => ['public' => true]],
+            'meta'                => [
+                'show_in_rest' => true,
+                'mcp'          => ['public' => true],
+                'annotations'  => [
+                    'destructive' => false,
+                    'idempotent'  => true,
+                ],
+            ],
         ]);
     }
 

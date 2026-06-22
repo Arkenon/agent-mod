@@ -3,12 +3,14 @@
  */
 import { loadProviderModels } from './persistence';
 
+const config = window.agentModChat || {};
+
 const DEFAULT_STATE = {
 	isOpen: false,
 	messages: [],
 	isLoading: false,
 	error: null,
-	isSiteContextEnabled: true,
+	isSiteContextEnabled: config.defaults?.siteContextEnabled ?? true,
 	conversationId: null,
 	agents: [],
 	selectedAgentId: null,
