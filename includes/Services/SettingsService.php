@@ -92,7 +92,7 @@ final class SettingsService
 			[
 				'section_name'  => 'agent_mod_chat_behaviour',
 				'section_title' => __('Chat Behaviour', 'agent-mod'),
-				'section_icon'  => 'dashicons-format-chat',
+				'section_icon'  => 'format-chat',
 				'fields'        => [
 					[
 						'fieldType'  => 'toggle',
@@ -114,7 +114,7 @@ final class SettingsService
 			[
 				'section_name'  => 'agent_mod_ai_limits',
 				'section_title' => __('AI Limits', 'agent-mod'),
-				'section_icon'  => 'dashicons-performance',
+				'section_icon'  => 'performance',
 				'fields'        => [
 					[
 						'fieldType'  => 'number',
@@ -142,7 +142,7 @@ final class SettingsService
 			[
 				'section_name'  => 'agent_mod_attachments',
 				'section_title' => __('File Attachments', 'agent-mod'),
-				'section_icon'  => 'dashicons-paperclip',
+				'section_icon'  => 'paperclip',
 				'fields'        => [
 					[
 						'fieldType'  => 'number',

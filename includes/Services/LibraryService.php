@@ -32,14 +32,24 @@ class LibraryService
 	 */
 	public function includeNCF(): void
 	{
-		$activePlugins = (array) get_option('active_plugins', []);
-		$isActive      = in_array('native-custom-fields/native-custom-fields.php', $activePlugins, true);
-
-		if (! $isActive) {
-			$file = AGENT_MOD_PATH . 'lib/native-custom-fields/native-custom-fields.php';
+		if (! is_plugin_active('native-custom-fields/native-custom-fields.php')) {
+			$file = AGENT_MOD_PATH . 'lib/vendor/native-custom-fields/native-custom-fields.php';
 			if (is_readable($file)) {
 				require_once $file;
 			}
+
+			//Hide NCF Admin Menu
+			add_action("admin_menu", array($this, "removeNCFMenu"), 999);
 		}
+	}
+
+	/**
+	 * Remove NCF Admin Menu
+	 * @return void
+	 * @since 1.0.0
+	 */
+	public function removeNCFMenu(): void
+	{
+		remove_menu_page("native-custom-fields");
 	}
 }

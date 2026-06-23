@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 /**
- * Plugin Name:       Agent Mod
- * Description:       Agent Mod empowers your site with intelligent AI agents to automate content creation, customer support, and data management, making your WordPress site smarter and more efficient.
+ * Plugin Name:       AgentMod
+ * Description:       AgentMod empowers your site with intelligent AI agents to automate content creation, customer support, and data management, making your WordPress site smarter and more efficient.
  * Requires at least: 7.0
  * Requires PHP:      7.4
  * Version:           1.0.0

@@ -1,4 +1,5 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) exit;
 /**
  * Uninstall file for the plugin
  * Runs on uninstallation of the plugin
