@@ -111,7 +111,7 @@ Built using official WordPress packages:
 
 Assets:
 
-* All images located in the Admin/assets/images folder are self created and are licensed under CC0 1.0 Universal (CC0 1.0) Public Domain Dedication.
+* All images located in the Admin/assets/img folder are self created and are licensed under CC0 1.0 Universal (CC0 1.0) Public Domain Dedication.
 
 Composer Packages:
 
@@ -119,7 +119,7 @@ Composer Packages:
 
 Libraries:
 
-* Native Custom Fields - Copyright (c) Arkenon
+* Native Custom Fields - Copyright (c) Arkenon (https://wordpress.org/plugins/native-custom-fields/)
 
 == Source Code ==
 
