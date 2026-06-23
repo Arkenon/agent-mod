@@ -65,6 +65,60 @@
             "install-path": "../laravel/serializable-closure"
         },
         {
+            "name": "native-custom-fields/native-custom-fields",
+            "version": "v1.2.6",
+            "version_normalized": "1.2.6.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Arkenon/native-custom-fields.git",
+                "reference": "b94cc80a7d0e4aa7fc3842833dd0da28ec9bfedc"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Arkenon/native-custom-fields/zipball/b94cc80a7d0e4aa7fc3842833dd0da28ec9bfedc",
+                "reference": "b94cc80a7d0e4aa7fc3842833dd0da28ec9bfedc",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.4",
+                "php-di/php-di": "^7.1.1"
+            },
+            "time": "2026-06-23T11:00:23+00:00",
+            "type": "library",
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "NativeCustomFields\\": "includes/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "GPL-2.0-or-later"
+            ],
+            "authors": [
+                {
+                    "name": "Kadim Gültekin",
+                    "homepage": "https://profiles.wordpress.org/arkenon/"
+                }
+            ],
+            "description": "A WordPress plugin for creating custom fields using Gutenberg components",
+            "homepage": "https://nativecustomfields.com",
+            "keywords": [
+                "custom-fields",
+                "gutenberg",
+                "meta",
+                "post-meta",
+                "term-meta",
+                "user-meta",
+                "wordpress"
+            ],
+            "support": {
+                "issues": "https://github.com/arkenon/native-custom-fields/issues",
+                "source": "https://github.com/arkenon/native-custom-fields"
+            },
+            "install-path": "../native-custom-fields/native-custom-fields"
+        },
+        {
             "name": "php-di/invoker",
             "version": "2.3.7",
             "version_normalized": "2.3.7.0",

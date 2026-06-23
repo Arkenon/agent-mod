@@ -15,6 +15,10 @@ class ComposerStaticInitAgentMod
         array (
             'Psr\\Container\\' => 14,
         ),
+        'N' =>
+        array (
+            'NativeCustomFields\\' => 19,
+        ),
         'L' =>
         array (
             'Laravel\\SerializableClosure\\' => 28,
@@ -37,6 +41,10 @@ class ComposerStaticInitAgentMod
         'Psr\\Container\\' =>
         array (
             0 => __DIR__ . '/..' . '/psr/container/src',
+        ),
+        'NativeCustomFields\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/native-custom-fields/native-custom-fields/includes',
         ),
         'Laravel\\SerializableClosure\\' =>
         array (

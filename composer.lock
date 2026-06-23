@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d6e9b095ce0d7d447749d88e06ce4406",
+    "content-hash": "6c590a57d29c31dfc304773cc66193c1",
     "packages": [
         {
             "name": "laravel/serializable-closure",
@@ -66,6 +66,57 @@
                 "source": "https://github.com/laravel/serializable-closure"
             },
             "time": "2026-04-16T14:03:50+00:00"
+        },
+        {
+            "name": "native-custom-fields/native-custom-fields",
+            "version": "v1.2.6",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Arkenon/native-custom-fields.git",
+                "reference": "b94cc80a7d0e4aa7fc3842833dd0da28ec9bfedc"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Arkenon/native-custom-fields/zipball/b94cc80a7d0e4aa7fc3842833dd0da28ec9bfedc",
+                "reference": "b94cc80a7d0e4aa7fc3842833dd0da28ec9bfedc",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.4",
+                "php-di/php-di": "^7.1.1"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "NativeCustomFields\\": "includes/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "GPL-2.0-or-later"
+            ],
+            "authors": [
+                {
+                    "name": "Kadim Gültekin",
+                    "homepage": "https://profiles.wordpress.org/arkenon/"
+                }
+            ],
+            "description": "A WordPress plugin for creating custom fields using Gutenberg components",
+            "homepage": "https://nativecustomfields.com",
+            "keywords": [
+                "custom-fields",
+                "gutenberg",
+                "meta",
+                "post-meta",
+                "term-meta",
+                "user-meta",
+                "wordpress"
+            ],
+            "support": {
+                "issues": "https://github.com/arkenon/native-custom-fields/issues",
+                "source": "https://github.com/arkenon/native-custom-fields"
+            },
+            "time": "2026-06-23T11:00:23+00:00"
         },
         {
             "name": "php-di/invoker",

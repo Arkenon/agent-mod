@@ -10,9 +10,13 @@
     },
     "require": {
         "php-di/php-di": "^7.1.1",
-        "php": ">=7.4"
+        "php": ">=7.4",
+        "native-custom-fields/native-custom-fields": "1.2.6"
     },
     "config": {
-        "autoloader-suffix": "AgentMod"
+        "autoloader-suffix": "AgentMod",
+        "allow-plugins": {
+            "composer/installers": true
+        }
     }
 }

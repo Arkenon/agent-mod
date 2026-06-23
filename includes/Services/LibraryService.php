@@ -32,14 +32,27 @@ class LibraryService
 	 */
 	public function includeNCF(): void
 	{
-		if (! is_plugin_active('native-custom-fields/native-custom-fields.php')) {
-			$file = AGENT_MOD_PATH . 'lib/vendor/native-custom-fields/native-custom-fields.php';
-			if (is_readable($file)) {
-				require_once $file;
-			}
+		if (! is_plugin_active( 'native-custom-fields/native-custom-fields.php' )
+			&& class_exists( '\NativeCustomFields\App' )
+		) {
+			// Create an instance of Native Custom Fields
+			$ncf = new \NativeCustomFields\App();
 
-			//Hide NCF Admin Menu
-			add_action("admin_menu", array($this, "removeNCFMenu"), 999);
+			//Boot App with it's absolute path and url, 
+			$ncf::boot(
+				[
+					'path' => AGENT_MOD_PATH . 'vendor/native-custom-fields/native-custom-fields/',
+					'url'  => AGENT_MOD_URL . 'vendor/native-custom-fields/native-custom-fields/',
+				]
+			);
+
+			// Remove NCF admin menu after it is registered
+			// If NCF will be active, then we don't need to remove it
+			add_action(
+				'admin_menu',
+				array( $this, 'removeNCFMenu' ),
+				999
+			);
 		}
 	}
 
