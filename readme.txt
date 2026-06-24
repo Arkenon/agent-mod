@@ -96,6 +96,10 @@ If you ask the agent to create a post, it will show you a confirmation modal sum
 
 == Changelog ==
 
+= 1.0.1 =
+* Fixed: Admin menu label bug
+* Removed: Provider logo url contained constant WP_CONTENT_DIR
+
 = 1.0.0 =
 * Initial public release
 
