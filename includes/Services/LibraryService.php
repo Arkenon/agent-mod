@@ -32,28 +32,30 @@ class LibraryService
 	 */
 	public function includeNCF(): void
 	{
-		if (! is_plugin_active( 'native-custom-fields/native-custom-fields.php' )
-			&& class_exists( '\NativeCustomFields\App' )
-		) {
-			// Create an instance of Native Custom Fields
-			$ncf = new \NativeCustomFields\App();
-
-			//Boot App with it's absolute path and url, 
-			$ncf::boot(
-				[
-					'path' => AGENT_MOD_PATH . 'vendor/native-custom-fields/native-custom-fields/',
-					'url'  => AGENT_MOD_URL . 'vendor/native-custom-fields/native-custom-fields/',
-				]
-			);
-
-			// Remove NCF admin menu after it is registered
-			// If NCF will be active, then we don't need to remove it
-			add_action(
-				'admin_menu',
-				array( $this, 'removeNCFMenu' ),
-				999
-			);
+		// Don't load NCF if it's already active as WordPress plugin
+		if ( is_plugin_active( 'native-custom-fields/native-custom-fields.php' ) ) {
+			return;
 		}
+
+		// Don't load NCF if it's not installed
+		if ( ! class_exists( '\NativeCustomFields\App' ) ) {
+			return;
+		}
+
+		// Bootstrap the NCF from vendor
+		\NativeCustomFields\App::boot(
+			[
+				'path' => AGENT_MOD_PATH . 'vendor/native-custom-fields/native-custom-fields/',
+				'url'  => AGENT_MOD_URL . 'vendor/native-custom-fields/native-custom-fields/',
+			]
+		);
+
+		// Remove NCF admin menu after it is registered
+		add_action(
+			'admin_menu',
+			[ $this, 'removeNCFMenu' ],
+			999
+		);
 	}
 
 	/**

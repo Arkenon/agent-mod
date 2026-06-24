@@ -101,8 +101,8 @@ final class AdminController
 	public function addMenu()
 	{
 		add_menu_page(
-			esc_html__('Agent Mod', 'agent-mod'),
-			esc_html__('Agent Mod', 'agent-mod'),
+			esc_html__('AgentMod', 'agent-mod'),
+			esc_html__('AgentMod', 'agent-mod'),
 			'manage_options',
 			'agent-mod',
 			[$this, 'renderDashboard'],

@@ -3,7 +3,7 @@
 /**
  * Admin controller for the Abilities page.
  *
- * Registers the "Abilities" submenu under Agent Mod, enqueues the React bundle
+ * Registers the "Abilities" submenu under AgentMod, enqueues the React bundle
  * only on that page, and renders the PHP wrapper template.
  *
  * @package    AgentMod

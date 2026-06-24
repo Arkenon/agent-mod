@@ -117,13 +117,6 @@ export default function ProviderModelSelector() {
 									].join( ' ' ).trim() }
 									onClick={ () => openProvider( provider.id ) }
 								>
-									{ provider.logoUrl && (
-										<img
-											className="agent-mod-chat__provider-logo"
-											src={ provider.logoUrl }
-											alt=""
-										/>
-									) }
 									<span className="agent-mod-chat__provider-name">
 										{ provider.name }
 									</span>

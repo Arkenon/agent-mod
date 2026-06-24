@@ -459,13 +459,6 @@
 	border-radius: 10px;
 }
 
-.agent-mod-chat__provider-logo {
-	width: 14px;
-	height: 14px;
-	object-fit: contain;
-	display: block;
-}
-
 .agent-mod-chat__provider-icon {
 	font-size: 14px;
 	width: 14px;
@@ -530,12 +523,6 @@
 		&.is-selected {
 			font-weight: 600;
 		}
-	}
-
-	.agent-mod-chat__provider-logo {
-		width: 16px;
-		height: 16px;
-		object-fit: contain;
 	}
 }
 

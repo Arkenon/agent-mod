@@ -46,11 +46,11 @@ class ProviderInfoService
 	 * plugin's helpers (e.g. WordPress\AI\is_connector_configured), so the chat
 	 * widget keeps working whether or not that plugin is installed.
 	 *
-	 * The provider's display name and logo are enriched from the core Connectors
-	 * API (wp_get_connectors) when available, falling back to the provider's own
+	 * The provider's display name is enriched from the core Connectors API
+	 * (wp_get_connectors) when available, falling back to the provider's own
 	 * metadata. Both sources are WordPress core.
 	 *
-	 * Each entry is ['id' => ..., 'name' => ..., 'logoUrl' => ...].
+	 * Each entry is ['id' => ..., 'name' => ...].
 	 *
 	 * @return array<int, array<string, string>>
 	 * @since 1.0.0
@@ -74,27 +74,19 @@ class ProviderInfoService
 					continue;
 				}
 
-				$name    = $labels[$id]['name'] ?? '';
-				$logoUrl = $labels[$id]['logoUrl'] ?? '';
+				$name = $labels[$id] ?? '';
 
-				if ('' === $name || '' === $logoUrl) {
+				if ('' === $name) {
 					$metadata = $this->providerMetadata($registry, $id);
 
 					if (null !== $metadata) {
-						if ('' === $name) {
-							$name = (string) $metadata->getName();
-						}
-
-						if ('' === $logoUrl) {
-							$logoUrl = $this->providerLogoUrl($metadata);
-						}
+						$name = (string) $metadata->getName();
 					}
 				}
 
 				$providers[] = [
-					'id'      => $id,
-					'name'    => '' !== $name ? $name : $id,
-					'logoUrl' => $logoUrl,
+					'id'   => $id,
+					'name' => '' !== $name ? $name : $id,
 				];
 			}
 
@@ -191,14 +183,13 @@ class ProviderInfoService
 	}
 
 	/**
-	 * Returns display labels (name + logo URL) keyed by provider id, read from the
-	 * core Connectors API.
+	 * Returns display names keyed by provider id, read from the core Connectors API.
 	 *
 	 * This is cosmetic enrichment only; it never decides which providers are
 	 * connected. wp_get_connectors() is a WordPress core function (wp-includes/
 	 * connectors.php), so this does not couple AgentMod to the "AI" plugin.
 	 *
-	 * @return array<string, array{name: string, logoUrl: string}>
+	 * @return array<string, string>
 	 * @since 1.0.0
 	 */
 	private function connectorLabels(): array
@@ -214,10 +205,7 @@ class ProviderInfoService
 				continue;
 			}
 
-			$labels[$id] = [
-				'name'    => isset($data['name']) ? (string) $data['name'] : '',
-				'logoUrl' => isset($data['logo_url']) ? (string) $data['logo_url'] : '',
-			];
+			$labels[$id] = isset($data['name']) ? (string) $data['name'] : '';
 		}
 
 		return $labels;
@@ -241,39 +229,5 @@ class ProviderInfoService
 		} catch (Throwable $e) {
 			return null;
 		}
-	}
-
-	/**
-	 * Derives a browser-usable logo URL from a provider's metadata logo path.
-	 *
-	 * The AI Client exposes the logo as a filesystem path (getLogoPath, added in
-	 * a later AI Client version); this maps it to a URL under wp-content when
-	 * possible. Returns an empty string when no usable logo is available.
-	 *
-	 * @param ProviderMetadata $metadata Provider metadata.
-	 *
-	 * @return string
-	 * @since 1.0.0
-	 */
-	private function providerLogoUrl(ProviderMetadata $metadata): string
-	{
-		if (! method_exists($metadata, 'getLogoPath')) {
-			return '';
-		}
-
-		$logoPath = $metadata->getLogoPath();
-
-		if (! is_string($logoPath) || '' === $logoPath || ! file_exists($logoPath)) {
-			return '';
-		}
-
-		$logoPath   = wp_normalize_path($logoPath);
-		$contentDir = wp_normalize_path(WP_CONTENT_DIR);
-
-		if (0 === strpos($logoPath, $contentDir)) {
-			return content_url(substr($logoPath, strlen($contentDir)));
-		}
-
-		return '';
 	}
 }
