@@ -44,6 +44,10 @@ final class App
 		ControllerInit::class
 	];
 
+	public function __construct()
+    {
+    }
+
 	/**
 	 * Run all services and controllers
 	 * @return void
@@ -73,7 +77,8 @@ final class App
 	 */
 	public function initPluginServices(): void
 	{
-		//Initialize all services
+		$this->services = apply_filters('agent_mod_services', $this->services);
+
 		foreach ($this->services as $service) {
 			DI::container()->get($service);
 		}
@@ -89,8 +94,8 @@ final class App
 	public function initPluginControllers(): void
 	{
 		//Initialize all controllers
-		foreach ($this->controllers as $controller) {
-			DI::container()->get($controller);
-		}
+        foreach ( $this->controllers as $controller ) {
+            DI::container()->get( $controller );
+        }
 	}
 }

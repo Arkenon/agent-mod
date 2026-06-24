@@ -59,7 +59,7 @@ final class AbilitiesController
 	 */
 	public function enqueueAssets(string $hookSuffix): void
 	{
-		if ('agent-mod_page_agent-mod-abilities' !== $hookSuffix) {
+		if ('agentmod_page_agent-mod-abilities' !== $hookSuffix) {
 			return;
 		}
 

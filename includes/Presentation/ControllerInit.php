@@ -34,17 +34,11 @@ final class ControllerInit
 	];
 
 	/**
-	 * Controllers that must load on every request (e.g. REST controllers).
-	 *
-	 * REST controllers register their routes on the `rest_api_init` hook, which
-	 * fires during REST requests where `is_admin()` is false. They therefore must
-	 * be instantiated regardless of the admin context, otherwise their routes are
-	 * never registered and the endpoint returns "No route was found".
-	 *
+	 * List of controllers to be initialized for Client-side
 	 * @var array
 	 * @since 1.0.0
 	 */
-	private array $restControllers = [
+	private array $clientControllers = [
 		AIChatRestController::class,
 	];
 
@@ -55,6 +49,19 @@ final class ControllerInit
 	 */
 	public function __construct()
 	{
+
+		// Add filters to allow plugins to add their own admin controllers
+		$this->adminControllers = apply_filters(
+			'agent_mod_admin_controllers',
+			$this->adminControllers
+		);
+
+		// Add filters to allow plugins to add their own client-side controllers
+		$this->clientControllers = apply_filters(
+			'agent_mod_client_controllers',
+			$this->clientControllers
+		);
+
 		// Initialize controllers
 		$this->initControllers();
 	}
@@ -66,9 +73,8 @@ final class ControllerInit
 	 */
 	public function initControllers()
 	{
-		// REST controllers must load on every request so their routes register
-		// on rest_api_init (where is_admin() is false).
-		foreach ($this->restControllers as $controller) {
+		// Client side controllers must load on every request
+		foreach ($this->clientControllers as $controller) {
 			DI::container()->get($controller);
 		}
 
