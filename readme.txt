@@ -99,6 +99,7 @@ If you ask the agent to create a post, it will show you a confirmation modal sum
 = 1.0.2 =
 * Fixed: Ability List page render error
 * Added: Filter hooks for services and controllers
+* Added: Useful Url's into the Dashboard sidebar
 
 = 1.0.1 =
 * Fixed: Admin menu label bug

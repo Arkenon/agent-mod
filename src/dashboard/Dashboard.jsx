@@ -11,11 +11,10 @@ import {
 
 function DashboardSidebar() {
 	const links = [
-		{ label: __( 'Documentation', 'agent-mod' ),    url: '#' },
-		{ label: __( 'Plugin Homepage', 'agent-mod' ),  url: '#' },
-		{ label: __( 'GitHub Repository', 'agent-mod' ), url: '#' },
-		{ label: __( 'Report a Bug', 'agent-mod' ),     url: '#' },
-		{ label: __( 'Rate the Plugin', 'agent-mod' ),  url: '#' },
+		{ label: __( 'Plugin Homepage', 'agent-mod' ),  url: 'https://agentmodwp.com' },
+		{ label: __( 'GitHub Repository', 'agent-mod' ), url: 'https://github.com/Arkenon/agent-mod' },
+		{ label: __( 'Report a Bug', 'agent-mod' ),     url: 'https://wordpress.org/support/plugin/agent-mod' },
+		{ label: __( 'Rate the Plugin', 'agent-mod' ),  url: 'https://wordpress.org/plugins/agent-mod/#reviews' },
 	];
 
 	return (
@@ -60,7 +59,7 @@ function DashboardSidebar() {
 						<p style={ { margin: 0, fontSize: '13px', color: '#646970', textAlign: 'center', lineHeight: 1.5 } }>
 							{ __( 'Enjoying the plugin? Consider giving it a ⭐ on WordPress.org!', 'agent-mod' ) }
 						</p>
-						<Button variant="primary" href="#" target="_blank">
+						<Button variant="primary" href="https://wordpress.org/support/plugin/agent-mod/reviews/#new-post" target="_blank">
 							{ __( 'Leave a Review', 'agent-mod' ) }
 						</Button>
 					</VStack>
