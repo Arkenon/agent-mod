@@ -38,6 +38,14 @@ class UserMetaController
 
 		// Register rest api routes
 		add_action('rest_api_init', [$this, 'registerRestRoutes']);
+
+		// Add form field hooks for the user meta fields
+		add_action("show_user_profile", [$this->userMetaService, 'renderFields']);
+		add_action("edit_user_profile", [$this->userMetaService, 'renderFields']);
+
+		// Add save hooks
+		add_action("personal_options_update", [$this->userMetaService, 'saveUserMeta']);
+		add_action("edit_user_profile_update", [$this->userMetaService, 'saveUserMeta']);
 	}
 
 	/**

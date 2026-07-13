@@ -33,34 +33,10 @@ class TermMetaService implements BaseMetaServiceInterface, TermMetaServiceInterf
 	 */
 	private TermMetaRepository $termMetaRepository;
 
-	/**
-	 * To ensure hooks are registered only once
-	 *
-	 * @var bool
-	 * @since 1.0.0
-	 */
-	private static bool $hooksRegistered = false;
-
 	public function __construct(TermMetaRepository $termMetaRepository)
 	{
 		//Inject dependencies
 		$this->termMetaRepository = $termMetaRepository;
-
-		if (! self::$hooksRegistered) {
-			// Register taxonomies
-			add_action('init', [$this, 'registerTaxonomies']);
-
-			// Register all term meta fields when a taxonomy is registered
-			add_action('registered_taxonomy', [$this, 'registerAllTermMeta'], 10, 2);
-
-			// Add form fields to taxonomy add and edit forms
-			add_action('registered_taxonomy', [$this, 'addFormFieldsToTaxonomy'], 10, 2);
-
-			// Add edit and save hooks for taxonomy
-			add_action('registered_taxonomy', [$this, 'editOrSaveHooksForTaxonomy'], 10, 2);
-
-			self::$hooksRegistered = true;
-		}
 	}
 
 	#region Custom Taxonomies

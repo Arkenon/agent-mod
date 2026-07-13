@@ -85,32 +85,6 @@ class AbilityRegistrarService
 		// -------------------------------------------------------------------------
 
 		wp_register_ability(
-			'agent-mod/get-site-info',
-			[
-				'label'               => __('Get Site Info', 'agent-mod'),
-				'description'         => __('Returns basic information about the current WordPress site: name, tagline, URL and WordPress version.', 'agent-mod'),
-				'category'            => self::CATEGORY,
-				'execute_callback'    => [$this, 'executeGetSiteInfo'],
-				'permission_callback' => static function (): bool {
-					return current_user_can('read');
-				},
-				'output_schema'       => [
-					'type'       => 'object',
-					'properties' => [
-						'name'        => ['type' => 'string'],
-						'description' => ['type' => 'string'],
-						'url'         => ['type' => 'string'],
-						'wp_version'  => ['type' => 'string'],
-					],
-				],
-				'meta'                => [
-					'annotations'  => ['readonly' => true],
-					'show_in_rest' => true,
-				],
-			]
-		);
-
-		wp_register_ability(
 			'agent-mod/create-draft-post',
 			[
 				'label'               => __('Create Draft Post', 'agent-mod'),

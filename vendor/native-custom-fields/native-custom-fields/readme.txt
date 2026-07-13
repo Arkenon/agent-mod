@@ -4,7 +4,7 @@ Tags: custom fields, custom post type, meta box, gutenberg, block editor
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.2.6
+Stable tag: 1.2.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -136,6 +136,19 @@ Yes. The free version has Repeater and Group fields. These are custom components
 
 
 == Changelog ==
+
+= 1.2.8 =
+* Fix: Boot method for external usage in another plugins.
+
+= 1.2.7 =
+* Add: Singleton pattern intp DI Container
+* Fix: Boot method for external usage in another plugins.
+* Move: Hooks in the services into controllers
+
+= 1.2.6 =
+* Add: Static boot method for external usage in another plugins.
+* Test: Added Composer package capability.
+* Test: Added GitHub Actions workflow for testing.
 
 = 1.2.3 =
 * Add: Into Packagist repository

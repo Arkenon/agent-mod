@@ -31,29 +31,9 @@ class UserMetaService implements BaseMetaServiceInterface, UserMetaServiceInterf
 	 */
 	private UserMetaRepository $userMetaRepository;
 
-	/**
-	 * To ensure hooks are registered only once
-	 *
-	 * @var bool
-	 * @since 1.0.0
-	 */
-	private static bool $hooksRegistered = false;
-
 	public function __construct(UserMetaRepository $user_meta_repository)
 	{
 		$this->userMetaRepository = $user_meta_repository;
-
-		if (! self::$hooksRegistered) {
-			// Add form field hooks for the user meta fields
-			add_action("show_user_profile", [$this, 'renderFields']);
-			add_action("edit_user_profile", [$this, 'renderFields']);
-
-			// Add save hooks
-			add_action("personal_options_update", [$this, 'saveUserMeta']);
-			add_action("edit_user_profile_update", [$this, 'saveUserMeta']);
-
-			self::$hooksRegistered = true;
-		}
 	}
 
 	/**

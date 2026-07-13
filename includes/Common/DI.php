@@ -18,6 +18,13 @@ use Exception;
 class DI
 {
 	/**
+	 * Dependency Injection Container Instance
+	 * @var Container|null
+	 * @since 1.0.0
+	 */
+	private static ?Container $container = null;
+
+	/**
 	 * Dependency Injection Container
 	 * @return Container
 	 * @throws Exception
@@ -25,8 +32,11 @@ class DI
 	 */
 	public static function container(): Container
 	{
-		$containerBuilder = new ContainerBuilder();
-
-		return $containerBuilder->build();
+		if (self::$container === null) {
+			$containerBuilder = new ContainerBuilder();
+			$containerBuilder->useAutowiring(true);
+			self::$container = $containerBuilder->build();
+		}
+		return self::$container;
 	}
 }

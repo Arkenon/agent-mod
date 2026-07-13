@@ -66,24 +66,24 @@
         },
         {
             "name": "native-custom-fields/native-custom-fields",
-            "version": "v1.2.6",
-            "version_normalized": "1.2.6.0",
+            "version": "v1.2.8",
+            "version_normalized": "1.2.8.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Arkenon/native-custom-fields.git",
-                "reference": "b94cc80a7d0e4aa7fc3842833dd0da28ec9bfedc"
+                "reference": "502b0e2148f917334fe91e1d9b9321e9e16e6ae4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Arkenon/native-custom-fields/zipball/b94cc80a7d0e4aa7fc3842833dd0da28ec9bfedc",
-                "reference": "b94cc80a7d0e4aa7fc3842833dd0da28ec9bfedc",
+                "url": "https://api.github.com/repos/Arkenon/native-custom-fields/zipball/502b0e2148f917334fe91e1d9b9321e9e16e6ae4",
+                "reference": "502b0e2148f917334fe91e1d9b9321e9e16e6ae4",
                 "shasum": ""
             },
             "require": {
                 "php": ">=7.4",
                 "php-di/php-di": "^7.1.1"
             },
-            "time": "2026-06-23T11:00:23+00:00",
+            "time": "2026-07-13T12:42:30+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {

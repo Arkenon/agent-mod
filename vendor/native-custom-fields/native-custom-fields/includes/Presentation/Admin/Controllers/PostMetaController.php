@@ -40,6 +40,18 @@ class PostMetaController
 
 		// Register rest api routes
 		add_action('rest_api_init', [$this, 'registerRestRoutes']);
+
+		// Register post types
+		add_action('init', [$this->postMetaService, 'registerPostTypes']);
+
+		// Register meta boxes
+		add_action('add_meta_boxes', [$this->postMetaService, 'addMetaBoxes']);
+
+		// Register all post meta fields when a post type is registered
+		add_action('registered_post_type', [$this->postMetaService, 'registerAllPostMeta'], 10, 2);
+
+		// Save custom fields into database
+		add_action('save_post', [$this->postMetaService, 'savePostMeta']);
 	}
 
 	#region Rest Routes and Callbacks

@@ -12,6 +12,7 @@ use DI\DependencyException;
 use DI\NotFoundException;
 use Exception;
 use NativeCustomFields\Common\DI;
+use NativeCustomFields\Presentation\Admin\Controllers\AbilityContoller;
 use NativeCustomFields\Presentation\ControllerInit;
 use NativeCustomFields\Services\AjaxService;
 use NativeCustomFields\Services\ImportExportService;
@@ -76,22 +77,34 @@ final class App {
             return;
         }
 
-        self::$booted = true;
+        $url = isset( $config['url'] )
+            ? sanitize_text_field( $config['url'] )
+            : ( defined( 'NATIVE_CUSTOM_FIELDS_URL' ) ? NATIVE_CUSTOM_FIELDS_URL : '' );
+        $path = isset( $config['path'] )
+            ? sanitize_text_field( $config['path'] )
+            : ( defined( 'NATIVE_CUSTOM_FIELDS_PATH' ) ? NATIVE_CUSTOM_FIELDS_PATH : '' );
+       
 
         if ( ! defined( 'NATIVE_CUSTOM_FIELDS_URL' ) ) {
-            define( 'NATIVE_CUSTOM_FIELDS_URL', $config['url'] );
+            define( 'NATIVE_CUSTOM_FIELDS_URL', $url );
         }
 
         if ( ! defined( 'NATIVE_CUSTOM_FIELDS_PATH' ) ) {
-            define( 'NATIVE_CUSTOM_FIELDS_PATH', $config['path'] );
+            define( 'NATIVE_CUSTOM_FIELDS_PATH', $path );
         }
 
         if ( ! defined( 'NATIVE_CUSTOM_FIELDS_INCLUDES_PATH' ) ) {
             define(
                 'NATIVE_CUSTOM_FIELDS_INCLUDES_PATH',
-                $config['path'] . 'includes/'
+                $path . 'includes/'
             );
         }
+
+        // Remove AbilityContoller from the controllers list because it will
+        // already be registered/loaded automatically when booted via Composer.
+        add_filter( 'native_custom_fields_controllers', static function ( array $controllers ): array {
+            return array_diff( $controllers, [ AbilityContoller::class ] );
+        } );
 
         ( new self() )->run();
 	}
@@ -102,6 +115,12 @@ final class App {
 	 * @since 1.0.0
 	 */
 	public function run(): void {
+        if ( self::$booted ) {
+            return;
+        }
+
+        self::$booted = true;
+
         //Define a hook run before initializing the plugin
         do_action( 'native_custom_fields_before_init' );
 

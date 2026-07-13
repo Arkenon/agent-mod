@@ -38,6 +38,18 @@ class TermMetaController
 
 		// Register rest api routes
 		add_action('rest_api_init', [$this, 'registerRestRoutes']);
+
+		// Register taxonomies
+		add_action('init', [$this->termMetaService, 'registerTaxonomies']);
+
+		// Register all term meta fields when a taxonomy is registered
+		add_action('registered_taxonomy', [$this->termMetaService, 'registerAllTermMeta'], 10, 2);
+
+		// Add form fields to taxonomy add and edit forms
+		add_action('registered_taxonomy', [$this->termMetaService, 'addFormFieldsToTaxonomy'], 10, 2);
+
+		// Add edit and save hooks for taxonomy
+		add_action('registered_taxonomy', [$this->termMetaService, 'editOrSaveHooksForTaxonomy'], 10, 2);
 	}
 
 	#region Rest Routes and Callbacks

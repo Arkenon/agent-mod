@@ -35,34 +35,10 @@ class PostMetaService implements BaseMetaServiceInterface, PostMetaServiceInterf
 	 */
 	private PostMetaRepository $postMetaRepository;
 
-	/**
-	 * To ensure hooks are registered only once
-	 *
-	 * @var bool
-	 * @since 1.0.0
-	 */
-	private static bool $hooksRegistered = false;
-
 	public function __construct(PostMetaRepository $postMetaRepository)
 	{
 		//Inject dependencies
 		$this->postMetaRepository = $postMetaRepository;
-
-		if (! self::$hooksRegistered) {
-			// Register post types
-			add_action('init', [$this, 'registerPostTypes']);
-
-			// Register meta boxes
-			add_action('add_meta_boxes', [$this, 'addMetaBoxes']);
-
-			// Register all post meta fields when a post type is registered
-			add_action('registered_post_type', [$this, 'registerAllPostMeta'], 10, 2);
-
-			// Save custom fields into database
-			add_action('save_post', [$this, 'savePostMeta']);
-
-			self::$hooksRegistered = true;
-		}
 	}
 
 	#region Post Types
