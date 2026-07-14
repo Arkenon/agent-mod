@@ -38,15 +38,25 @@ class AIClientAdapter
 	private ToolCallRepairManager $toolCallRepairs;
 
 	/**
+	 * Live tool-call progress store.
+	 *
+	 * @var ProgressStore
+	 * @since 1.1.0
+	 */
+	private ProgressStore $progressStore;
+
+	/**
 	 * Constructor (PHP-DI autowired).
 	 *
 	 * @param ToolCallRepairManager $toolCallRepairs Provider tool-call repair manager.
+	 * @param ProgressStore         $progressStore   Live tool-call progress store.
 	 *
 	 * @since 1.0.0
 	 */
-	public function __construct(ToolCallRepairManager $toolCallRepairs)
+	public function __construct(ToolCallRepairManager $toolCallRepairs, ProgressStore $progressStore)
 	{
 		$this->toolCallRepairs = $toolCallRepairs;
+		$this->progressStore   = $progressStore;
 	}
 
 	/**
@@ -58,6 +68,7 @@ class AIClientAdapter
 	 * @param string      $provider          Provider id.
 	 * @param string|null $model             Optional model id.
 	 * @param int         $maxToolCalls      Max tool-calling iterations.
+	 * @param string      $requestId         Optional client-generated UUID for live progress reporting.
 	 *
 	 * @return AgentResponse
 	 * @since 1.0.0
@@ -68,7 +79,8 @@ class AIClientAdapter
 		array $abilities,
 		string $provider,
 		?string $model,
-		int $maxToolCalls
+		int $maxToolCalls,
+		string $requestId = ''
 	): AgentResponse {
 		if (! function_exists('wp_ai_client_prompt')) {
 			return AgentResponse::fromError(
@@ -86,10 +98,16 @@ class AIClientAdapter
 				$abilities,
 				$provider,
 				$model,
-				$maxToolCalls
+				$maxToolCalls,
+				$requestId
 			);
 		} finally {
 			$this->toolCallRepairs->unregister();
+
+			// Progress is only meaningful while the request is in flight.
+			if ('' !== $requestId) {
+				$this->progressStore->delete($requestId);
+			}
 		}
 	}
 
@@ -102,6 +120,7 @@ class AIClientAdapter
 	 * @param string      $provider          Provider id.
 	 * @param string|null $model             Optional model id.
 	 * @param int         $maxToolCalls      Max tool-calling iterations.
+	 * @param string      $requestId         Optional client-generated UUID for live progress reporting.
 	 *
 	 * @return AgentResponse
 	 * @since 1.0.0
@@ -112,7 +131,8 @@ class AIClientAdapter
 		array $abilities,
 		string $provider,
 		?string $model,
-		int $maxToolCalls
+		int $maxToolCalls,
+		string $requestId = ''
 	): AgentResponse {
 		$resolver   = new WP_AI_Client_Ability_Function_Resolver(...$abilities);
 		$history    = $messages;
@@ -120,6 +140,8 @@ class AIClientAdapter
 		$tokenUsage = [];
 
 		for ($i = 0; $i < $maxToolCalls; $i++) {
+			$this->reportProgress($requestId, 'thinking', '', $toolCalls);
+
 			$builder = wp_ai_client_prompt()
 				->with_history(...$history)
 				->using_system_instruction($systemInstruction);
@@ -177,8 +199,18 @@ class AIClientAdapter
 			}
 
 			// Record the requested tool calls, then execute them and feed responses back.
+			$this->reportProgress(
+				$requestId,
+				'running_tool',
+				implode(', ', array_column($requestedCalls, 'name')),
+				$toolCalls,
+				$requestedCalls
+			);
+
 			$toolCalls = array_merge($toolCalls, $requestedCalls);
 			$history[] = $resolver->execute_abilities($message);
+
+			$this->reportProgress($requestId, 'thinking', '', $toolCalls);
 		}
 
 		// Tool-call limit reached: do a final pass without abilities to force a text answer.
@@ -211,6 +243,52 @@ class AIClientAdapter
 			$history,
 			$this->extractTokenUsage($finalResult)
 		);
+	}
+
+	/**
+	 * Writes a progress snapshot for the polling endpoint. No-op without a request id.
+	 *
+	 * @param string                            $requestId     Client-generated UUID, or '' to skip.
+	 * @param string                            $status        'thinking' or 'running_tool'.
+	 * @param string                            $currentTool   Names of the tools currently executing.
+	 * @param array<int, array<string, mixed>>  $executedCalls Tool calls completed so far.
+	 * @param array<int, array<string, mixed>>  $runningCalls  Tool calls currently executing.
+	 *
+	 * @return void
+	 * @since 1.1.0
+	 */
+	private function reportProgress(
+		string $requestId,
+		string $status,
+		string $currentTool,
+		array $executedCalls,
+		array $runningCalls = []
+	): void {
+		if ('' === $requestId) {
+			return;
+		}
+
+		$mapCalls = static function (array $calls, string $callStatus): array {
+			return array_map(
+				static function (array $call) use ($callStatus): array {
+					return [
+						'name'   => (string) ($call['name'] ?? ''),
+						'args'   => $call['args'] ?? [],
+						'status' => $callStatus,
+					];
+				},
+				$calls
+			);
+		};
+
+		$this->progressStore->save($requestId, [
+			'status'        => $status,
+			'currentTool'   => $currentTool,
+			'executedCalls' => array_merge(
+				$mapCalls($executedCalls, 'done'),
+				$mapCalls($runningCalls, 'running')
+			),
+		]);
 	}
 
 	/**

@@ -558,6 +558,194 @@
 	margin: 8px;
 }
 
+// Live tool-call progress (shown next to the loading spinner).
+.agent-mod-chat__progress {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-left: 8px;
+}
+
+.agent-mod-chat__progress-status {
+	font-size: 12px;
+	color: #757575;
+	font-style: italic;
+}
+
+.agent-mod-chat__progress-calls {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+
+	li {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		margin: 0;
+		font-size: 12px;
+
+		.dashicons-yes {
+			color: #00a32a;
+			font-size: 16px;
+			width: 16px;
+			height: 16px;
+		}
+
+		code {
+			background: transparent;
+			font-size: 11px;
+			color: #757575;
+		}
+	}
+}
+
+// Collapsible "Tools used" section on assistant messages.
+.agent-mod-chat__toolcalls {
+	margin-top: 8px;
+	font-size: 12px;
+
+	summary {
+		cursor: pointer;
+		color: #757575;
+
+		&:hover {
+			color: #2271b1;
+		}
+	}
+
+	ul {
+		margin: 6px 0 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	li {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		margin: 0 0 6px;
+		padding: 6px 8px;
+		background: #f6f7f7;
+		border-radius: 2px;
+	}
+
+	.agent-mod-chat__toolcall-name {
+		background: transparent;
+		font-weight: 600;
+		font-size: 11px;
+	}
+
+	.agent-mod-chat__toolcall-args {
+		background: transparent;
+		font-size: 11px;
+		color: #757575;
+		word-break: break-all;
+		white-space: normal;
+	}
+}
+
+// Ask/Plan/Execute mode drop-up menu.
+.agent-mod-chat__mode-menu {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 260px;
+	padding: 4px;
+
+	.components-button {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 2px;
+		width: 100%;
+		height: auto;
+		padding: 6px 8px;
+		text-align: left;
+		white-space: normal;
+
+		&.is-selected {
+			background: #f0f0f1;
+
+			.agent-mod-chat__mode-label {
+				font-weight: 600;
+			}
+		}
+	}
+}
+
+.agent-mod-chat__mode-label {
+	font-size: 13px;
+	color: #1e1e1e;
+}
+
+.agent-mod-chat__mode-description {
+	font-size: 12px;
+	color: #757575;
+}
+
+// Ability tray drop-up.
+.agent-mod-chat__ability-tray {
+	display: flex;
+	flex-direction: column;
+	min-width: 300px;
+	max-width: 380px;
+	padding: 8px;
+
+	.agent-mod-chat__ability-search .components-base-control__field {
+		margin-bottom: 8px;
+	}
+}
+
+.agent-mod-chat__ability-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	max-height: 260px;
+	overflow-y: auto;
+
+	.agent-mod-chat__ability-item {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 2px;
+		width: 100%;
+		height: auto;
+		padding: 6px 8px;
+		text-align: left;
+		white-space: normal;
+	}
+}
+
+.agent-mod-chat__ability-label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 13px;
+	color: #1e1e1e;
+}
+
+.agent-mod-chat__ability-badge {
+	padding: 1px 6px;
+	background: #edfaef;
+	color: #00a32a;
+	border-radius: 2px;
+	font-size: 10px;
+	text-transform: uppercase;
+}
+
+.agent-mod-chat__ability-name {
+	background: transparent;
+	font-size: 11px;
+	color: #757575;
+	word-break: break-all;
+}
+
+.agent-mod-chat__ability-hint {
+	color: #757575;
+	font-size: 12px;
+	margin: 8px;
+}
+
 // Site-context toggle row.
 .agent-mod-chat__context-scope {
 	.components-base-control {

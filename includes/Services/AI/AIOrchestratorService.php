@@ -103,11 +103,12 @@ class AIOrchestratorService
 	 * @param string                            $message     The user message.
 	 * @param array<int, array<string, mixed>>  $history     Prior turns as ['role' => ..., 'text' => ..., 'attachments' => [...]].
 	 * @param array<int, array<string, string>> $attachments Attachments for the current turn (each ['data' => dataUri, 'mimeType' => ..., 'name' => ...]).
+	 * @param string                            $requestId   Optional client-generated UUID for live progress reporting.
 	 *
 	 * @return AgentResponse
 	 * @since 1.0.0
 	 */
-	public function chat(AgentConfig $agent, string $message, array $history = [], array $attachments = []): AgentResponse
+	public function chat(AgentConfig $agent, string $message, array $history = [], array $attachments = [], string $requestId = ''): AgentResponse
 	{
 		$guard = $this->guard($agent->provider);
 		if ($guard instanceof WP_Error) {
@@ -133,7 +134,8 @@ class AIOrchestratorService
 			$abilities,
 			$agent->provider,
 			$agent->model,
-			$agent->maxToolCalls
+			$agent->maxToolCalls,
+			$requestId
 		);
 
 		// When a write ability requires confirmation, persist the wire-format

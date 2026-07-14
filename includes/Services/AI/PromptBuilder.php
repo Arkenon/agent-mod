@@ -14,6 +14,7 @@
 
 namespace AgentMod\Services\AI;
 
+use AgentMod\Common\Constants;
 use AgentMod\Services\AI\DTO\AgentConfig;
 
 defined('ABSPATH') || exit;
@@ -65,24 +66,112 @@ class PromptBuilder
 			$sections[] = $this->formatSiteContext($siteContext);
 		}
 
-		$sections[] = __(
-			'Never directly execute destructive operations (delete, trash, erase, or remove content or users). Instead, list the affected items and ask the user for explicit confirmation before any such action is taken. If no relevant tool exists to list them, describe what would be affected and request confirmation.',
-			'agent-mod'
-		);
+		// User-managed base prompt (settings), defaulting to the built-in directives.
+		$base = trim(Constants::aiBaseSystemPrompt());
+		if ('' !== $base) {
+			$sections[] = $base;
+		}
 
-		$sections[] = __(
-			'When a user request is ambiguous or missing required details, ask one short clarifying question before calling any tools. Do not assume intent.',
-			'agent-mod'
-		);
+		$modeDirective = $this->buildModeDirective($agent);
+		if ('' !== $modeDirective) {
+			$sections[] = $modeDirective;
+		}
 
-		$sections[] = __(
-			'When a tool can answer the user accurately, call it before responding. Base your answers on tool results rather than guessing.',
-			'agent-mod'
-		);
+		$emphasized = $this->resolveEmphasized($agent);
+		if (! empty($emphasized)) {
+			$sections[] = sprintf(
+				/* translators: %s: comma-separated ability (tool) names. */
+				__('The user has highlighted these tools for this request. Prefer using them when they can fulfil the task: %s. All other tools remain available.', 'agent-mod'),
+				implode(', ', $emphasized)
+			);
+		}
 
 		$instruction = implode("\n\n", array_filter($sections));
 
 		return (string) apply_filters('agent_mod_system_prompt', $instruction, $agent);
+	}
+
+	/**
+	 * Builds the directive for the active interaction mode.
+	 *
+	 * Execute mode adds nothing; ask/plan modes steer the agent away from
+	 * making changes (write abilities are also removed by the AbilityResolver).
+	 *
+	 * @param AgentConfig $agent The agent configuration.
+	 *
+	 * @return string
+	 * @since 1.1.0
+	 */
+	private function buildModeDirective(AgentConfig $agent): string
+	{
+		$directive = '';
+
+		if ('ask' === $agent->mode) {
+			$directive = __(
+				'You are in Ask mode: answer questions and explain. You may read site data with the available tools, but you must not create, modify, or delete anything. If the user asks for a change, explain what you would do and suggest switching to Execute mode.',
+				'agent-mod'
+			);
+		} elseif ('plan' === $agent->mode) {
+			$directive = __(
+				'You are in Plan mode: produce a clear, step-by-step plan of what you WOULD do, including which tools you would call and with what arguments. You may read site data with the available tools, but do not execute any changes. Suggest switching to Execute mode to carry the plan out.',
+				'agent-mod'
+			);
+		}
+
+		return (string) apply_filters('agent_mod_mode_directive', $directive, $agent->mode, $agent);
+	}
+
+	/**
+	 * Validates the user-mentioned ability names against the registry.
+	 *
+	 * Unregistered names are dropped so nothing user-controlled is injected
+	 * into the system instruction; the list is deduped and capped at 10. In
+	 * ask/plan modes write abilities are dropped too, mirroring the tool list
+	 * resolved for those modes.
+	 *
+	 * @param AgentConfig $agent The agent configuration.
+	 *
+	 * @return string[] Valid ability names.
+	 * @since 1.1.0
+	 */
+	private function resolveEmphasized(AgentConfig $agent): array
+	{
+		if (empty($agent->emphasizedAbilities) || ! function_exists('wp_get_ability')) {
+			return [];
+		}
+
+		$readonlyOnly = 'execute' !== $agent->mode;
+		$names        = [];
+
+		foreach (array_unique($agent->emphasizedAbilities) as $name) {
+			$name = sanitize_text_field((string) $name);
+
+			if ('' === $name) {
+				continue;
+			}
+
+			$ability = wp_get_ability($name);
+
+			if (null === $ability) {
+				continue;
+			}
+
+			if ($readonlyOnly) {
+				$meta = (array) $ability->get_meta();
+
+				if (true !== ($meta['annotations']['readonly'] ?? false)) {
+					continue;
+				}
+			}
+
+			$names[] = $name;
+
+			if (count($names) >= 10) {
+				break;
+			}
+		}
+
+		return $names;
 	}
 
 	/**

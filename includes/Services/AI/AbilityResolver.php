@@ -38,7 +38,35 @@ class AbilityResolver
 			? $this->resolveSelected($agent->allowedAbilities)
 			: array_values(wp_get_abilities());
 
+		// Ask/Plan modes only get read-only abilities; Pro keeps final say via the filter below.
+		if ('execute' !== $agent->mode) {
+			$abilities = $this->filterReadonly($abilities);
+		}
+
 		return (array) apply_filters('agent_mod_resolved_abilities', $abilities, $agent);
+	}
+
+	/**
+	 * Keeps only abilities explicitly annotated as read-only.
+	 *
+	 * Abilities without a readonly annotation are treated as writable and removed.
+	 *
+	 * @param WP_Ability[] $abilities Resolved abilities.
+	 *
+	 * @return WP_Ability[]
+	 * @since 1.1.0
+	 */
+	private function filterReadonly(array $abilities): array
+	{
+		return array_values(array_filter($abilities, static function ($ability): bool {
+			if (! $ability instanceof WP_Ability) {
+				return false;
+			}
+
+			$meta = (array) $ability->get_meta();
+
+			return true === ($meta['annotations']['readonly'] ?? false);
+		}));
 	}
 
 	/**

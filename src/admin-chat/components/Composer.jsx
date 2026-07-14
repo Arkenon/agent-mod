@@ -13,6 +13,8 @@ import { STORE_NAME } from '../store';
 import AttachmentUploader from './AttachmentUploader';
 import AgentSelector from './AgentSelector';
 import ProviderModelSelector from './ProviderModelSelector';
+import ModeSelector from './ModeSelector';
+import AbilityTray from './AbilityTray';
 
 export default function Composer() {
 	const [ text, setText ]               = useState( '' );
@@ -50,6 +52,14 @@ export default function Composer() {
 		}
 	};
 
+	// Appends an "@ability-name " mention from the ability tray to the text.
+	const insertMention = ( name ) => {
+		setText( ( current ) =>
+			( current && ! current.endsWith( ' ' ) ? current + ' ' : current ) +
+			'@' + name + ' '
+		);
+	};
+
 	return (
 		<div className="agent-mod-chat__composer">
 			<AttachmentUploader
@@ -74,7 +84,9 @@ export default function Composer() {
 			<div className="agent-mod-chat__composer-actions">
 				<div className="agent-mod-chat__tools">
 					<AgentSelector />
+					<ModeSelector />
 					<ProviderModelSelector />
+					<AbilityTray onInsert={ insertMention } disabled={ loading } />
 
 					<Button
 						icon="paperclip"

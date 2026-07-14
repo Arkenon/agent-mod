@@ -59,6 +59,14 @@ export function setPendingConfirmation( data ) {
 	return { type: 'SET_PENDING_CONFIRMATION', data };
 }
 
+export function setProgress( progress ) {
+	return { type: 'SET_PROGRESS', progress };
+}
+
+export function clearProgress() {
+	return { type: 'CLEAR_PROGRESS' };
+}
+
 export function setProviderModels( providerId, models ) {
 	return { type: 'SET_PROVIDER_MODELS', providerId, models };
 }
@@ -76,6 +84,15 @@ export function setModelsLoading( providerId ) {
  */
 export function selectProviderModel( provider, model ) {
 	return { type: 'SELECT_PROVIDER_MODEL', provider, model };
+}
+
+/**
+ * Selects the interaction mode for the next chat requests.
+ *
+ * @param {string} mode One of 'ask', 'plan', 'execute'.
+ */
+export function selectMode( mode ) {
+	return { type: 'SELECT_MODE', mode };
 }
 
 /**
@@ -111,6 +128,35 @@ export function clearConfirmation() {
 	return { type: 'CLEAR_CONFIRMATION' };
 }
 
+export function setAbilities( abilities ) {
+	return { type: 'SET_ABILITIES', abilities };
+}
+
+export function setAbilitiesLoading( loading ) {
+	return { type: 'SET_ABILITIES_LOADING', loading };
+}
+
+/**
+ * Lazily fetches the registered abilities from the core Abilities API endpoint
+ * and caches them in the store. No-op when already loaded.
+ */
+export const fetchAbilities = () => async ( { dispatch, select } ) => {
+	if ( null !== select.getAbilities() || select.isAbilitiesLoading() ) {
+		return;
+	}
+
+	dispatch.setAbilitiesLoading( true );
+
+	try {
+		const abilities = await apiFetch( { path: '/wp-abilities/v1/abilities' } );
+		dispatch.setAbilities( Array.isArray( abilities ) ? abilities : [] );
+	} catch {
+		dispatch.setAbilities( [] );
+	} finally {
+		dispatch.setAbilitiesLoading( false );
+	}
+};
+
 /**
  * Fetches the list of agents from the REST endpoint and updates the store.
  */
@@ -135,18 +181,25 @@ export const fetchAgents = () => async ( { dispatch } ) => {
 export const confirmAction = ( token, conversationId ) => async ( { dispatch } ) => {
 	dispatch.setLoading( true );
 
+	const requestId   = generateRequestId();
+	const stopPolling = startProgressPolling( requestId, dispatch );
+
 	try {
 		const config = window.agentModChat || {};
 		const data   = await apiFetch( {
 			path:   ( config.restNamespace || 'agent-mod/v1' ) + '/confirm-action',
 			method: 'POST',
-			data:   { token, conversationId },
+			data:   { token, conversationId, requestId },
 		} );
 
 		dispatch.clearConfirmation();
 
 		if ( data && data.success && ! data.pendingConfirmation ) {
-			dispatch.appendMessage( { role: 'assistant', text: data.text || '' } );
+			dispatch.appendMessage( {
+				role: 'assistant',
+				text: data.text || '',
+				toolCalls: Array.isArray( data.toolCalls ) ? data.toolCalls : [],
+			} );
 
 			if ( data.conversationId ) {
 				dispatch.setConversationId( data.conversationId );
@@ -171,6 +224,7 @@ export const confirmAction = ( token, conversationId ) => async ( { dispatch } )
 			__( 'Request failed. Please try again.', 'agent-mod' )
 		);
 	} finally {
+		stopPolling();
 		dispatch.setLoading( false );
 	}
 };
@@ -183,6 +237,73 @@ export const confirmAction = ( token, conversationId ) => async ( { dispatch } )
  */
 function toWireAttachment( { name, mimeType, data } ) {
 	return { name, mimeType, data };
+}
+
+/**
+ * Extracts namespaced ability names mentioned as "@namespace/ability" in a
+ * message. Names are deduped; validity is enforced server-side.
+ *
+ * @param {string} text The message text.
+ * @return {string[]} Mentioned ability names.
+ */
+function parseAbilityMentions( text ) {
+	const matches = ( text || '' ).matchAll(
+		/@([a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*)/g
+	);
+
+	return [ ...new Set( [ ...matches ].map( ( match ) => match[ 1 ] ) ) ];
+}
+
+/**
+ * Generates a UUID v4 request id for live progress polling.
+ *
+ * Falls back to Math.random when crypto.randomUUID is unavailable (it requires
+ * a secure context, which plain-http local sites do not have).
+ *
+ * @return {string} A UUID v4 string.
+ */
+function generateRequestId() {
+	if ( window.crypto?.randomUUID ) {
+		return window.crypto.randomUUID();
+	}
+
+	return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace( /[xy]/g, ( c ) => {
+		const r = ( Math.random() * 16 ) | 0;
+		const v = 'x' === c ? r : ( r & 0x3 ) | 0x8;
+		return v.toString( 16 );
+	} );
+}
+
+/**
+ * Starts polling the chat-progress endpoint for an in-flight request and
+ * dispatches the live state into the store. Returns a stop function.
+ *
+ * @param {string}   requestId Client-generated UUID sent with the chat request.
+ * @param {Function} dispatch  Store dispatch object.
+ * @return {Function} Stops polling and clears the progress state.
+ */
+function startProgressPolling( requestId, dispatch ) {
+	const config = window.agentModChat || {};
+	const path =
+		( config.restNamespace || 'agent-mod/v1' ) +
+		'/chat-progress?requestId=' +
+		encodeURIComponent( requestId );
+
+	const interval = setInterval( async () => {
+		try {
+			const progress = await apiFetch( { path } );
+			if ( progress && 'unknown' !== progress.status ) {
+				dispatch.setProgress( progress );
+			}
+		} catch {
+			// Progress is best-effort; never surface polling errors.
+		}
+	}, 1200 );
+
+	return () => {
+		clearInterval( interval );
+		dispatch.clearProgress();
+	};
 }
 
 /**
@@ -207,9 +328,10 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 	// Build history from the messages present *before* this new turn.
 	// Spread `...rest` so Pro can persist extra fields (e.g. structured_data)
 	// that survive the round-trip through the DB and the sanitizeHistory filter.
+	// toolCalls is display-only metadata and is not re-sent.
 	const history = select
 		.getMessages()
-		.map( ( { role, text: messageText, attachments: turnFiles, ...rest } ) => ( {
+		.map( ( { role, text: messageText, attachments: turnFiles, toolCalls, ...rest } ) => ( {
 			role,
 			text: messageText,
 			attachments: ( turnFiles || [] ).map( toWireAttachment ),
@@ -227,7 +349,15 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 		...( config.defaultAgent || {} ),
 		...( selectedAgent || {} ),
 		autoIncludeSiteContext: select.isSiteContextEnabled(),
+		mode: select.getSelectedMode() || 'execute',
 	};
+
+	// @-mentioned abilities (e.g. "@agent-mod/list-posts") are emphasized in the
+	// system prompt server-side; the mention text itself stays in the message.
+	const mentionedAbilities = parseAbilityMentions( trimmed );
+	if ( 0 < mentionedAbilities.length ) {
+		agent.emphasizedAbilities = mentionedAbilities;
+	}
 
 	// A provider/model picked in the picker overrides the agent defaults so the
 	// WP AI Client uses exactly that provider and model for this request.
@@ -241,6 +371,9 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 	dispatch.appendMessage( { role: 'user', text: trimmed, attachments: files } );
 	dispatch.setLoading( true );
 
+	const requestId    = generateRequestId();
+	const stopPolling  = startProgressPolling( requestId, dispatch );
+
 	try {
 		const basePayload = {
 			message: trimmed,
@@ -248,6 +381,7 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 			history,
 			attachments: files.map( toWireAttachment ),
 			conversationId: select.getConversationId(),
+			requestId,
 		};
 
 		const payload = applyFilters( 'agent_mod.send_message_payload', basePayload );
@@ -275,6 +409,7 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 				dispatch.appendMessage( {
 					role: 'assistant',
 					text: data.text || '',
+					toolCalls: Array.isArray( data.toolCalls ) ? data.toolCalls : [],
 				} );
 
 				if ( data.conversationId ) {
@@ -293,6 +428,7 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 			__( 'Request failed. Please try again.', 'agent-mod' );
 		dispatch.setError( message );
 	} finally {
+		stopPolling();
 		dispatch.setLoading( false );
 	}
 };

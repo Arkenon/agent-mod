@@ -20,6 +20,7 @@ use AgentMod\Common\Constants;
 use AgentMod\Common\Helper;
 use AgentMod\Services\AI\AIOrchestratorService;
 use AgentMod\Services\AI\ConfirmationStore;
+use AgentMod\Services\AI\ProgressStore;
 use AgentMod\Services\AI\ProviderInfoService;
 use AgentMod\Services\AI\DTO\AgentConfig;
 
@@ -52,22 +53,33 @@ final class AIChatRestController
 	private ProviderInfoService $providerInfo;
 
 	/**
+	 * Live tool-call progress store.
+	 *
+	 * @var ProgressStore
+	 * @since 1.1.0
+	 */
+	private ProgressStore $progressStore;
+
+	/**
 	 * Constructor (PHP-DI autowired). Binds the REST route registration.
 	 *
 	 * @param AIOrchestratorService  $orchestrator           AI orchestrator service.
 	 * @param ConfirmationStore      $confirmationStore      Pending write-action store.
 	 * @param ProviderInfoService    $providerInfo           Connected-provider info service.
+	 * @param ProgressStore          $progressStore          Live tool-call progress store.
 	 *
 	 * @since 1.0.0
 	 */
 	public function __construct(
 		AIOrchestratorService $orchestrator,
 		ConfirmationStore $confirmationStore,
-		ProviderInfoService $providerInfo
+		ProviderInfoService $providerInfo,
+		ProgressStore $progressStore
 	) {
 		$this->orchestrator           = $orchestrator;
 		$this->confirmationStore      = $confirmationStore;
 		$this->providerInfo           = $providerInfo;
+		$this->progressStore          = $progressStore;
 		add_action('rest_api_init', [$this, 'registerRoutes']);
 	}
 
@@ -129,6 +141,23 @@ final class AIChatRestController
 				'permission_callback' => [$this, 'checkPermission'],
 			]
 		);
+
+		// Live tool-call progress for an in-flight chat request (polled by the widget).
+		register_rest_route(
+			Constants::REST_NAMESPACE,
+			'/chat-progress',
+			[
+				'methods'             => 'GET',
+				'callback'            => [$this, 'handleChatProgress'],
+				'permission_callback' => [$this, 'checkPermission'],
+				'args'                => [
+					'requestId' => [
+						'type'     => 'string',
+						'required' => true,
+					],
+				],
+			]
+		);
 	}
 
 	/**
@@ -181,7 +210,7 @@ final class AIChatRestController
 
 		do_action('agent_mod_before_chat', $agent, $message, $history);
 
-		$response = $this->orchestrator->chat($agent, $message, $history, $attachments);
+		$response = $this->orchestrator->chat($agent, $message, $history, $attachments, $this->sanitizeRequestId($request));
 
 		do_action('agent_mod_after_chat', $agent, $response, $conversationId);
 
@@ -278,7 +307,7 @@ final class AIChatRestController
 			wp_json_encode($pendingCall['args'] ?? [])
 		);
 
-		$response = $this->orchestrator->chat($agent, $confirmInstruction, $history, $attachments);
+		$response = $this->orchestrator->chat($agent, $confirmInstruction, $history, $attachments, $this->sanitizeRequestId($request));
 
 		if ($response->isError()) {
 			$error  = $response->error;
@@ -300,6 +329,44 @@ final class AIChatRestController
 		$payload['conversationId'] = $conversationId ?: null;
 
 		return rest_ensure_response($payload);
+	}
+
+	/**
+	 * Returns the live tool-call progress for an in-flight chat request.
+	 *
+	 * @param WP_REST_Request $request The REST request.
+	 *
+	 * @return WP_REST_Response|WP_Error
+	 * @since 1.1.0
+	 */
+	public function handleChatProgress(WP_REST_Request $request)
+	{
+		$requestId = $this->sanitizeRequestId($request);
+
+		if ('' === $requestId) {
+			return new WP_Error('invalid_request_id', __('Invalid request id.', 'agent-mod'), ['status' => 400]);
+		}
+
+		$state    = $this->progressStore->load($requestId);
+		$response = rest_ensure_response($state ?? ['status' => 'unknown']);
+		$response->header('Cache-Control', 'no-store');
+
+		return $response;
+	}
+
+	/**
+	 * Extracts and validates the client-generated request id (UUID) from a request.
+	 *
+	 * @param WP_REST_Request $request The REST request.
+	 *
+	 * @return string The UUID, or '' when missing/invalid.
+	 * @since 1.1.0
+	 */
+	private function sanitizeRequestId(WP_REST_Request $request): string
+	{
+		$requestId = sanitize_text_field((string) $request->get_param('requestId'));
+
+		return wp_is_uuid($requestId) ? $requestId : '';
 	}
 
 	/**

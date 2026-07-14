@@ -13,6 +13,8 @@
 
 namespace AgentMod\Services;
 
+use AgentMod\Common\Constants;
+
 defined('ABSPATH') || exit;
 
 final class SettingsService
@@ -44,8 +46,11 @@ final class SettingsService
 		add_filter('agent_mod_attachment_max_count',   [$this, 'filterAttachmentMaxCount']);
 		add_filter('agent_mod_attachment_mime_types',  [$this, 'filterAttachmentMimeTypes']);
 
-		// Prepend global system prompt at priority 5 so Pro overrides (priority 10) run after.
-		add_filter('agent_mod_system_prompt', [$this, 'prependGlobalSystemPrompt'], 5, 2);
+		// Bridge the user-managed base system prompt into the filterable constant.
+		add_filter('agent_mod_base_system_prompt', [$this, 'filterBaseSystemPrompt']);
+
+		// One-time migration: seed the editable prompt text on existing installs.
+		add_action('admin_init', [$this, 'maybeSeedBaseSystemPrompt']);
 	}
 
 	/**
@@ -104,10 +109,10 @@ final class SettingsService
 					[
 						'fieldType'   => 'textarea',
 						'name'        => 'global_system_prompt',
-						'fieldLabel'  => __('Global System Prompt', 'agent-mod'),
-						'help'        => __('Prepended to every agent\'s system prompt. Leave empty to skip.', 'agent-mod'),
+						'fieldLabel'  => __('Base System Prompt', 'agent-mod'),
+						'help'        => __('The core behaviour instructions sent to the AI with every message. Fully editable: change or remove directives to manage the assistant\'s behaviour. Leave empty to use the built-in defaults.', 'agent-mod'),
 						'placeholder' => __('You are a helpful WordPress assistant.', 'agent-mod'),
-						'default'     => '',
+						'default'     => Constants::aiDefaultSystemPrompt(),
 					],
 				],
 			],
@@ -247,20 +252,42 @@ final class SettingsService
 	}
 
 	/**
-	 * Prepends the saved global system prompt (if any) to the assembled instruction.
+	 * Returns the user-managed base system prompt when saved, else the default.
 	 *
-	 * Runs at priority 5 so Pro-level overrides at priority 10 still apply after.
+	 * An empty saved value falls back to the caller-supplied default so a site
+	 * can never accidentally ship an assistant with no behaviour directives.
 	 *
-	 * @param string $instruction Assembled system instruction.
-	 * @param mixed  $agent       AgentConfig DTO (unused here).
+	 * @param string $default Caller-supplied default (the built-in directives).
 	 *
 	 * @return string
-	 * @since 1.0.0
+	 * @since 1.1.0
 	 */
-	public function prependGlobalSystemPrompt(string $instruction, $agent): string
+	public function filterBaseSystemPrompt(string $default): string
 	{
-		$prefix = trim((string) ($this->getSettings()['global_system_prompt'] ?? ''));
-		return '' !== $prefix ? $prefix . "\n\n" . $instruction : $instruction;
+		$saved = trim((string) ($this->getSettings()['global_system_prompt'] ?? ''));
+		return '' !== $saved ? $saved : $default;
+	}
+
+	/**
+	 * Seeds the base system prompt on installs that saved settings before the
+	 * prompt became user-managed, so admins see (and can edit) the real text.
+	 *
+	 * @return void
+	 * @since 1.1.0
+	 */
+	public function maybeSeedBaseSystemPrompt(): void
+	{
+		if (get_option('agent_mod_prompt_seeded')) {
+			return;
+		}
+
+		$settings = get_option(self::OPTION_KEY, false);
+		if (is_array($settings) && '' === trim((string) ($settings['global_system_prompt'] ?? ''))) {
+			$settings['global_system_prompt'] = Constants::aiDefaultSystemPrompt();
+			update_option(self::OPTION_KEY, $settings);
+		}
+
+		update_option('agent_mod_prompt_seeded', 1, false);
 	}
 
 	/**

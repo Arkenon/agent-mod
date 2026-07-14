@@ -109,6 +109,28 @@ final class AgentConfig
 	public bool $autoIncludeSiteContext;
 
 	/**
+	 * Interaction mode: 'ask', 'plan' or 'execute'.
+	 *
+	 * In 'ask' and 'plan' modes only read-only abilities are resolved and the
+	 * system instruction steers the agent away from making changes.
+	 *
+	 * @var string
+	 * @since 1.1.0
+	 */
+	public string $mode;
+
+	/**
+	 * Ability names the user @-mentioned for this request.
+	 *
+	 * These are emphasized in the system instruction (the full tool list stays
+	 * available); names are validated against the registry by the PromptBuilder.
+	 *
+	 * @var string[]
+	 * @since 1.1.0
+	 */
+	public array $emphasizedAbilities;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param string      $name                   Agent name.
@@ -122,6 +144,8 @@ final class AgentConfig
 	 * @param string[]    $allowedAbilities       Allowed ability names for 'selected'.
 	 * @param int         $maxToolCalls           Max tool-calling iterations.
 	 * @param bool        $autoIncludeSiteContext Include site context flag.
+	 * @param string      $mode                   'ask', 'plan' or 'execute'.
+	 * @param string[]    $emphasizedAbilities    Ability names mentioned by the user.
 	 *
 	 * @since 1.0.0
 	 */
@@ -136,7 +160,9 @@ final class AgentConfig
 		string $abilitySource = 'all',
 		array $allowedAbilities = [],
 		int $maxToolCalls = Constants::AI_MAX_TOOL_CALLS,
-		bool $autoIncludeSiteContext = true
+		bool $autoIncludeSiteContext = true,
+		string $mode = 'execute',
+		array $emphasizedAbilities = []
 	) {
 		$this->name                   = $name;
 		$this->role                   = $role;
@@ -149,6 +175,8 @@ final class AgentConfig
 		$this->allowedAbilities       = $allowedAbilities;
 		$this->maxToolCalls           = $maxToolCalls > 0 ? $maxToolCalls : Constants::aiMaxToolCalls();
 		$this->autoIncludeSiteContext = $autoIncludeSiteContext;
+		$this->mode                   = in_array($mode, ['ask', 'plan', 'execute'], true) ? $mode : 'execute';
+		$this->emphasizedAbilities    = $emphasizedAbilities;
 	}
 
 	/**
@@ -173,6 +201,11 @@ final class AgentConfig
 			$allowed = array_filter(array_map('trim', explode(',', $allowed)));
 		}
 
+		$emphasized = $data['emphasizedAbilities'] ?? ($data['emphasized_abilities'] ?? []);
+		if (is_string($emphasized)) {
+			$emphasized = array_filter(array_map('trim', explode(',', $emphasized)));
+		}
+
 		return new self(
 			(string) ($data['name'] ?? 'AgentMod Assistant'),
 			(string) ($data['role'] ?? ''),
@@ -184,7 +217,9 @@ final class AgentConfig
 			(string) ($data['abilitySource'] ?? ($data['ability_source'] ?? 'all')),
 			array_values((array) $allowed),
 			(int) ($data['maxToolCalls'] ?? ($data['max_tool_calls'] ?? Constants::aiMaxToolCalls())),
-			(bool) ($data['autoIncludeSiteContext'] ?? ($data['auto_include_site_context'] ?? true))
+			(bool) ($data['autoIncludeSiteContext'] ?? ($data['auto_include_site_context'] ?? true)),
+			(string) ($data['mode'] ?? 'execute'),
+			array_values((array) $emphasized)
 		);
 	}
 }

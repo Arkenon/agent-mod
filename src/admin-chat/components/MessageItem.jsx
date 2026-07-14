@@ -3,18 +3,24 @@
  *
  * Renders any attachments above the message content. Text is rendered via
  * MessageContent (markdown-aware for assistant messages) and action buttons
- * (copy, create draft) via MessageActions.
+ * (copy, create draft) via MessageActions. Assistant messages list the tools
+ * used to produce the answer in a collapsible section.
  *
  * @package    AgentMod
  * @subpackage AdminChat/Components
  * @since      1.0.0
  */
+import { __, sprintf } from '@wordpress/i18n';
+
 import MessageContent from './MessageContent';
 import MessageActions from './MessageActions';
 
 export default function MessageItem( { message } ) {
 	const role = 'assistant' === message.role ? 'assistant' : 'user';
 	const attachments = message.attachments || [];
+	const toolCalls = 'assistant' === role && Array.isArray( message.toolCalls )
+		? message.toolCalls
+		: [];
 
 	return (
 		<div
@@ -50,6 +56,30 @@ export default function MessageItem( { message } ) {
 
 				{ !! ( message.text || '' ) && (
 					<MessageContent message={ message } />
+				) }
+
+				{ 0 < toolCalls.length && (
+					<details className="agent-mod-chat__toolcalls">
+						<summary>
+							{ sprintf(
+								/* translators: %d: number of tool calls. */
+								__( 'Tools used (%d)', 'agent-mod' ),
+								toolCalls.length
+							) }
+						</summary>
+						<ul>
+							{ toolCalls.map( ( call, index ) => (
+								<li key={ index }>
+									<code className="agent-mod-chat__toolcall-name">
+										{ call.name }
+									</code>
+									<code className="agent-mod-chat__toolcall-args">
+										{ JSON.stringify( call.args || {} ) }
+									</code>
+								</li>
+							) ) }
+						</ul>
+					</details>
 				) }
 
 				<MessageActions message={ message } />

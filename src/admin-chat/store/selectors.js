@@ -46,6 +46,22 @@ export function getSelectedModel( state ) {
 	return state.selectedModel;
 }
 
+export function getSelectedMode( state ) {
+	return state.selectedMode;
+}
+
+export function getProgress( state ) {
+	return state.progress;
+}
+
+export function getAbilities( state ) {
+	return state.abilities;
+}
+
+export function isAbilitiesLoading( state ) {
+	return state.abilitiesLoading;
+}
+
 export function getProviderModels( state, providerId ) {
 	return state.providerModels[ providerId ] || null;
 }

@@ -179,6 +179,14 @@ class AbilityRegistrarService
 				},
 				'input_schema'        => [
 					'type' => 'object',
+					'properties'=>[
+						'count'=>[
+							'type' => 'integer',
+							'description' => __('How many templates to return (1-20).', 'agent-mod'),
+							'minimum' => 1,
+							'maximum' => Constants::aiMaxSearchResults(),
+						],
+					],
 				],
 				'output_schema'       => [
 					'type'       => 'object',
@@ -307,7 +315,7 @@ class AbilityRegistrarService
 						],
 						'posts_per_page' => [
 							'type'        => 'integer',
-							'description' => __('Results per page. Default 10, max 50.', 'agent-mod'),
+							'description' => __('Results per page. Default 10, capped at the Max Search Results setting.', 'agent-mod'),
 						],
 						'paged'          => [
 							'type'        => 'integer',
@@ -1135,7 +1143,8 @@ class AbilityRegistrarService
 	{
 		$input        = is_array($input) ? $input : [];
 		$postType     = isset($input['post_type']) ? $input['post_type'] : 'any';
-		$postsPerPage = isset($input['posts_per_page']) ? min(absint($input['posts_per_page']), 50) : 10;
+		$maxResults   = Constants::aiMaxSearchResults();
+		$postsPerPage = isset($input['posts_per_page']) ? min(absint($input['posts_per_page']), $maxResults) : min(10, $maxResults);
 		$paged        = isset($input['paged']) ? max(absint($input['paged']), 1) : 1;
 		$search       = isset($input['s']) ? sanitize_text_field((string) $input['s']) : '';
 		$orderby      = isset($input['orderby']) ? $input['orderby'] : 'title';
@@ -1207,8 +1216,23 @@ class AbilityRegistrarService
 	 */
 	public function executeGetPost($input = null): array
 	{
+		// Full-content reads are capped per request to control latency and token cost.
+		static $fullContentReads = 0;
+
 		if (! is_array($input) || empty($input['post_id'])) {
 			return ['success' => false, 'error' => __('post_id is required.', 'agent-mod')];
+		}
+
+		$maxReads = Constants::aiMaxFullContentPosts();
+		if ($fullContentReads >= $maxReads) {
+			return [
+				'success' => false,
+				'error'   => sprintf(
+					/* translators: %d: maximum number of full-content post reads per message. */
+					__('Full-content read limit reached: at most %d posts can be read in full per message. Summarize what you already have, or ask the user to narrow the request.', 'agent-mod'),
+					$maxReads
+				),
+			];
 		}
 
 		$postId = absint($input['post_id']);
@@ -1224,6 +1248,8 @@ class AbilityRegistrarService
 				),
 			];
 		}
+
+		$fullContentReads++;
 
 		return [
 			'success'   => true,

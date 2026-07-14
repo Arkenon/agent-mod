@@ -15,8 +15,12 @@ const DEFAULT_STATE = {
 	agents: [],
 	selectedAgentId: null,
 	pendingConfirmation: null, // { token, actionName, args, pendingToolCalls }
+	progress: null, // live tool-call progress: { status, currentTool, executedCalls }
+	abilities: null, // registered abilities for the ability tray (null = not loaded)
+	abilitiesLoading: false,
 	selectedProvider: null, // provider id chosen in the provider/model picker
 	selectedModel: null, // model id chosen for the selected provider
+	selectedMode: 'execute', // interaction mode: 'ask' | 'plan' | 'execute'
 	// providerId -> [{ id, name }]. Hydrated from localStorage so the picker is
 	// populated instantly across page loads; refreshed by the background prefetch.
 	providerModels: loadProviderModels(),
@@ -79,6 +83,21 @@ export default function reducer( state = DEFAULT_STATE, action ) {
 				selectedProvider: action.provider,
 				selectedModel: action.model,
 			};
+
+		case 'SELECT_MODE':
+			return { ...state, selectedMode: action.mode };
+
+		case 'SET_PROGRESS':
+			return { ...state, progress: action.progress };
+
+		case 'CLEAR_PROGRESS':
+			return { ...state, progress: null };
+
+		case 'SET_ABILITIES':
+			return { ...state, abilities: action.abilities };
+
+		case 'SET_ABILITIES_LOADING':
+			return { ...state, abilitiesLoading: action.loading };
 
 		case 'SET_PENDING_CONFIRMATION':
 			return { ...state, pendingConfirmation: action.data, isLoading: false };

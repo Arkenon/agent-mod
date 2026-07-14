@@ -104,6 +104,50 @@ class Constants
 	// -------------------------------------------------------------------------
 
 	/**
+	 * Returns the canonical default base system prompt.
+	 *
+	 * These core behaviour directives ship as the default value of the
+	 * "Base System Prompt" setting so site owners can fully manage them.
+	 *
+	 * @return string
+	 * @since 1.1.0
+	 */
+	public static function aiDefaultSystemPrompt(): string
+	{
+		$directives = [
+			__(
+				'Never directly execute destructive operations (delete, trash, erase, or remove content or users). Instead, list the affected items and ask the user for explicit confirmation before any such action is taken. If no relevant tool exists to list them, describe what would be affected and request confirmation.',
+				'agent-mod'
+			),
+			__(
+				'When a user request is ambiguous or missing required details, ask one short clarifying question before calling any tools. Do not assume intent.',
+				'agent-mod'
+			),
+			__(
+				'When a tool can answer the user accurately, call it before responding. Base your answers on tool results rather than guessing.',
+				'agent-mod'
+			),
+		];
+
+		return implode("\n\n", $directives);
+	}
+
+	/**
+	 * Returns the effective base system prompt, after applying the
+	 * `agent_mod_base_system_prompt` filter.
+	 *
+	 * The settings page bridges the saved "Base System Prompt" value through
+	 * this filter, so the user-managed text replaces the default entirely.
+	 *
+	 * @return string
+	 * @since 1.1.0
+	 */
+	public static function aiBaseSystemPrompt(): string
+	{
+		return (string) apply_filters('agent_mod_base_system_prompt', self::aiDefaultSystemPrompt());
+	}
+
+	/**
 	 * Returns the effective maximum tool-call iterations, after applying the
 	 * `agent_mod_max_tool_calls` filter.
 	 *
