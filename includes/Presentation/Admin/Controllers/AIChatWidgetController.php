@@ -17,6 +17,7 @@ namespace AgentMod\Presentation\Admin\Controllers;
 use WP_Admin_Bar;
 use AgentMod\Common\Constants;
 use AgentMod\Services\AI\ProviderInfoService;
+use AgentMod\Services\SettingsService;
 
 defined('ABSPATH') || exit;
 
@@ -53,9 +54,19 @@ final class AIChatWidgetController
 	 *
 	 * @since 1.0.0
 	 */
-	public function __construct(ProviderInfoService $providerInfo)
+
+	/**
+	 * Inject SettingsService
+	 *
+	 * @var SettingsService
+	 * @since 1.0.0
+	 */
+	private SettingsService $settingsService;
+
+	public function __construct(ProviderInfoService $providerInfo, SettingsService $settingsService)
 	{
 		$this->providerInfo = $providerInfo;
+		$this->settingsService = $settingsService;
 
 		add_action('admin_bar_menu', [$this, 'addToolbarNode'], 100);
 		add_action('admin_enqueue_scripts', [$this, 'enqueueAssets']);
@@ -138,9 +149,6 @@ final class AIChatWidgetController
 			$asset['version']
 		);
 
-		$settings = (array) get_option('agent_mod_settings', []);
-		error_log(print_r($settings, true));
-
 		wp_localize_script(
 			self::HANDLE,
 			'agentModChat',
@@ -149,18 +157,18 @@ final class AIChatWidgetController
 				'defaultAgent'  => [
 					'provider'      => Constants::AI_PROVIDER_DEFAULT,
 					'abilitySource' => 'all',
-					'role'          => Constants::aiBaseRole(),
-					'goal'          => Constants::aiBaseGoal(),
+					'role'          => $this->settingsService->getRole(),
+					'goal'          => $this->settingsService->getGoal(),
 				],
 				'providers'     => $this->providerInfo->getConnectedProviders(),
 				'connectorsUrl' => admin_url('options-connectors.php'),
 				'attachments'  => [
-					'maxBytes'  => Constants::aiAttachmentMaxBytes(),
-					'maxCount'  => Constants::aiAttachmentMaxCount(),
-					'mimeTypes' => array_values(Constants::aiAttachmentMimeTypes()),
+					'maxBytes'  => $this->settingsService->getAttachmentMaxBytes(),
+					'maxCount'  => $this->settingsService->getAttachmentMaxCount(),
+					'mimeTypes' => $this->settingsService->getAttachmentMimeTypes(),
 				],
 				'defaults'     => [
-					'siteContextEnabled' => Constants::aiBaseContextEnabled(),
+					'siteContextEnabled' => $this->settingsService->isSiteContextEnabled(),
 				],
 				'strings'      => [
 					'title'             => __('AgentMod Assistant', 'agent-mod'),

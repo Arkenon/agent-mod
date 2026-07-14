@@ -18,6 +18,7 @@ use AgentMod\Presentation\Admin\Controllers\AdminController;
 use AgentMod\Presentation\Admin\Controllers\AbilitiesController;
 use AgentMod\Presentation\Admin\Controllers\AIChatRestController;
 use AgentMod\Presentation\Admin\Controllers\AIChatWidgetController;
+use AgentMod\Presentation\Admin\Controllers\SettingsController;
 
 final class ControllerInit
 {
@@ -29,6 +30,7 @@ final class ControllerInit
 	 */
 	private array $adminControllers =  [
 		AdminController::class,
+		SettingsController::class,
 		AIChatWidgetController::class,
 		AbilitiesController::class,
 	];

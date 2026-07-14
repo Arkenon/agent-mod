@@ -15,6 +15,8 @@
 namespace AgentMod\Services\AI\DTO;
 
 use AgentMod\Common\Constants;
+use AgentMod\Common\DI;
+use AgentMod\Services\SettingsService;
 
 defined('ABSPATH') || exit;
 
@@ -29,7 +31,7 @@ final class AgentConfig
 	public string $name;
 
 	/**
-	 * Short role description (e.g. "Support Assistant").
+	 * Role description.
 	 *
 	 * @var string
 	 * @since 1.0.0
@@ -61,7 +63,7 @@ final class AgentConfig
 	public string $systemPrompt;
 
 	/**
-	 * AI provider id (e.g. "gemini").
+	 * AI provider id (e.g. "gemini", empty string means "auto").
 	 *
 	 * @var string
 	 * @since 1.0.0
@@ -131,52 +133,65 @@ final class AgentConfig
 	public array $emphasizedAbilities;
 
 	/**
+	 * User-managed base system prompt, or built-in defaults.
+	 *
+	 * @var string
+	 * @since 1.1.0
+	 */
+	public string $baseSystemPrompt;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param string      $name                   Agent name.
-	 * @param string      $role                   Agent role.
-	 * @param string      $goal                   Agent goal.
+	 * @param string|null $name                   Agent name.
+	 * @param string|null $role                   Agent role.
+	 * @param string|null $goal                   Agent goal.
 	 * @param string[]    $personality            Personality traits.
 	 * @param string      $systemPrompt           Explicit system prompt override.
 	 * @param string      $provider               Provider id.
 	 * @param string|null $model                  Model id, or null for provider default.
 	 * @param string      $abilitySource          'all' or 'selected'.
 	 * @param string[]    $allowedAbilities       Allowed ability names for 'selected'.
-	 * @param int         $maxToolCalls           Max tool-calling iterations.
-	 * @param bool        $autoIncludeSiteContext Include site context flag.
+	 * @param int|null    $maxToolCalls           Max tool-calling iterations.
+	 * @param bool|null   $autoIncludeSiteContext Include site context flag.
 	 * @param string      $mode                   'ask', 'plan' or 'execute'.
 	 * @param string[]    $emphasizedAbilities    Ability names mentioned by the user.
+	 * @param string|null $baseSystemPrompt       Base system prompt.
 	 *
 	 * @since 1.0.0
 	 */
 	public function __construct(
-		string $name = Constants::AI_AGENT_DEFAULT_NAME,
-		string $role = Constants::AI_AGENT_DEFAULT_ROLE,
-		string $goal = Constants::AI_AGENT_DEFAULT_GOAL,
+		?string $name = null,
+		?string $role = null,
+		?string $goal = null,
 		array $personality = [],
 		string $systemPrompt = '',
 		string $provider = Constants::AI_PROVIDER_DEFAULT,
 		?string $model = null,
 		string $abilitySource = 'all',
 		array $allowedAbilities = [],
-		int $maxToolCalls = Constants::AI_MAX_TOOL_CALLS,
-		bool $autoIncludeSiteContext = true,
+		?int $maxToolCalls = null,
+		?bool $autoIncludeSiteContext = null,
 		string $mode = 'execute',
-		array $emphasizedAbilities = []
+		array $emphasizedAbilities = [],
+		?string $baseSystemPrompt = null
 	) {
-		$this->name                   = $name;
-		$this->role                   = $role;
-		$this->goal                   = $goal;
+		$settingsService = DI::container()->get(SettingsService::class);
+
+		$this->name                   = $name ?? Constants::AI_AGENT_DEFAULT_NAME;
+		$this->role                   = $role ?? $settingsService->getRole();
+		$this->goal                   = $goal ?? $settingsService->getGoal();
 		$this->personality            = $personality;
 		$this->systemPrompt           = $systemPrompt;
 		$this->provider               = $provider;
 		$this->model                  = $model;
 		$this->abilitySource          = in_array($abilitySource, ['all', 'selected'], true) ? $abilitySource : 'all';
 		$this->allowedAbilities       = $allowedAbilities;
-		$this->maxToolCalls           = $maxToolCalls > 0 ? $maxToolCalls : Constants::aiMaxToolCalls();
-		$this->autoIncludeSiteContext = $autoIncludeSiteContext;
+		$this->maxToolCalls           = ($maxToolCalls !== null && $maxToolCalls > 0) ? $maxToolCalls : $settingsService->getMaxToolCalls();
+		$this->autoIncludeSiteContext = $autoIncludeSiteContext ?? $settingsService->isSiteContextEnabled();
 		$this->mode                   = in_array($mode, ['ask', 'plan', 'execute'], true) ? $mode : 'execute';
 		$this->emphasizedAbilities    = $emphasizedAbilities;
+		$this->baseSystemPrompt       = $baseSystemPrompt ?? $settingsService->getSystemPrompt();
 	}
 
 	/**
@@ -207,19 +222,20 @@ final class AgentConfig
 		}
 
 		return new self(
-			(string) ($data['name'] ?? Constants::AI_AGENT_DEFAULT_NAME),
-			(string) ($data['role'] ?? Constants::AI_AGENT_DEFAULT_ROLE),
-			(string) ($data['goal'] ?? Constants::AI_AGENT_DEFAULT_GOAL),
+			isset($data['name']) && '' !== trim((string)$data['name']) ? (string) $data['name'] : null,
+			isset($data['role']) && '' !== trim((string)$data['role']) ? (string) $data['role'] : null,
+			isset($data['goal']) && '' !== trim((string)$data['goal']) ? (string) $data['goal'] : null,
 			array_values((array) $personality),
 			(string) ($data['systemPrompt'] ?? ($data['system_prompt'] ?? '')),
 			(string) ($data['provider'] ?? Constants::AI_PROVIDER_DEFAULT),
 			isset($data['model']) && '' !== $data['model'] ? (string) $data['model'] : null,
 			(string) ($data['abilitySource'] ?? ($data['ability_source'] ?? 'all')),
 			array_values((array) $allowed),
-			(int) ($data['maxToolCalls'] ?? ($data['max_tool_calls'] ?? Constants::aiMaxToolCalls())),
-			(bool) ($data['autoIncludeSiteContext'] ?? ($data['auto_include_site_context'] ?? true)),
+			isset($data['maxToolCalls']) || isset($data['max_tool_calls']) ? (int) ($data['maxToolCalls'] ?? $data['max_tool_calls']) : null,
+			isset($data['autoIncludeSiteContext']) || isset($data['auto_include_site_context']) ? (bool) ($data['autoIncludeSiteContext'] ?? $data['auto_include_site_context']) : null,
 			(string) ($data['mode'] ?? 'execute'),
-			array_values((array) $emphasized)
+			array_values((array) $emphasized),
+			isset($data['baseSystemPrompt']) || isset($data['base_system_prompt']) ? (string) ($data['baseSystemPrompt'] ?? $data['base_system_prompt']) : null
 		);
 	}
 }

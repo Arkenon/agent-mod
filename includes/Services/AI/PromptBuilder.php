@@ -14,7 +14,6 @@
 
 namespace AgentMod\Services\AI;
 
-use AgentMod\Common\Constants;
 use AgentMod\Services\AI\DTO\AgentConfig;
 
 defined('ABSPATH') || exit;
@@ -67,7 +66,7 @@ class PromptBuilder
 		}
 
 		// User-managed base prompt (settings), defaulting to the built-in directives.
-		$base = trim(Constants::aiBaseSystemPrompt());
+		$base = trim($agent->baseSystemPrompt);
 		if ('' !== $base) {
 			$sections[] = $base;
 		}

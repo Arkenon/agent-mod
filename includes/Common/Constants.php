@@ -120,7 +120,7 @@ class Constants
 	 * @since 1.0.5
 	 * @var string
 	 */
-	public const AI_AGENT_DEFAULT_ROLE = 'Creating content, designing and managing website via using ability tools.';
+	public const AI_AGENT_DEFAULT_ROLE = 'You are a WordPress expert AI assistant. You can create content, design, and manage the website using abilities.';
 
 	/**
 	 * Default goal of AgentMod Assistant.
@@ -128,7 +128,7 @@ class Constants
 	 * @since 1.0.5
 	 * @var string
 	 */
-	public const AI_AGENT_DEFAULT_GOAL = 'Completing requests with no mistake.';
+	public const AI_AGENT_DEFAULT_GOAL = 'Your goal is completing requests with high accuracy and efficiency and making no mistakes.';
 
 	// -------------------------------------------------------------------------
 	// Filtered getters — use these instead of the raw constants so that
@@ -162,129 +162,5 @@ class Constants
 		];
 
 		return implode("\n\n", $directives);
-	}
-
-	/**
-	 * Returns the effective base system prompt, after applying the
-	 * `agent_mod_base_system_prompt` filter.
-	 *
-	 * The settings page bridges the saved "Base System Prompt" value through
-	 * this filter, so the user-managed text replaces the default entirely.
-	 *
-	 * @return string
-	 * @since 1.0.0
-	 */
-	public static function aiBaseSystemPrompt(): string
-	{
-		return (string) apply_filters('agent_mod_base_system_prompt', self::aiDefaultSystemPrompt());
-	}
-
-	/**
-	 * Returns the effective base system role, after applying the
-	 * `agent_mod_base_role` filter.
-	 *
-	 * @return string
-	 * @since 1.0.5
-	 */
-	public static function aiBaseRole(): string
-	{
-		return (string) apply_filters('agent_mod_base_role', self::AI_AGENT_DEFAULT_ROLE);
-	}
-
-	/**
-	 * Returns the effective base system gole, after applying the
-	 * `agent_mod_base_goal` filter.
-	 *
-	 * @return string
-	 * @since 1.0.5
-	 */
-	public static function aiBaseGoal(): string
-	{
-		return (string) apply_filters('agent_mod_base_goal', self::AI_AGENT_DEFAULT_GOAL);
-	}
-
-
-	/**
-	 * Returns the effective base system context enabled, after applying the
-	 * `agent_mod_base_context_enabled` filter.
-	 *
-	 * @return bool
-	 * @since 1.0.6
-	 */
-	public static function aiBaseContextEnabled(): bool
-	{
-		return (bool) apply_filters('agent_mod_base_context_enabled', self::AI_CONTEXT_ENABLED);
-	}
-
-	/**
-	 * Returns the effective maximum tool-call iterations, after applying the
-	 * `agent_mod_max_tool_calls` filter.
-	 *
-	 * @return int
-	 * @since 1.0.0
-	 */
-	public static function aiMaxToolCalls(): int
-	{
-		return (int) apply_filters('agent_mod_max_tool_calls', self::AI_MAX_TOOL_CALLS);
-	}
-
-	/**
-	 * Returns the effective maximum search results, after applying the
-	 * `agent_mod_max_search_results` filter.
-	 *
-	 * @return int
-	 * @since 1.0.0
-	 */
-	public static function aiMaxSearchResults(): int
-	{
-		return (int) apply_filters('agent_mod_max_search_results', self::AI_MAX_SEARCH_RESULTS);
-	}
-
-	/**
-	 * Returns the effective maximum full-content posts, after applying the
-	 * `agent_mod_max_full_content_posts` filter.
-	 *
-	 * @return int
-	 * @since 1.0.0
-	 */
-	public static function aiMaxFullContentPosts(): int
-	{
-		return (int) apply_filters('agent_mod_max_full_content_posts', self::AI_MAX_FULL_CONTENT_POSTS);
-	}
-
-	/**
-	 * Returns the effective maximum attachment size in bytes, after applying the
-	 * `agent_mod_attachment_max_bytes` filter.
-	 *
-	 * @return int
-	 * @since 1.0.0
-	 */
-	public static function aiAttachmentMaxBytes(): int
-	{
-		return (int) apply_filters('agent_mod_attachment_max_bytes', self::AI_ATTACHMENT_MAX_BYTES);
-	}
-
-	/**
-	 * Returns the effective maximum attachment count per turn, after applying the
-	 * `agent_mod_attachment_max_count` filter.
-	 *
-	 * @return int
-	 * @since 1.0.0
-	 */
-	public static function aiAttachmentMaxCount(): int
-	{
-		return (int) apply_filters('agent_mod_attachment_max_count', self::AI_ATTACHMENT_MAX_COUNT);
-	}
-
-	/**
-	 * Returns the effective list of allowed attachment MIME types, after applying
-	 * the `agent_mod_attachment_mime_types` filter.
-	 *
-	 * @return string[]
-	 * @since 1.0.0
-	 */
-	public static function aiAttachmentMimeTypes(): array
-	{
-		return (array) apply_filters('agent_mod_attachment_mime_types', self::AI_ATTACHMENT_MIME_TYPES);
 	}
 }
