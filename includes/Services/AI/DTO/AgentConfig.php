@@ -223,8 +223,8 @@ final class AgentConfig
 
 		return new self(
 			isset($data['name']) && '' !== trim((string)$data['name']) ? (string) $data['name'] : null,
-			isset($data['role']) && '' !== trim((string)$data['role']) ? (string) $data['role'] : null,
-			isset($data['goal']) && '' !== trim((string)$data['goal']) ? (string) $data['goal'] : null,
+			isset($data['role']) ? trim((string) $data['role']) : null,
+			isset($data['goal']) ? trim((string) $data['goal']) : null,
 			array_values((array) $personality),
 			(string) ($data['systemPrompt'] ?? ($data['system_prompt'] ?? '')),
 			(string) ($data['provider'] ?? Constants::AI_PROVIDER_DEFAULT),

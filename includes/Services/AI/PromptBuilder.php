@@ -36,23 +36,23 @@ class PromptBuilder
 		// Explicit override takes precedence and is prepended verbatim.
 		if ('' !== trim($agent->systemPrompt)) {
 			$sections[] = trim($agent->systemPrompt);
-		}
-
-		$identity = [];
-		if ('' !== trim($agent->name)) {
-			/* translators: %s: agent name. */
-			$identity[] = sprintf(__('You are %s.', 'agent-mod'), $agent->name);
-		}
-		if ('' !== trim($agent->role)) {
-			/* translators: %s: agent role. */
-			$identity[] = sprintf(__('Your role: %s.', 'agent-mod'), $agent->role);
-		}
-		if ('' !== trim($agent->goal)) {
-			/* translators: %s: agent goal. */
-			$identity[] = sprintf(__('Your goal: %s.', 'agent-mod'), $agent->goal);
-		}
-		if (! empty($identity)) {
-			$sections[] = implode(' ', $identity);
+		} else {
+			$identity = [];
+			if ('' !== trim($agent->name)) {
+				/* translators: %s: agent name. */
+				$identity[] = sprintf(__('You are %s.', 'agent-mod'), $agent->name);
+			}
+			if ('' !== trim($agent->role)) {
+				/* translators: %s: agent role. */
+				$identity[] = sprintf(__('Your role: %s.', 'agent-mod'), $agent->role);
+			}
+			if ('' !== trim($agent->goal)) {
+				/* translators: %s: agent goal. */
+				$identity[] = sprintf(__('Your goal: %s.', 'agent-mod'), $agent->goal);
+			}
+			if (! empty($identity)) {
+				$sections[] = implode(' ', $identity);
+			}
 		}
 
 		if (! empty($agent->personality)) {
