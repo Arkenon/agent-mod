@@ -46,11 +46,11 @@ final class SettingsService
 		add_filter('agent_mod_attachment_max_count',   [$this, 'filterAttachmentMaxCount']);
 		add_filter('agent_mod_attachment_mime_types',  [$this, 'filterAttachmentMimeTypes']);
 
-		// Bridge the user-managed base system prompt into the filterable constant.
+		// Bridge the user-managed base system prompt, role and goal info into the filterable constant.
 		add_filter('agent_mod_base_system_prompt', [$this, 'filterBaseSystemPrompt']);
-
-		// One-time migration: seed the editable prompt text on existing installs.
-		add_action('admin_init', [$this, 'maybeSeedBaseSystemPrompt']);
+		add_filter('agent_mod_base_role', [$this, 'filterBaseRole']);
+		add_filter('agent_mod_base_goal', [$this, 'filterBaseGoal']);
+		add_filter('agent_mod_base_context_enabled', [$this, 'filterBaseContextEnabled']);
 	}
 
 	/**
@@ -105,6 +105,18 @@ final class SettingsService
 						'fieldLabel' => __('Enable Site Context (RAG) by Default', 'agent-mod'),
 						'help'       => __('When enabled, the agent automatically includes site metadata (name, URL, WordPress version, etc.) in its system prompt.', 'agent-mod'),
 						'default'    => true,
+					],
+					[
+						'fieldType'   => 'text',
+						'name'        => 'role',
+						'fieldLabel'  => __('Role', 'agent-mod'),
+						'default'     => Constants::AI_AGENT_DEFAULT_ROLE
+					],
+					[
+						'fieldType'   => 'text',
+						'name'        => 'goal',
+						'fieldLabel'  => __('Goal', 'agent-mod'),
+						'default'     => Constants::AI_AGENT_DEFAULT_GOAL
 					],
 					[
 						'fieldType'   => 'textarea',
@@ -187,7 +199,7 @@ final class SettingsService
 	 */
 	public function filterMaxToolCalls(int $default): int
 	{
-		$saved = (int) ($this->getSettings()['max_tool_calls'] ?? 0);
+		$saved = (int) ($this->getSettings()['agent_mod_ai_limits']['max_tool_calls'] ?? 0);
 		return $saved > 0 ? $saved : $default;
 	}
 
@@ -198,7 +210,7 @@ final class SettingsService
 	 */
 	public function filterMaxSearchResults(int $default): int
 	{
-		$saved = (int) ($this->getSettings()['max_search_results'] ?? 0);
+		$saved = (int) ($this->getSettings()['agent_mod_ai_limits']['max_search_results'] ?? 0);
 		return $saved > 0 ? $saved : $default;
 	}
 
@@ -209,7 +221,7 @@ final class SettingsService
 	 */
 	public function filterMaxFullContentPosts(int $default): int
 	{
-		$saved = (int) ($this->getSettings()['max_full_content_posts'] ?? 0);
+		$saved = (int) ($this->getSettings()['agent_mod_ai_limits']['max_full_content_posts'] ?? 0);
 		return $saved > 0 ? $saved : $default;
 	}
 
@@ -220,7 +232,7 @@ final class SettingsService
 	 */
 	public function filterAttachmentMaxBytes(int $default): int
 	{
-		$saved = (int) ($this->getSettings()['attachment_max_bytes'] ?? 0);
+		$saved = (int) ($this->getSettings()['agent_mod_attachments']['attachment_max_bytes'] ?? 0);
 		return $saved > 0 ? $saved : $default;
 	}
 
@@ -231,7 +243,7 @@ final class SettingsService
 	 */
 	public function filterAttachmentMaxCount(int $default): int
 	{
-		$saved = (int) ($this->getSettings()['attachment_max_count'] ?? 0);
+		$saved = (int) ($this->getSettings()['agent_mod_attachments']['attachment_max_count'] ?? 0);
 		return $saved > 0 ? $saved : $default;
 	}
 
@@ -242,7 +254,7 @@ final class SettingsService
 	 */
 	public function filterAttachmentMimeTypes(array $default): array
 	{
-		$raw = trim((string) ($this->getSettings()['attachment_mime_types'] ?? ''));
+		$raw = trim((string) ($this->getSettings()['agent_mod_attachments']['attachment_mime_types'] ?? ''));
 		if ('' === $raw) {
 			return $default;
 		}
@@ -260,34 +272,48 @@ final class SettingsService
 	 * @param string $default Caller-supplied default (the built-in directives).
 	 *
 	 * @return string
-	 * @since 1.1.0
+	 * @since 1.0.0
 	 */
 	public function filterBaseSystemPrompt(string $default): string
 	{
-		$saved = trim((string) ($this->getSettings()['global_system_prompt'] ?? ''));
+		$saved = trim((string) ($this->getSettings()['agent_mod_chat_behaviour']['global_system_prompt'] ?? ''));
 		return '' !== $saved ? $saved : $default;
 	}
 
 	/**
-	 * Seeds the base system prompt on installs that saved settings before the
-	 * prompt became user-managed, so admins see (and can edit) the real text.
+	 * @param bool $default Caller-supplied default (the built-in role).
 	 *
-	 * @return void
-	 * @since 1.1.0
+	 * @return bool
+	 * @since 1.0.5
 	 */
-	public function maybeSeedBaseSystemPrompt(): void
+	public function filterBaseContextEnabled(bool $default): bool
 	{
-		if (get_option('agent_mod_prompt_seeded')) {
-			return;
-		}
+		$saved = trim((string) ($this->getSettings()['agent_mod_chat_behaviour']['site_context_enabled'] ?? ''));
+		return '' !== $saved ? $saved : $default;
+	}
 
-		$settings = get_option(self::OPTION_KEY, false);
-		if (is_array($settings) && '' === trim((string) ($settings['global_system_prompt'] ?? ''))) {
-			$settings['global_system_prompt'] = Constants::aiDefaultSystemPrompt();
-			update_option(self::OPTION_KEY, $settings);
-		}
+	/**
+	 * @param string $default Caller-supplied default (the built-in role).
+	 *
+	 * @return string
+	 * @since 1.0.5
+	 */
+	public function filterBaseRole(string $default): string
+	{
+		$saved = trim((string) ($this->getSettings()['agent_mod_chat_behaviour']['role'] ?? ''));
+		return '' !== $saved ? $saved : $default;
+	}
 
-		update_option('agent_mod_prompt_seeded', 1, false);
+	/**
+	 * @param string $default Caller-supplied default (the built-in goal).
+	 *
+	 * @return string
+	 * @since 1.0.5
+	 */
+	public function filterBaseGoal(string $default): string
+	{
+		$saved = trim((string) ($this->getSettings()['agent_mod_chat_behaviour']['goal'] ?? ''));
+		return '' !== $saved ? $saved : $default;
 	}
 
 	/**

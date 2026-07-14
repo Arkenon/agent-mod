@@ -98,6 +98,38 @@ class Constants
 		'text/csv',
 	];
 
+	/**
+	 * Default name of AgentMod Assistant.
+	 *
+	 * @since 1.0.5
+	 * @var string
+	 */
+	public const AI_AGENT_DEFAULT_NAME = 'AgentMod Assistant';
+
+	/**
+	 * Default context enabled of AgentMod Assistant.
+	 *
+	 * @since 1.0.5
+	 * @var bool
+	 */
+	public const AI_CONTEXT_ENABLED = true;
+
+	/**
+	 * Default role of AgentMod Assistant.
+	 *
+	 * @since 1.0.5
+	 * @var string
+	 */
+	public const AI_AGENT_DEFAULT_ROLE = 'Creating content, designing and managing website via using ability tools.';
+
+	/**
+	 * Default goal of AgentMod Assistant.
+	 *
+	 * @since 1.0.5
+	 * @var string
+	 */
+	public const AI_AGENT_DEFAULT_GOAL = 'Completing requests with no mistake.';
+
 	// -------------------------------------------------------------------------
 	// Filtered getters — use these instead of the raw constants so that
 	// agent-mod-pro (or any third party) can override values via hooks.
@@ -110,7 +142,7 @@ class Constants
 	 * "Base System Prompt" setting so site owners can fully manage them.
 	 *
 	 * @return string
-	 * @since 1.1.0
+	 * @since 1.0.0
 	 */
 	public static function aiDefaultSystemPrompt(): string
 	{
@@ -140,11 +172,48 @@ class Constants
 	 * this filter, so the user-managed text replaces the default entirely.
 	 *
 	 * @return string
-	 * @since 1.1.0
+	 * @since 1.0.0
 	 */
 	public static function aiBaseSystemPrompt(): string
 	{
 		return (string) apply_filters('agent_mod_base_system_prompt', self::aiDefaultSystemPrompt());
+	}
+
+	/**
+	 * Returns the effective base system role, after applying the
+	 * `agent_mod_base_role` filter.
+	 *
+	 * @return string
+	 * @since 1.0.5
+	 */
+	public static function aiBaseRole(): string
+	{
+		return (string) apply_filters('agent_mod_base_role', self::AI_AGENT_DEFAULT_ROLE);
+	}
+
+	/**
+	 * Returns the effective base system gole, after applying the
+	 * `agent_mod_base_goal` filter.
+	 *
+	 * @return string
+	 * @since 1.0.5
+	 */
+	public static function aiBaseGoal(): string
+	{
+		return (string) apply_filters('agent_mod_base_goal', self::AI_AGENT_DEFAULT_GOAL);
+	}
+
+
+	/**
+	 * Returns the effective base system context enabled, after applying the
+	 * `agent_mod_base_context_enabled` filter.
+	 *
+	 * @return bool
+	 * @since 1.0.6
+	 */
+	public static function aiBaseContextEnabled(): bool
+	{
+		return (bool) apply_filters('agent_mod_base_context_enabled', self::AI_CONTEXT_ENABLED);
 	}
 
 	/**

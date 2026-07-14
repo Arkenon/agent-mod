@@ -150,9 +150,9 @@ final class AgentConfig
 	 * @since 1.0.0
 	 */
 	public function __construct(
-		string $name = 'AgentMod Assistant',
-		string $role = '',
-		string $goal = '',
+		string $name = Constants::AI_AGENT_DEFAULT_NAME,
+		string $role = Constants::AI_AGENT_DEFAULT_ROLE,
+		string $goal = Constants::AI_AGENT_DEFAULT_GOAL,
 		array $personality = [],
 		string $systemPrompt = '',
 		string $provider = Constants::AI_PROVIDER_DEFAULT,
@@ -207,9 +207,9 @@ final class AgentConfig
 		}
 
 		return new self(
-			(string) ($data['name'] ?? 'AgentMod Assistant'),
-			(string) ($data['role'] ?? ''),
-			(string) ($data['goal'] ?? ''),
+			(string) ($data['name'] ?? Constants::AI_AGENT_DEFAULT_NAME),
+			(string) ($data['role'] ?? Constants::AI_AGENT_DEFAULT_ROLE),
+			(string) ($data['goal'] ?? Constants::AI_AGENT_DEFAULT_GOAL),
 			array_values((array) $personality),
 			(string) ($data['systemPrompt'] ?? ($data['system_prompt'] ?? '')),
 			(string) ($data['provider'] ?? Constants::AI_PROVIDER_DEFAULT),

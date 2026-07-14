@@ -139,6 +139,7 @@ final class AIChatWidgetController
 		);
 
 		$settings = (array) get_option('agent_mod_settings', []);
+		error_log(print_r($settings, true));
 
 		wp_localize_script(
 			self::HANDLE,
@@ -148,6 +149,8 @@ final class AIChatWidgetController
 				'defaultAgent'  => [
 					'provider'      => Constants::AI_PROVIDER_DEFAULT,
 					'abilitySource' => 'all',
+					'role'          => Constants::aiBaseRole(),
+					'goal'          => Constants::aiBaseGoal(),
 				],
 				'providers'     => $this->providerInfo->getConnectedProviders(),
 				'connectorsUrl' => admin_url('options-connectors.php'),
@@ -157,9 +160,7 @@ final class AIChatWidgetController
 					'mimeTypes' => array_values(Constants::aiAttachmentMimeTypes()),
 				],
 				'defaults'     => [
-					'siteContextEnabled' => isset($settings['site_context_enabled'])
-						? (bool) $settings['site_context_enabled']
-						: true,
+					'siteContextEnabled' => Constants::aiBaseContextEnabled(),
 				],
 				'strings'      => [
 					'title'             => __('AgentMod Assistant', 'agent-mod'),

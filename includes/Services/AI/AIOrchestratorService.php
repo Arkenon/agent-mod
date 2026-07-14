@@ -122,6 +122,7 @@ class AIOrchestratorService
 		}
 
 		$siteContext = $agent->autoIncludeSiteContext ? $this->knowledgeResolver->getSiteContext() : [];
+		error_log(print_r($agent, true));
 		$systemInstruction = $this->promptBuilder->buildSystemInstruction($agent, $siteContext);
 		$abilities = $this->abilityResolver->resolve($agent);
 
