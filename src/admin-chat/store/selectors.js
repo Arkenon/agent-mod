@@ -55,6 +55,30 @@ export function getProgress( state ) {
 	return state.progress;
 }
 
+/**
+ * Sums the per-turn token usage of every assistant message in the current
+ * session. Naturally resets when messages are cleared (new topic).
+ *
+ * @param {Object} state Store state.
+ * @return {{promptTokens: number, completionTokens: number, totalTokens: number}} Session totals.
+ */
+export function getSessionTokenUsage( state ) {
+	return state.messages.reduce(
+		( totals, message ) => {
+			const usage = message.tokenUsage;
+			if ( ! usage ) {
+				return totals;
+			}
+			return {
+				promptTokens: totals.promptTokens + ( usage.promptTokens || 0 ),
+				completionTokens: totals.completionTokens + ( usage.completionTokens || 0 ),
+				totalTokens: totals.totalTokens + ( usage.totalTokens || 0 ),
+			};
+		},
+		{ promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+	);
+}
+
 export function getProviderModels( state, providerId ) {
 	return state.providerModels[ providerId ] || null;
 }

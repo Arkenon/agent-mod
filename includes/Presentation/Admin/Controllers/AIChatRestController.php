@@ -316,7 +316,7 @@ final class AIChatRestController
 			wp_json_encode($pendingCall['args'] ?? [])
 		);
 
-		$response = $this->orchestrator->chat($agent, $confirmInstruction, $history, $attachments, $this->sanitizeRequestId($request));
+		$response = $this->orchestrator->chat($agent, $confirmInstruction, $history, $attachments, $this->sanitizeRequestId($request), [$pendingCall]);
 
 		if ($response->isError()) {
 			$error  = $response->error;

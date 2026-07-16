@@ -82,6 +82,24 @@ export default function MessageItem( { message } ) {
 					</details>
 				) }
 
+				{ message.tokenUsage && (
+					<span
+						className="agent-mod-chat__token-usage"
+						title={ sprintf(
+							/* translators: 1: prompt tokens, 2: completion tokens. */
+							__( 'Prompt: %1$d · Completion: %2$d', 'agent-mod' ),
+							message.tokenUsage.promptTokens || 0,
+							message.tokenUsage.completionTokens || 0
+						) }
+					>
+						{ sprintf(
+							/* translators: %d: total tokens used for this reply. */
+							__( '%d tokens', 'agent-mod' ),
+							message.tokenUsage.totalTokens || 0
+						) }
+					</span>
+				) }
+
 				<MessageActions message={ message } />
 			</div>
 		</div>

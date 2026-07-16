@@ -1,12 +1,11 @@
 <?php
-
 declare(strict_types=1);
 /**
  * Plugin Name:       AgentMod
  * Description:       AgentMod empowers your site with intelligent AI agents to automate content creation, customer support, and data management, making your WordPress site smarter and more efficient.
  * Requires at least: 7.0
  * Requires PHP:      7.4
- * Version:           1.0.4
+ * Version:           1.0.5
  * Author:            Kadim Gültekin
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html

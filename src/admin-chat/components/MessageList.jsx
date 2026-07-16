@@ -35,6 +35,12 @@ export default function MessageList() {
 		( call ) => 'done' === call.status
 	);
 
+	// AgentMod is built around tool calls, so there's no separate "generating
+	// a plain-text answer" phase worth naming — only an active tool call gets
+	// a status line; every other moment (including between tool calls) just
+	// shows the spinner.
+	const isRunningTool = 'running_tool' === progress?.status && progress?.currentTool;
+
 	return (
 		<div className="agent-mod-chat__messages">
 			{ 0 === messages.length && ! loading && (
@@ -51,16 +57,14 @@ export default function MessageList() {
 				<div className="agent-mod-chat__loading">
 					<Spinner />
 
-					{ progress && (
+					{ isRunningTool && (
 						<div className="agent-mod-chat__progress">
 							<span className="agent-mod-chat__progress-status">
-								{ 'running_tool' === progress.status && progress.currentTool
-									? sprintf(
-										/* translators: %s: tool name(s) being executed. */
-										__( 'Running tool: %s…', 'agent-mod' ),
-										progress.currentTool
-									)
-									: __( 'Thinking…', 'agent-mod' ) }
+								{ sprintf(
+									/* translators: %s: tool name(s) being executed. */
+									__( 'Running tool: %s…', 'agent-mod' ),
+									progress.currentTool
+								) }
 							</span>
 
 							{ 0 < doneCalls.length && (

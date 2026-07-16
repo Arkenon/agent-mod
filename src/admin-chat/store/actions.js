@@ -9,6 +9,8 @@ import apiFetch from '@wordpress/api-fetch';
 import { applyFilters, doAction } from '@wordpress/hooks';
 import { __ } from '@wordpress/i18n';
 
+import { parseAbilityMentions } from '../utils/mentions';
+
 export function openChat() {
 	return { type: 'OPEN_CHAT' };
 }
@@ -148,6 +150,10 @@ export const fetchAgents = () => async ( { dispatch, select } ) => {
  * @param {number} conversationId Current conversation ID.
  */
 export const confirmAction = ( token, conversationId ) => async ( { dispatch, select } ) => {
+	// Close the modal immediately on confirm; don't wait for the request to
+	// resolve. If the resumed run hits another write action needing approval,
+	// the pendingConfirmation branch below re-opens it.
+	dispatch.clearConfirmation();
 	dispatch.setLoading( true );
 
 	const requestId   = generateRequestId();
@@ -167,6 +173,7 @@ export const confirmAction = ( token, conversationId ) => async ( { dispatch, se
 				role: 'assistant',
 				text: data.text || '',
 				toolCalls: Array.isArray( data.toolCalls ) ? data.toolCalls : [],
+				tokenUsage: data.tokenUsage || null,
 			} );
 
 			if ( data.conversationId ) {
@@ -205,21 +212,6 @@ export const confirmAction = ( token, conversationId ) => async ( { dispatch, se
  */
 function toWireAttachment( { name, mimeType, data } ) {
 	return { name, mimeType, data };
-}
-
-/**
- * Extracts namespaced ability names mentioned as "@namespace/ability" in a
- * message. Names are deduped; validity is enforced server-side.
- *
- * @param {string} text The message text.
- * @return {string[]} Mentioned ability names.
- */
-function parseAbilityMentions( text ) {
-	const matches = ( text || '' ).matchAll(
-		/@([a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*)/g
-	);
-
-	return [ ...new Set( [ ...matches ].map( ( match ) => match[ 1 ] ) ) ];
 }
 
 /**
@@ -377,6 +369,7 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 					role: 'assistant',
 					text: data.text || '',
 					toolCalls: Array.isArray( data.toolCalls ) ? data.toolCalls : [],
+					tokenUsage: data.tokenUsage || null,
 				} );
 
 				if ( data.conversationId ) {

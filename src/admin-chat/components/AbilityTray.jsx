@@ -17,8 +17,13 @@
  * The list mirrors what the assistant can actually call: in Ask/Plan modes
  * only read-only abilities are shown (the server resolves the tool list the
  * same way), in Execute mode every eligible ability is shown.
+ *
+ * The open state and search term can both be driven externally (see
+ * `forceOpen`/`search` props) so Composer.jsx can open and filter this same
+ * tray when the user types "@" directly into the message textarea, instead
+ * of duplicating the ability list/filtering logic there.
  */
-import { useState } from '@wordpress/element';
+import { useEffect, useState } from '@wordpress/element';
 import { Dropdown, Button, TextControl, Spinner } from '@wordpress/components';
 import { useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
@@ -26,10 +31,26 @@ import { store as abilitiesStore } from '@wordpress/abilities';
 
 import { STORE_NAME } from '../store';
 
-export default function AbilityTray( { onInsert, disabled } ) {
-	const [ search, setSearch ] = useState( '' );
-	const [ bootstrapped, setBootstrapped ] = useState( false );
-	const [ loadingAll, setLoadingAll ] = useState( false );
+export default function AbilityTray( {
+	onInsert,
+	disabled,
+	search: controlledSearch,
+	onSearchChange,
+	forceOpen = false,
+	onForceOpenChange,
+} ) {
+	const [ internalSearch, setInternalSearch ] = useState( '' );
+	const [ manualOpen, setManualOpen ]         = useState( false );
+	const [ bootstrapped, setBootstrapped ]     = useState( false );
+	const [ loadingAll, setLoadingAll ]         = useState( false );
+
+	// Controlled when a `search` prop is passed (composer-driven "@" filter);
+	// otherwise the tray manages its own search box as before.
+	const isSearchControlled = undefined !== controlledSearch;
+	const search    = isSearchControlled ? controlledSearch : internalSearch;
+	const setSearch = isSearchControlled ? ( onSearchChange || ( () => {} ) ) : setInternalSearch;
+
+	const isOpen = forceOpen || manualOpen;
 
 	const { selectedMode, abilitySource, selectedAbilities, allAbilities } = useSelect( ( select ) => {
 		const storeSelect = select( STORE_NAME );
@@ -59,46 +80,55 @@ export default function AbilityTray( { onInsert, disabled } ) {
 		: items;
 
 	// The full site-wide list is only needed for "All Abilities"; loaded lazily
-	// (once) on first open so "Selected Abilities" — already fully known from
-	// localized settings — never triggers a request.
-	const openTray = async () => {
-		if ( selectedOnly || bootstrapped ) {
+	// (once) whenever the tray opens — whether via the toolbar button or a
+	// composer-driven "@" trigger — so "Selected Abilities" never triggers a
+	// request.
+	useEffect( () => {
+		if ( ! isOpen || selectedOnly || bootstrapped ) {
 			return;
 		}
 		setBootstrapped( true );
 		setLoadingAll( true );
-		try {
-			const { initialize } = await import( '@wordpress/core-abilities' );
-			await initialize();
-		} finally {
-			setLoadingAll( false );
-		}
-	};
+		( async () => {
+			try {
+				const { initialize } = await import( '@wordpress/core-abilities' );
+				await initialize();
+			} finally {
+				setLoadingAll( false );
+			}
+		} )();
+	}, [ isOpen, selectedOnly, bootstrapped ] );
 
 	return (
 		<Dropdown
 			className="agent-mod-chat__ability-tray-picker"
 			popoverProps={ { placement: 'top-start' } }
-			renderToggle={ ( { isOpen, onToggle } ) => (
+			open={ isOpen }
+			onToggle={ ( willOpen ) => {
+				setManualOpen( willOpen );
+				if ( ! willOpen ) {
+					onForceOpenChange?.( false );
+				}
+			} }
+			renderToggle={ ( { isOpen: toggleOpen, onToggle } ) => (
 				<Button
 					variant="tertiary"
 					size="small"
 					icon="admin-tools"
-					aria-expanded={ isOpen }
+					aria-expanded={ toggleOpen }
 					disabled={ disabled }
 					label={ __( 'Abilities', 'agent-mod' ) }
-					onClick={ () => {
-						if ( ! isOpen ) {
-							openTray();
-						}
-						onToggle();
-					} }
+					onClick={ onToggle }
 				>
 					{ __( 'Abilities', 'agent-mod' ) }
 				</Button>
 			) }
 			renderContent={ ( { onClose } ) => (
 				<div className="agent-mod-chat__ability-tray">
+					<p className="agent-mod-chat__ability-tray-title">
+						{ __( 'Highlight Abilities', 'agent-mod' ) }
+					</p>
+
 					<TextControl
 						className="agent-mod-chat__ability-search"
 						value={ search }

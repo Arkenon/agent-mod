@@ -345,11 +345,59 @@
 	gap: 8px;
 	border-top: 1px solid #e0e0e0;
 	padding-top: 12px;
+}
 
-	.agent-mod-chat__input textarea {
-		width: 100%;
-		resize: vertical;
-	}
+// Wraps the highlight overlay and the (visually transparent) textarea so the
+// overlay can be absolutely positioned exactly on top of it.
+.agent-mod-chat__input-wrapper {
+	position: relative;
+}
+
+// Shared box model between the overlay and the real textarea so highlighted
+// "@mention" text lines up with the (invisible) characters underneath it.
+// font-family is pinned explicitly (matching WP admin's default stack) rather
+// than left to inherit, so both elements always wrap text at the same points.
+.agent-mod-chat__input-highlight,
+.agent-mod-chat__input textarea {
+	box-sizing: border-box;
+	width: 100%;
+	margin: 0;
+	padding: 9px 11px;
+	border: 1px solid transparent;
+	border-radius: 2px;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans,
+		Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+	font-size: 13px;
+	font-weight: normal;
+	letter-spacing: normal;
+	line-height: 20px;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+}
+
+.agent-mod-chat__input-highlight {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	color: #1e1e1e;
+	pointer-events: none;
+}
+
+// No padding/border/font-weight here — anything that changes the rendered
+// width of the mention text desyncs the overlay's line-wrapping from the
+// real (invisible) textarea underneath, making the visible caret position
+// appear wrong. Only background/color are safe to change.
+.agent-mod-chat__mention {
+	background: #d7e5f0;
+	color: #0a4b78;
+}
+
+.agent-mod-chat__input textarea {
+	position: relative;
+	resize: vertical;
+	background: transparent;
+	color: transparent;
+	caret-color: #1e1e1e;
 }
 
 // Hidden native file input; triggered by the attach button.
@@ -599,6 +647,26 @@
 	}
 }
 
+// Per-message token usage, shown below the tool-calls/actions row.
+.agent-mod-chat__token-usage {
+	display: inline-block;
+	margin-top: 4px;
+	font-size: 11px;
+	color: #757575;
+	cursor: default;
+}
+
+// Cumulative session token usage badge, shown above the message list.
+.agent-mod-chat__session-tokens {
+	align-self: flex-start;
+	padding: 2px 8px;
+	background: #f0f0f1;
+	border-radius: 10px;
+	font-size: 11px;
+	color: #50575e;
+	cursor: default;
+}
+
 // Collapsible "Tools used" section on assistant messages.
 .agent-mod-chat__toolcalls {
 	margin-top: 8px;
@@ -694,6 +762,15 @@
 	.agent-mod-chat__ability-search .components-base-control__field {
 		margin-bottom: 8px;
 	}
+}
+
+.agent-mod-chat__ability-tray-title {
+	margin: 0 0 6px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: #757575;
 }
 
 .agent-mod-chat__ability-list {

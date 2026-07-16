@@ -69,6 +69,9 @@ class AIClientAdapter
 	 * @param string|null $model             Optional model id.
 	 * @param int         $maxToolCalls      Max tool-calling iterations.
 	 * @param string      $requestId         Optional client-generated UUID for live progress reporting.
+	 * @param array<int, array<string, mixed>> $approvedCalls Tool calls the user has already confirmed
+	 *                                                          (each ['name' => string, 'args' => array]).
+	 *                                                          Bypasses the confirmation gate once per match.
 	 *
 	 * @return AgentResponse
 	 * @since 1.0.0
@@ -80,7 +83,8 @@ class AIClientAdapter
 		string $provider,
 		?string $model,
 		int $maxToolCalls,
-		string $requestId = ''
+		string $requestId = '',
+		array $approvedCalls = []
 	): AgentResponse {
 		if (! function_exists('wp_ai_client_prompt')) {
 			return AgentResponse::fromError(
@@ -99,7 +103,8 @@ class AIClientAdapter
 				$provider,
 				$model,
 				$maxToolCalls,
-				$requestId
+				$requestId,
+				$approvedCalls
 			);
 		} finally {
 			$this->toolCallRepairs->unregister();
@@ -121,6 +126,8 @@ class AIClientAdapter
 	 * @param string|null $model             Optional model id.
 	 * @param int         $maxToolCalls      Max tool-calling iterations.
 	 * @param string      $requestId         Optional client-generated UUID for live progress reporting.
+	 * @param array<int, array<string, mixed>> $approvedCalls Tool calls the user has already confirmed;
+	 *                                                          each is exempted from the confirmation gate once.
 	 *
 	 * @return AgentResponse
 	 * @since 1.0.0
@@ -132,7 +139,8 @@ class AIClientAdapter
 		string $provider,
 		?string $model,
 		int $maxToolCalls,
-		string $requestId = ''
+		string $requestId = '',
+		array $approvedCalls = []
 	): AgentResponse {
 		$resolver   = new WP_AI_Client_Ability_Function_Resolver(...$abilities);
 		$history    = $messages;
@@ -186,8 +194,9 @@ class AIClientAdapter
 			}
 
 			// Intercept write operations before execution to allow user confirmation.
+			// Calls already approved via the confirm-action endpoint are exempted once.
 			$requestedCalls = $this->extractToolCalls($message);
-			$writeCalls     = $this->filterWriteToolCalls($requestedCalls);
+			$writeCalls     = $this->filterWriteToolCalls($requestedCalls, $approvedCalls);
 
 			if (! empty($writeCalls)) {
 				return AgentResponse::pendingConfirmation(
@@ -345,24 +354,34 @@ class AIClientAdapter
 	 * Filters tool calls that require user confirmation before execution.
 	 *
 	 * Other plugins register write abilities via the agent_mod_ability_requires_confirmation
-	 * filter, returning true for ability names that must not be executed silently.
+	 * filter, returning true for ability names that must not be executed silently. A call
+	 * matching an already-approved entry (by ability name) is exempted once and removed
+	 * from $approvedCalls, so re-requesting the same ability later still requires confirmation.
 	 *
-	 * @param array<int, array<string, mixed>> $toolCalls Extracted tool calls.
+	 * @param array<int, array<string, mixed>> $toolCalls     Extracted tool calls.
+	 * @param array<int, array<string, mixed>> $approvedCalls Tool calls already confirmed by the user.
 	 *
-	 * @return array<int, array<string, mixed>> Only the calls that need confirmation.
+	 * @return array<int, array<string, mixed>> Only the calls that still need confirmation.
 	 * @since 1.0.0
 	 */
-	private function filterWriteToolCalls(array $toolCalls): array
+	private function filterWriteToolCalls(array $toolCalls, array &$approvedCalls = []): array
 	{
 		return array_values(
 			array_filter(
 				$toolCalls,
-				static function (array $call): bool {
-					return (bool) apply_filters(
-						'agent_mod_ability_requires_confirmation',
-						false,
-						$call['name']
-					);
+				static function (array $call) use (&$approvedCalls): bool {
+					if (! (bool) apply_filters('agent_mod_ability_requires_confirmation', false, $call['name'])) {
+						return false;
+					}
+
+					foreach ($approvedCalls as $index => $approved) {
+						if (($approved['name'] ?? '') === $call['name']) {
+							unset($approvedCalls[$index]);
+							return false;
+						}
+					}
+
+					return true;
 				}
 			)
 		);

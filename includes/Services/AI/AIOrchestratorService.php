@@ -104,11 +104,14 @@ class AIOrchestratorService
 	 * @param array<int, array<string, mixed>>  $history     Prior turns as ['role' => ..., 'text' => ..., 'attachments' => [...]].
 	 * @param array<int, array<string, string>> $attachments Attachments for the current turn (each ['data' => dataUri, 'mimeType' => ..., 'name' => ...]).
 	 * @param string                            $requestId   Optional client-generated UUID for live progress reporting.
+	 * @param array<int, array<string, mixed>>  $approvedCalls Tool calls the user has already confirmed
+	 *                                                          (each ['name' => string, 'args' => array]); exempted
+	 *                                                          once from the write-confirmation gate.
 	 *
 	 * @return AgentResponse
 	 * @since 1.0.0
 	 */
-	public function chat(AgentConfig $agent, string $message, array $history = [], array $attachments = [], string $requestId = ''): AgentResponse
+	public function chat(AgentConfig $agent, string $message, array $history = [], array $attachments = [], string $requestId = '', array $approvedCalls = []): AgentResponse
 	{
 		$guard = $this->guard($agent->provider);
 		if ($guard instanceof WP_Error) {
@@ -136,7 +139,8 @@ class AIOrchestratorService
 			$agent->provider,
 			$agent->model,
 			$agent->maxToolCalls,
-			$requestId
+			$requestId,
+			$approvedCalls
 		);
 
 		// When a write ability requires confirmation, persist the wire-format
