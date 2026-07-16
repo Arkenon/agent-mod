@@ -16,16 +16,15 @@ import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 
 export default function ProviderModelSelector() {
-	const config    = window.agentModChat || {};
-	const providers = Array.isArray( config.providers ) ? config.providers : [];
-
 	const { fetchProviderModels, selectProviderModel } = useDispatch( STORE_NAME );
 
-	const { selectedProvider, selectedModel } = useSelect( ( select ) => {
+	const { selectedProvider, selectedModel, providers, connectorsUrl } = useSelect( ( select ) => {
 		const storeSelect = select( STORE_NAME );
 		return {
 			selectedProvider: storeSelect.getSelectedProvider(),
 			selectedModel:    storeSelect.getSelectedModel(),
+			providers:        storeSelect.getProviders(),
+			connectorsUrl:    storeSelect.getConnectorsUrl(),
 		};
 	}, [] );
 
@@ -54,7 +53,7 @@ export default function ProviderModelSelector() {
 		return (
 			<a
 				className="agent-mod-chat__provider agent-mod-chat__provider--empty"
-				href={ config.connectorsUrl || '#' }
+				href={ connectorsUrl || '#' }
 				title={ __( 'No AI provider connected. Click to configure.', 'agent-mod' ) }
 			>
 				<span className="dashicons dashicons-warning" aria-hidden="true" />

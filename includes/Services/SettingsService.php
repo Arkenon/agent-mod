@@ -183,6 +183,48 @@ final class SettingsService
 	}
 
 	/**
+	 * Resolves the allowed abilities to their display details.
+	 *
+	 * Uses wp_get_ability() directly (not the REST abilities list), so an
+	 * allowed ability is always included here even when it is excluded from
+	 * REST discovery (e.g. core/get-user-info, which core registers with
+	 * show_in_rest => false for privacy reasons).
+	 *
+	 * @return array<int, array{name: string, label: string, meta: array{annotations: array{readonly: bool}}}>
+	 * @since 1.2.0
+	 */
+	public function getAllowedAbilitiesDetailed(): array
+	{
+		if (! function_exists('wp_get_ability')) {
+			return [];
+		}
+
+		$details = [];
+
+		foreach ($this->getAllowedAbilities() as $name) {
+			$ability = wp_get_ability((string) $name);
+
+			if (null === $ability) {
+				continue;
+			}
+
+			$meta = (array) $ability->get_meta();
+
+			$details[] = [
+				'name'  => $ability->get_name(),
+				'label' => $ability->get_label(),
+				'meta'  => [
+					'annotations' => [
+						'readonly' => true === ($meta['annotations']['readonly'] ?? false),
+					],
+				],
+			];
+		}
+
+		return $details;
+	}
+
+	/**
 	 * @return string[]
 	 * @since 1.1.0
 	 */

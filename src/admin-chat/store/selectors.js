@@ -1,6 +1,7 @@
 /**
  * Selectors for the admin-chat store.
  */
+import config from './config';
 
 export function getMessages( state ) {
 	return state.messages;
@@ -54,14 +55,6 @@ export function getProgress( state ) {
 	return state.progress;
 }
 
-export function getAbilities( state ) {
-	return state.abilities;
-}
-
-export function isAbilitiesLoading( state ) {
-	return state.abilitiesLoading;
-}
-
 export function getProviderModels( state, providerId ) {
 	return state.providerModels[ providerId ] || null;
 }
@@ -72,4 +65,53 @@ export function getProviderModelsMap( state ) {
 
 export function getModelsLoading( state ) {
 	return state.modelsLoading;
+}
+
+/**
+ * Settings resolved from the AgentMod settings page, localized once at page
+ * load (see AIChatWidgetController::enqueueAssets()). Components read them
+ * here instead of touching window.agentModChat directly.
+ */
+
+export function getRestPath() {
+	return config.restPath || '';
+}
+
+export function getRestNamespace() {
+	return config.restNamespace || 'agent-mod/v1';
+}
+
+export function getAbilitySource() {
+	return config.defaults?.abilitySource || 'all';
+}
+
+/**
+ * Abilities allowed by the "Selected Abilities" setting, resolved server-side
+ * via wp_get_ability() (not the REST abilities list, so an ability missing
+ * from REST discovery — e.g. core/get-user-info — is still included here).
+ * Each item matches the @wordpress/abilities `Ability` shape.
+ */
+export function getSelectedAbilities() {
+	return Array.isArray( config.defaults?.selectedAbilities ) ? config.defaults.selectedAbilities : [];
+}
+
+export function getAttachmentLimits() {
+	const limits = config.attachments || {};
+	return {
+		maxBytes:  limits.maxBytes || 5242880,
+		maxCount:  limits.maxCount || 5,
+		mimeTypes: Array.isArray( limits.mimeTypes ) ? limits.mimeTypes : [],
+	};
+}
+
+export function getStrings() {
+	return config.strings || {};
+}
+
+export function getProviders() {
+	return Array.isArray( config.providers ) ? config.providers : [];
+}
+
+export function getConnectorsUrl() {
+	return config.connectorsUrl || '';
 }

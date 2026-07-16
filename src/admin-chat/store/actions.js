@@ -109,10 +109,9 @@ export const fetchProviderModels = ( providerId ) => async ( { dispatch, select 
 	dispatch.setModelsLoading( providerId );
 
 	try {
-		const config = window.agentModChat || {};
 		const models = await apiFetch( {
 			path:
-				( config.restNamespace || 'agent-mod/v1' ) +
+				select.getRestNamespace() +
 				'/provider-models?provider=' +
 				encodeURIComponent( providerId ),
 		} );
@@ -128,42 +127,12 @@ export function clearConfirmation() {
 	return { type: 'CLEAR_CONFIRMATION' };
 }
 
-export function setAbilities( abilities ) {
-	return { type: 'SET_ABILITIES', abilities };
-}
-
-export function setAbilitiesLoading( loading ) {
-	return { type: 'SET_ABILITIES_LOADING', loading };
-}
-
-/**
- * Lazily fetches the registered abilities from the core Abilities API endpoint
- * and caches them in the store. No-op when already loaded.
- */
-export const fetchAbilities = () => async ( { dispatch, select } ) => {
-	if ( null !== select.getAbilities() || select.isAbilitiesLoading() ) {
-		return;
-	}
-
-	dispatch.setAbilitiesLoading( true );
-
-	try {
-		const abilities = await apiFetch( { path: '/wp-abilities/v1/abilities' } );
-		dispatch.setAbilities( Array.isArray( abilities ) ? abilities : [] );
-	} catch {
-		dispatch.setAbilities( [] );
-	} finally {
-		dispatch.setAbilitiesLoading( false );
-	}
-};
-
 /**
  * Fetches the list of agents from the REST endpoint and updates the store.
  */
-export const fetchAgents = () => async ( { dispatch } ) => {
+export const fetchAgents = () => async ( { dispatch, select } ) => {
 	try {
-		const config = window.agentModChat || {};
-		const agents = await apiFetch( { path: ( config.restNamespace || 'agent-mod/v1' ) + '/agents' } );
+		const agents = await apiFetch( { path: select.getRestNamespace() + '/agents' } );
 		if ( Array.isArray( agents ) ) {
 			dispatch.setAgents( agents );
 		}
@@ -178,16 +147,15 @@ export const fetchAgents = () => async ( { dispatch } ) => {
  * @param {string} token          Confirmation token.
  * @param {number} conversationId Current conversation ID.
  */
-export const confirmAction = ( token, conversationId ) => async ( { dispatch } ) => {
+export const confirmAction = ( token, conversationId ) => async ( { dispatch, select } ) => {
 	dispatch.setLoading( true );
 
 	const requestId   = generateRequestId();
-	const stopPolling = startProgressPolling( requestId, dispatch );
+	const stopPolling = startProgressPolling( requestId, dispatch, select );
 
 	try {
-		const config = window.agentModChat || {};
-		const data   = await apiFetch( {
-			path:   ( config.restNamespace || 'agent-mod/v1' ) + '/confirm-action',
+		const data = await apiFetch( {
+			path:   select.getRestNamespace() + '/confirm-action',
 			method: 'POST',
 			data:   { token, conversationId, requestId },
 		} );
@@ -280,12 +248,12 @@ function generateRequestId() {
  *
  * @param {string}   requestId Client-generated UUID sent with the chat request.
  * @param {Function} dispatch  Store dispatch object.
+ * @param {Object}   select    Store select object.
  * @return {Function} Stops polling and clears the progress state.
  */
-function startProgressPolling( requestId, dispatch ) {
-	const config = window.agentModChat || {};
+function startProgressPolling( requestId, dispatch, select ) {
 	const path =
-		( config.restNamespace || 'agent-mod/v1' ) +
+		select.getRestNamespace() +
 		'/chat-progress?requestId=' +
 		encodeURIComponent( requestId );
 
@@ -323,8 +291,6 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 		return;
 	}
 
-	const config = window.agentModChat || {};
-
 	// Build history from the messages present *before* this new turn.
 	// Spread `...rest` so Pro can persist extra fields (e.g. structured_data)
 	// that survive the round-trip through the DB and the sanitizeHistory filter.
@@ -338,7 +304,10 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 			...rest,
 		} ) );
 
-	// Use the selected agent config if available; fall back to defaultAgent.
+	// Everything the agent needs beyond `mode` (role, goal, personality,
+	// abilitySource, allowedAbilities, site context, ...) is already resolved
+	// server-side from the AgentMod settings — only a selected Pro agent record
+	// (below) legitimately overrides those per request.
 	const selectedAgentId = select.getSelectedAgentId();
 	const agents          = select.getAgents();
 	const selectedAgent   = selectedAgentId
@@ -346,9 +315,7 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 		: null;
 
 	const agent = {
-		...( config.defaultAgent || {} ),
 		...( selectedAgent || {} ),
-		autoIncludeSiteContext: select.isSiteContextEnabled(),
 		mode: select.getSelectedMode() || 'execute',
 	};
 
@@ -372,7 +339,7 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 	dispatch.setLoading( true );
 
 	const requestId    = generateRequestId();
-	const stopPolling  = startProgressPolling( requestId, dispatch );
+	const stopPolling  = startProgressPolling( requestId, dispatch, select );
 
 	try {
 		const basePayload = {
@@ -387,7 +354,7 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 		const payload = applyFilters( 'agent_mod.send_message_payload', basePayload );
 
 		const rawData = await apiFetch( {
-			path: config.restPath,
+			path: select.getRestPath(),
 			method: 'POST',
 			data: payload,
 		} );

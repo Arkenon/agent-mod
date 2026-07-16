@@ -15,7 +15,10 @@
  */
 import { forwardRef, useImperativeHandle, useRef } from '@wordpress/element';
 import { Button } from '@wordpress/components';
-import { __ } from '@wordpress/i18n';
+import { useDispatch, useSelect } from '@wordpress/data';
+import { __, sprintf } from '@wordpress/i18n';
+
+import { STORE_NAME } from '../store';
 
 /**
  * Reads a File into a base64 data URI.
@@ -39,14 +42,19 @@ const AttachmentUploader = forwardRef( function AttachmentUploader(
 	ref
 ) {
 	const fileInputRef = useRef( null );
+	const { setError } = useDispatch( STORE_NAME );
 
-	const config    = window.agentModChat || {};
-	const strings   = config.strings || {};
-	const limits    = config.attachments || {};
-	const maxBytes  = limits.maxBytes || 5242880;
-	const maxCount  = limits.maxCount || 5;
-	const mimeTypes = limits.mimeTypes || [];
-	const accept    = mimeTypes.join( ',' );
+	const { strings, maxBytes, maxCount, mimeTypes } = useSelect( ( select ) => {
+		const storeSelect = select( STORE_NAME );
+		const limits      = storeSelect.getAttachmentLimits();
+		return {
+			strings:   storeSelect.getStrings(),
+			maxBytes:  limits.maxBytes,
+			maxCount:  limits.maxCount,
+			mimeTypes: limits.mimeTypes,
+		};
+	}, [] );
+	const accept = mimeTypes.join( ',' );
 
 	useImperativeHandle( ref, () => ( {
 		open() {
@@ -66,17 +74,33 @@ const AttachmentUploader = forwardRef( function AttachmentUploader(
 
 		let room       = maxCount - attachments.length;
 		const accepted = [];
+		const rejected = [];
 
 		for ( const file of selected ) {
 			if ( room <= 0 ) {
+				rejected.push(
+					strings.tooManyFiles
+						? sprintf( strings.tooManyFiles, maxCount )
+						: sprintf( __( 'You can attach up to %d files.', 'agent-mod' ), maxCount )
+				);
 				break;
 			}
 
 			if ( mimeTypes.length && ! mimeTypes.includes( file.type ) ) {
+				rejected.push(
+					strings.fileTypeNotAllowed
+						? sprintf( strings.fileTypeNotAllowed, file.name )
+						: sprintf( __( '"%s" is not an allowed file type.', 'agent-mod' ), file.name )
+				);
 				continue;
 			}
 
 			if ( file.size > maxBytes ) {
+				rejected.push(
+					strings.fileTooLarge
+						? sprintf( strings.fileTooLarge, file.name )
+						: sprintf( __( '"%s" is too large.', 'agent-mod' ), file.name )
+				);
 				continue;
 			}
 
@@ -97,6 +121,10 @@ const AttachmentUploader = forwardRef( function AttachmentUploader(
 
 		if ( accepted.length && onChange ) {
 			onChange( [ ...attachments, ...accepted ] );
+		}
+
+		if ( rejected.length ) {
+			setError( rejected.join( ' ' ) );
 		}
 	};
 

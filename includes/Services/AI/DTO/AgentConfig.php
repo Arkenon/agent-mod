@@ -54,14 +54,6 @@ final class AgentConfig
 	public array $personality;
 
 	/**
-	 * Optional explicit system prompt override. When set, it is prepended verbatim.
-	 *
-	 * @var string
-	 * @since 1.0.0
-	 */
-	public string $systemPrompt;
-
-	/**
 	 * AI provider id (e.g. "gemini", empty string means "auto").
 	 *
 	 * @var string
@@ -146,7 +138,6 @@ final class AgentConfig
 	 * @param string|null $role                   Agent role.
 	 * @param string|null $goal                   Agent goal.
 	 * @param string[]    $personality            Personality traits.
-	 * @param string      $systemPrompt           Explicit system prompt override.
 	 * @param string      $provider               Provider id.
 	 * @param string|null $model                  Model id, or null for provider default.
 	 * @param string      $abilitySource          'all' or 'selected'.
@@ -164,13 +155,12 @@ final class AgentConfig
 		?string $role = null,
 		?string $goal = null,
 		array $personality = [],
-		string $systemPrompt = '',
 		string $provider = Constants::AI_PROVIDER_DEFAULT,
 		?string $model = null,
-		?string $abilitySource = null,
+		?string $abilitySource = 'all',
 		array $allowedAbilities = [],
 		?int $maxToolCalls = null,
-		?bool $autoIncludeSiteContext = null,
+		?bool $autoIncludeSiteContext = true,
 		string $mode = 'execute',
 		array $emphasizedAbilities = [],
 		?string $baseSystemPrompt = null
@@ -181,7 +171,6 @@ final class AgentConfig
 		$this->role                   = $role ?? $settingsService->getRole();
 		$this->goal                   = $goal ?? $settingsService->getGoal();
 		$this->personality            = empty($personality) ? $settingsService->getPersonalityTraits() : $personality;
-		$this->systemPrompt           = $systemPrompt;
 		$this->provider               = $provider;
 		$this->model                  = $model;
 		$resolvedAbilitySource        = $abilitySource ?? $settingsService->getAbilitySource();
@@ -207,32 +196,31 @@ final class AgentConfig
 	public static function fromArray(array $data): self
 	{
 		$personality = $data['personality'] ?? [];
-		if (is_string($personality)) {
+		if (is_string($personality) && !empty($personality)) {
 			$personality = array_filter(array_map('trim', explode(',', $personality)));
 		}
 
 		$allowed = $data['allowedAbilities'] ?? ($data['allowed_abilities'] ?? []);
-		if (is_string($allowed)) {
+		if (is_string($allowed) && !empty($allowed)) {
 			$allowed = array_filter(array_map('trim', explode(',', $allowed)));
 		}
 
 		$emphasized = $data['emphasizedAbilities'] ?? ($data['emphasized_abilities'] ?? []);
-		if (is_string($emphasized)) {
+		if (is_string($emphasized) && !empty($emphasized)) {
 			$emphasized = array_filter(array_map('trim', explode(',', $emphasized)));
 		}
 
 		return new self(
-			isset($data['name']) ? trim((string)$data['name']) : null,
+			isset($data['name']) ? trim((string) $data['name']) : null,
 			isset($data['role']) ? trim((string) $data['role']) : null,
 			isset($data['goal']) ? trim((string) $data['goal']) : null,
 			array_values((array) $personality),
-			isset($data['systemPrompt']) ? (string) $data['systemPrompt'] : null,
-			isset($data['provider']) ? (string) $data['provider'] : null,
+			isset($data['provider']) ? (string) $data['provider'] : Constants::AI_PROVIDER_DEFAULT,
 			isset($data['model']) ? (string) $data['model'] : null,
 			isset($data['abilitySource']) ? (string) $data['abilitySource'] : (isset($data['ability_source']) ? (string) $data['ability_source'] : null),
 			array_values((array) $allowed),
-			isset($data['max_tool_calls']) ? (int) $data['max_tool_calls'] : null,
-			isset($data['autoIncludeSiteContext']) ? (bool) $data['auto_include_site_context'] : null,
+			isset($data['maxToolCalls']) ? (int) $data['maxToolCalls'] : (isset($data['max_tool_calls']) ? (int) $data['max_tool_calls'] : null),
+			isset($data['autoIncludeSiteContext']) ? (bool) $data['autoIncludeSiteContext'] : null,
 			isset($data['mode']) ? (string) $data['mode'] : 'execute',
 			array_values((array) $emphasized),
 			isset($data['baseSystemPrompt']) ? (string) $data['baseSystemPrompt'] : null

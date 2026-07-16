@@ -1,38 +1,52 @@
 /**
  * Ability tray (drop-up).
  *
- * Lists the abilities registered on the site (fetched lazily from the core
- * Abilities API endpoint and cached in the store). Picking one inserts an
+ * Lists abilities the assistant can call. Picking one inserts an
  * "@ability-name" mention into the composer; on send the mentioned abilities
  * are emphasized in the system prompt so the assistant prefers them.
  *
+ * Data source depends on the "Ability Source" setting:
+ * - "Selected Abilities": the list is already fully known from settings
+ *   (localized server-side via wp_get_ability(), which — unlike the REST
+ *   abilities list — is not subject to the show_in_rest visibility
+ *   restriction). No request is made at all.
+ * - "All Abilities": the full site-wide list is loaded lazily via the
+ *   official @wordpress/abilities client, bootstrapped on first open by
+ *   dynamically importing @wordpress/core-abilities.
+ *
  * The list mirrors what the assistant can actually call: in Ask/Plan modes
  * only read-only abilities are shown (the server resolves the tool list the
- * same way), in Execute mode every ability is shown.
+ * same way), in Execute mode every eligible ability is shown.
  */
 import { useState } from '@wordpress/element';
 import { Dropdown, Button, TextControl, Spinner } from '@wordpress/components';
-import { useDispatch, useSelect } from '@wordpress/data';
+import { useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
+import { store as abilitiesStore } from '@wordpress/abilities';
 
 import { STORE_NAME } from '../store';
 
 export default function AbilityTray( { onInsert, disabled } ) {
-	const { fetchAbilities } = useDispatch( STORE_NAME );
 	const [ search, setSearch ] = useState( '' );
+	const [ bootstrapped, setBootstrapped ] = useState( false );
+	const [ loadingAll, setLoadingAll ] = useState( false );
 
-	const { abilities, loading, selectedMode } = useSelect( ( select ) => {
+	const { selectedMode, abilitySource, selectedAbilities, allAbilities } = useSelect( ( select ) => {
 		const storeSelect = select( STORE_NAME );
 		return {
-			abilities: storeSelect.getAbilities(),
-			loading: storeSelect.isAbilitiesLoading(),
 			selectedMode: storeSelect.getSelectedMode(),
+			abilitySource: storeSelect.getAbilitySource(),
+			selectedAbilities: storeSelect.getSelectedAbilities(),
+			allAbilities: select( abilitiesStore ).getAbilities(),
 		};
 	}, [] );
 
+	const selectedOnly = 'selected' === abilitySource;
+	const source        = selectedOnly ? selectedAbilities : allAbilities;
+
 	// Ask/Plan modes: only read-only abilities are callable, so only they are listed.
 	const readonlyOnly = 'execute' !== selectedMode;
-	const items = ( Array.isArray( abilities ) ? abilities : [] ).filter(
+	const items = source.filter(
 		( item ) => ! readonlyOnly || true === item.meta?.annotations?.readonly
 	);
 
@@ -43,6 +57,23 @@ export default function AbilityTray( { onInsert, disabled } ) {
 			( item.name || '' ).toLowerCase().includes( term )
 		)
 		: items;
+
+	// The full site-wide list is only needed for "All Abilities"; loaded lazily
+	// (once) on first open so "Selected Abilities" — already fully known from
+	// localized settings — never triggers a request.
+	const openTray = async () => {
+		if ( selectedOnly || bootstrapped ) {
+			return;
+		}
+		setBootstrapped( true );
+		setLoadingAll( true );
+		try {
+			const { initialize } = await import( '@wordpress/core-abilities' );
+			await initialize();
+		} finally {
+			setLoadingAll( false );
+		}
+	};
 
 	return (
 		<Dropdown
@@ -58,7 +89,7 @@ export default function AbilityTray( { onInsert, disabled } ) {
 					label={ __( 'Abilities', 'agent-mod' ) }
 					onClick={ () => {
 						if ( ! isOpen ) {
-							fetchAbilities();
+							openTray();
 						}
 						onToggle();
 					} }
@@ -76,15 +107,15 @@ export default function AbilityTray( { onInsert, disabled } ) {
 					/>
 
 					<div className="agent-mod-chat__ability-list">
-						{ loading && <Spinner /> }
+						{ loadingAll && <Spinner /> }
 
-						{ ! loading && 0 === filtered.length && (
+						{ ! loadingAll && 0 === filtered.length && (
 							<p className="agent-mod-chat__ability-hint">
 								{ __( 'No abilities found.', 'agent-mod' ) }
 							</p>
 						) }
 
-						{ ! loading &&
+						{ ! loadingAll &&
 							filtered.map( ( item ) => (
 								<Button
 									key={ item.name }

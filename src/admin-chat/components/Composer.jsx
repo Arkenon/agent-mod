@@ -23,18 +23,17 @@ export default function Composer() {
 
 	const { sendMessage, clearMessages, setConversationId } =
 		useDispatch( STORE_NAME );
-	const { loading, hasMessages } = useSelect( ( select ) => {
+	const { loading, hasMessages, strings, maxCount } = useSelect( ( select ) => {
 		const storeSelect = select( STORE_NAME );
 		return {
 			loading:     storeSelect.isLoading(),
 			hasMessages: storeSelect.getMessages().length > 0,
+			strings:     storeSelect.getStrings(),
+			maxCount:    storeSelect.getAttachmentLimits().maxCount,
 		};
 	}, [] );
 
-	const config   = window.agentModChat || {};
-	const strings  = config.strings || {};
-	const maxCount = ( config.attachments || {} ).maxCount || 5;
-	const canSend  = ( '' !== text.trim() || 0 < attachments.length ) && ! loading;
+	const canSend = ( '' !== text.trim() || 0 < attachments.length ) && ! loading;
 
 	const submit = () => {
 		if ( ! canSend ) {

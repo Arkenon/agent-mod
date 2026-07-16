@@ -2,8 +2,7 @@
  * Pure reducer for the admin-chat store.
  */
 import { loadProviderModels } from './persistence';
-
-const config = window.agentModChat || {};
+import config from './config';
 
 const DEFAULT_STATE = {
 	isOpen: false,
@@ -16,8 +15,6 @@ const DEFAULT_STATE = {
 	selectedAgentId: null,
 	pendingConfirmation: null, // { token, actionName, args, pendingToolCalls }
 	progress: null, // live tool-call progress: { status, currentTool, executedCalls }
-	abilities: null, // registered abilities for the ability tray (null = not loaded)
-	abilitiesLoading: false,
 	selectedProvider: null, // provider id chosen in the provider/model picker
 	selectedModel: null, // model id chosen for the selected provider
 	selectedMode: 'execute', // interaction mode: 'ask' | 'plan' | 'execute'
@@ -92,12 +89,6 @@ export default function reducer( state = DEFAULT_STATE, action ) {
 
 		case 'CLEAR_PROGRESS':
 			return { ...state, progress: null };
-
-		case 'SET_ABILITIES':
-			return { ...state, abilities: action.abilities };
-
-		case 'SET_ABILITIES_LOADING':
-			return { ...state, abilitiesLoading: action.loading };
 
 		case 'SET_PENDING_CONFIRMATION':
 			return { ...state, pendingConfirmation: action.data, isLoading: false };

@@ -5,7 +5,7 @@
  * lives in <ChatPanel/> so the exact same UI can be reused outside a modal.
  */
 import { Modal } from '@wordpress/components';
-import { useDispatch } from '@wordpress/data';
+import { useDispatch, useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
 
 import { STORE_NAME } from '../store';
@@ -14,7 +14,7 @@ import ChatPanel from './ChatPanel';
 export default function ChatModal() {
 	const { closeChat } = useDispatch( STORE_NAME );
 
-	const strings = ( window.agentModChat || {} ).strings || {};
+	const strings = useSelect( ( select ) => select( STORE_NAME ).getStrings(), [] );
 
 	return (
 		<Modal

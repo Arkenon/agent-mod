@@ -154,12 +154,7 @@ final class AIChatWidgetController
 			'agentModChat',
 			[
 				'restPath'      => Constants::REST_NAMESPACE . '/chat',
-				'defaultAgent'  => [
-					'provider'      => Constants::AI_PROVIDER_DEFAULT,
-					'abilitySource' => 'all',
-					'role'          => $this->settingsService->getRole(),
-					'goal'          => $this->settingsService->getGoal(),
-				],
+				'restNamespace' => Constants::REST_NAMESPACE,
 				'providers'     => $this->providerInfo->getConnectedProviders(),
 				'connectorsUrl' => admin_url('options-connectors.php'),
 				'attachments'  => [
@@ -169,6 +164,8 @@ final class AIChatWidgetController
 				],
 				'defaults'     => [
 					'siteContextEnabled' => $this->settingsService->isSiteContextEnabled(),
+					'abilitySource'      => $this->settingsService->getAbilitySource(),
+					'selectedAbilities'  => $this->settingsService->getAllowedAbilitiesDetailed(),
 				],
 				'strings'      => [
 					'title'             => __('AgentMod Assistant', 'agent-mod'),

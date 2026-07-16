@@ -19,6 +19,8 @@
 		"@wordpress/scripts": "^32.4.0"
 	},
 	"dependencies": {
+		"@wordpress/abilities": "^0.17.0",
+		"@wordpress/core-abilities": "^0.16.0",
 		"react-markdown": "^8.0.7",
 		"react-syntax-highlighter": "^15.6.6",
 		"remark-gfm": "^3.0.1"
