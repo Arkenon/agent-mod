@@ -80,6 +80,55 @@ This file defines the hardcoded, absolute default values for the plugin. If noth
 This service acts as the bridge between the database (options saved via the `SettingsController` using Native Custom Fields) and the application.
 - It reads user preferences (e.g., global system prompt, personality traits, allowed abilities, token limits).
 - If a setting is empty or unconfigured, it automatically falls back to `Constants.php`.
+- Setting data are serialized and stored in database as `agent_mod_settings`:
+
+Sample serialized data in database:
+
+```php
+Array
+(
+    [agent_mod_chat_behaviour] => Array
+        (
+            [personality_traits] => Array
+                (
+                    [0] => helpful
+                    [1] => friendly
+                )
+
+            [site_context_enabled] => 
+            [role] => You are a WordPress expert AI assistant. You can create content, design, and manage the website using abilities.
+            [goal] => Your goal is completing requests with high accuracy and efficiency and making no mistakes.
+            [global_system_prompt] => Never directly execute destructive operations (delete, trash, erase, or remove content or users). Instead, list the affected items and ask the user for explicit confirmation before any such action is taken. If no relevant tool exists to list them, describe what would be affected and request confirmation. When a user request is ambiguous or missing required details, ask one short clarifying question before calling any tools. Do not assume intent. When a tool can answer the user accurately, call it before responding. Base your answers on tool results rather than guessing.
+        )
+
+    [agent_mod_abilities] => Array
+        (
+            [ability_source] => selected
+            [allowed_abilities] => Array
+                (
+                    [0] => core/get-site-info
+                    [1] => core/get-user-info
+                    [2] => core/get-environment-info
+                )
+
+        )
+
+    [agent_mod_ai_limits] => Array
+        (
+            [max_tool_calls] => 10
+            [max_search_results] => 20
+            [max_full_content_posts] => 5
+        )
+
+    [agent_mod_attachments] => Array
+        (
+            [attachment_max_count] => 5
+            [attachment_max_bytes] => 5242880
+            [attachment_mime_types] => image/png image/jpeg image/gif image/webp application/pdf text/plain text/markdown text/csv
+        )
+
+)
+```
 
 ### 3. `AgentConfig.php` (The DTO)
 This Data Transfer Object (DTO) represents a single, stateless agent configuration for a specific chat request. It is the central configuration object passed around the `AI` services.

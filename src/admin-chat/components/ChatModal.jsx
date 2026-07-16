@@ -21,6 +21,7 @@ export default function ChatModal() {
 			title={ strings.title || __( 'AgentMod Assistant', 'agent-mod' ) }
 			onRequestClose={ closeChat }
 			className="agent-mod-chat__modal"
+			size="large"
 		>
 			<ChatPanel />
 		</Modal>

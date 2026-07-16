@@ -1,1 +1,57 @@
-.agent-mod-dashboard-container{background:#f0f2f5;padding:10px;width:70%}.agent-mod-dashboard-container .agent-mod-dashboard__app{background:#fff;margin-right:24px;margin-top:24px;overflow:hidden;padding:24px;position:relative}.agent-mod-dashboard-container .agent-mod-dashboard__header{margin-bottom:32px}.agent-mod-dashboard-container .agent-mod-dashboard__header h1{margin:0 0 8px}.agent-mod-dashboard-container .agent-mod-dashboard__subtitle{color:#646970;font-size:14px;margin:0}.agent-mod-dashboard-container .agent-mod-dashboard__layout{align-items:flex-start;display:flex;gap:24px}.agent-mod-dashboard-container .agent-mod-dashboard__main{flex:1;min-width:0}.agent-mod-dashboard-container .agent-mod-dashboard__description p{color:#646970;font-size:14px;line-height:1.7;margin:0}@media(max-width:960px){.agent-mod-dashboard-container .agent-mod-dashboard__layout{flex-direction:column}.agent-mod-dashboard-container .agent-mod-dashboard__layout>div[style]{width:100%!important}}@media(max-width:1400px){.agent-mod-dashboard-container{width:100%}}
+/*!*************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/dashboard/style.scss ***!
+  \*************************************************************************************************************************************************************************************************************************************************/
+.agent-mod-dashboard-container {
+  background: #f0f2f5;
+  width: 70%;
+  padding: 10px;
+}
+.agent-mod-dashboard-container .agent-mod-dashboard__app {
+  background: #fff;
+  margin-right: 24px;
+  margin-top: 24px;
+  overflow: hidden;
+  padding: 24px;
+  position: relative;
+}
+.agent-mod-dashboard-container .agent-mod-dashboard__header {
+  margin-bottom: 32px;
+}
+.agent-mod-dashboard-container .agent-mod-dashboard__header h1 {
+  margin: 0 0 8px;
+}
+.agent-mod-dashboard-container .agent-mod-dashboard__subtitle {
+  margin: 0;
+  color: #646970;
+  font-size: 14px;
+}
+.agent-mod-dashboard-container .agent-mod-dashboard__layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+}
+.agent-mod-dashboard-container .agent-mod-dashboard__main {
+  flex: 1;
+  min-width: 0;
+}
+.agent-mod-dashboard-container .agent-mod-dashboard__description p {
+  margin: 0;
+  color: #646970;
+  font-size: 14px;
+  line-height: 1.7;
+}
+@media (max-width: 960px) {
+  .agent-mod-dashboard-container .agent-mod-dashboard__layout {
+    flex-direction: column;
+  }
+  .agent-mod-dashboard-container .agent-mod-dashboard__layout > div[style] {
+    width: 100% !important;
+  }
+}
+@media (max-width: 1400px) {
+  .agent-mod-dashboard-container {
+    width: 100%;
+  }
+}
+
+/*# sourceMappingURL=style-index.css.map*/
