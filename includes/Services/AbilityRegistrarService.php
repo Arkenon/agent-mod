@@ -15,7 +15,6 @@
 
 namespace AgentMod\Services;
 
-use AgentMod\Common\Constants;
 use WP_Error;
 use WP_Query;
 use WP_Block_Patterns_Registry;
@@ -33,13 +32,22 @@ class AbilityRegistrarService
 	 */
 	private const CATEGORY = 'agent-mod';
 
+
+	/**
+	 * Inject Setting Service
+	 * @since 1.0.5
+	 */
+	private SettingsService $settings_service;
+
 	/**
 	 * Constructor. Binds the abilities API hooks.
 	 *
 	 * @since 1.0.0
 	 */
-	public function __construct()
+	public function __construct(SettingsService $settingsService)
 	{
+		$this->settings_service = $settingsService;
+
 		add_action('wp_abilities_api_categories_init', [$this, 'registerCategories']);
 		add_action('wp_abilities_api_init', [$this, 'registerAbilities']);
 
@@ -140,7 +148,7 @@ class AbilityRegistrarService
 							'type'        => 'integer',
 							'description' => __('How many posts to return (1-20).', 'agent-mod'),
 							'minimum'     => 1,
-							'maximum'     => Constants::aiMaxSearchResults(),
+							'maximum'     =>$this->settings_service->getMaxSearchResults(),
 						],
 					],
 				],
@@ -179,12 +187,12 @@ class AbilityRegistrarService
 				},
 				'input_schema'        => [
 					'type' => 'object',
-					'properties'=>[
-						'count'=>[
-							'type' => 'integer',
+					'properties' => [
+						'count' => [
+							'type'        => 'integer',
 							'description' => __('How many templates to return (1-20).', 'agent-mod'),
-							'minimum' => 1,
-							'maximum' => Constants::aiMaxSearchResults(),
+							'minimum'     => 1,
+							'maximum'     => $this->settings_service->getMaxSearchResults(),
 						],
 					],
 				],
@@ -925,7 +933,7 @@ class AbilityRegistrarService
 		if (is_array($input) && isset($input['count'])) {
 			$count = (int) $input['count'];
 		}
-		$count = max(1, min(Constants::aiMaxSearchResults(), $count));
+		$count = max(1, min($this->settings_service->getMaxSearchResults(), $count));
 
 		$posts = get_posts(
 			[
@@ -1143,7 +1151,7 @@ class AbilityRegistrarService
 	{
 		$input        = is_array($input) ? $input : [];
 		$postType     = isset($input['post_type']) ? $input['post_type'] : 'any';
-		$maxResults   = Constants::aiMaxSearchResults();
+		$maxResults   = $this->settings_service->getMaxSearchResults();
 		$postsPerPage = isset($input['posts_per_page']) ? min(absint($input['posts_per_page']), $maxResults) : min(10, $maxResults);
 		$paged        = isset($input['paged']) ? max(absint($input['paged']), 1) : 1;
 		$search       = isset($input['s']) ? sanitize_text_field((string) $input['s']) : '';
@@ -1223,7 +1231,7 @@ class AbilityRegistrarService
 			return ['success' => false, 'error' => __('post_id is required.', 'agent-mod')];
 		}
 
-		$maxReads = Constants::aiMaxFullContentPosts();
+		$maxReads = $this->settings_service->getMaxFullContentPosts();
 		if ($fullContentReads >= $maxReads) {
 			return [
 				'success' => false,

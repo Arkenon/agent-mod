@@ -23,6 +23,7 @@ use AgentMod\Services\AI\ConfirmationStore;
 use AgentMod\Services\AI\ProgressStore;
 use AgentMod\Services\AI\ProviderInfoService;
 use AgentMod\Services\AI\DTO\AgentConfig;
+use AgentMod\Services\SettingsService;
 
 defined('ABSPATH') || exit;
 
@@ -61,6 +62,12 @@ final class AIChatRestController
 	private ProgressStore $progressStore;
 
 	/**
+	 * Inject Setting Service
+	 * @since 1.0.5
+	 */
+	private SettingsService $settings_service;
+
+	/**
 	 * Constructor (PHP-DI autowired). Binds the REST route registration.
 	 *
 	 * @param AIOrchestratorService  $orchestrator           AI orchestrator service.
@@ -74,12 +81,14 @@ final class AIChatRestController
 		AIOrchestratorService $orchestrator,
 		ConfirmationStore $confirmationStore,
 		ProviderInfoService $providerInfo,
-		ProgressStore $progressStore
+		ProgressStore $progressStore,
+		SettingsService $settingsService
 	) {
 		$this->orchestrator           = $orchestrator;
 		$this->confirmationStore      = $confirmationStore;
 		$this->providerInfo           = $providerInfo;
 		$this->progressStore          = $progressStore;
+		$this->settings_service       = $settingsService;
 		add_action('rest_api_init', [$this, 'registerRoutes']);
 	}
 
@@ -437,7 +446,7 @@ final class AIChatRestController
 		$clean = [];
 
 		foreach ($raw as $item) {
-			if (count($clean) >= Constants::aiAttachmentMaxCount()) {
+			if (count($clean) >= $this->settings_service->getAttachmentMaxCount()) {
 				break;
 			}
 
@@ -453,14 +462,14 @@ final class AIChatRestController
 
 			[$mimeType, $base64] = $parsed;
 
-			if (! in_array($mimeType, Constants::aiAttachmentMimeTypes(), true)) {
+			if (! in_array($mimeType, $this->settings_service->getAttachmentMimeTypes(), true)) {
 				continue;
 			}
 
 			// Approximate the decoded size from the base64 length (4 chars -> 3 bytes).
 			$decodedSize = (int) (strlen($base64) * 3 / 4);
 
-			if ($decodedSize > Constants::aiAttachmentMaxBytes()) {
+			if ($decodedSize >$this->settings_service->getAttachmentMaxBytes()) {
 				continue;
 			}
 

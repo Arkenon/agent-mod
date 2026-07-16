@@ -15,7 +15,6 @@
 namespace AgentMod\Services\AI\DTO;
 
 use AgentMod\Common\Constants;
-use AgentMod\Common\DI;
 use AgentMod\Services\SettingsService;
 
 defined('ABSPATH') || exit;
@@ -176,7 +175,7 @@ final class AgentConfig
 		array $emphasizedAbilities = [],
 		?string $baseSystemPrompt = null
 	) {
-		$settingsService = DI::container()->get(SettingsService::class);
+		$settingsService = new SettingsService();
 
 		$this->name                   = $name ?? Constants::AI_AGENT_DEFAULT_NAME;
 		$this->role                   = $role ?? $settingsService->getRole();
@@ -222,20 +221,20 @@ final class AgentConfig
 		}
 
 		return new self(
-			isset($data['name']) && '' !== trim((string)$data['name']) ? (string) $data['name'] : null,
+			isset($data['name']) ? trim((string)$data['name']) : null,
 			isset($data['role']) ? trim((string) $data['role']) : null,
 			isset($data['goal']) ? trim((string) $data['goal']) : null,
 			array_values((array) $personality),
-			(string) ($data['systemPrompt'] ?? ($data['system_prompt'] ?? '')),
-			(string) ($data['provider'] ?? Constants::AI_PROVIDER_DEFAULT),
-			isset($data['model']) && '' !== $data['model'] ? (string) $data['model'] : null,
-			(string) ($data['abilitySource'] ?? ($data['ability_source'] ?? 'all')),
+			isset($data['systemPrompt']) ? (string) $data['systemPrompt'] : null,
+			isset($data['provider']) ? (string) $data['provider'] : null,
+			isset($data['model']) ? (string) $data['model'] : null,
+			isset($data['abilitySource']) ? (string) $data['ability_source'] : 'all',
 			array_values((array) $allowed),
-			isset($data['maxToolCalls']) || isset($data['max_tool_calls']) ? (int) ($data['maxToolCalls'] ?? $data['max_tool_calls']) : null,
-			isset($data['autoIncludeSiteContext']) || isset($data['auto_include_site_context']) ? (bool) ($data['autoIncludeSiteContext'] ?? $data['auto_include_site_context']) : null,
-			(string) ($data['mode'] ?? 'execute'),
+			isset($data['max_tool_calls']) ? (int) $data['max_tool_calls'] : null,
+			isset($data['autoIncludeSiteContext']) ? (bool) $data['auto_include_site_context'] : null,
+			isset($data['mode']) ? (string) $data['mode'] : 'execute',
 			array_values((array) $emphasized),
-			isset($data['baseSystemPrompt']) || isset($data['base_system_prompt']) ? (string) ($data['baseSystemPrompt'] ?? $data['base_system_prompt']) : null
+			isset($data['baseSystemPrompt']) ? (string) $data['baseSystemPrompt'] : null
 		);
 	}
 }
