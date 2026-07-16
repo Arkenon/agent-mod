@@ -25,14 +25,14 @@ final class SettingsService
 	 * @var string
 	 * @since 1.0.0
 	 */
-	public string $optionKey = 'agent_mod_settings';
+	public string $optionKey;
 
 	/**
 	 * Constructor (PHP-DI autowired). Registers all hooks immediately.
 	 *
 	 * @since 1.0.0
 	 */
-	public function __construct(string $optionKey = '')
+	public function __construct(string $optionKey = 'agent_mod_settings')
 	{
 		$this->optionKey = $optionKey;
 	}
@@ -159,6 +159,44 @@ final class SettingsService
 		$saved = trim((string) ($this->getSettings()['agent_mod_chat_behaviour']['goal'] ?? ''));
 		$value = '' !== $saved ? $saved : Constants::AI_AGENT_DEFAULT_GOAL;
 		return (string) $value;
+	}
+
+	/**
+	 * @return string
+	 * @since 1.1.0
+	 */
+	public function getAbilitySource(): string
+	{
+		$saved = trim((string) ($this->getSettings()['agent_mod_abilities']['ability_source'] ?? ''));
+		$value = '' !== $saved ? $saved : 'all';
+		return (string) $value;
+	}
+
+	/**
+	 * @return string[]
+	 * @since 1.1.0
+	 */
+	public function getAllowedAbilities(): array
+	{
+		$saved = $this->getSettings()['agent_mod_abilities']['allowed_abilities'] ?? [];
+		return is_array($saved) ? $saved : [];
+	}
+
+	/**
+	 * @return string[]
+	 * @since 1.1.0
+	 */
+	public function getPersonalityTraits(): array
+	{
+		$saved = $this->getSettings()['agent_mod_chat_behaviour']['personality_traits'] ?? [];
+		
+		// Token field values can sometimes come as a comma separated string if not handled natively as an array,
+		// but NCF's token_field normally saves as an array or comma string. We'll handle both.
+		if (is_string($saved)) {
+			$saved = array_filter(array_map('trim', explode(',', $saved)));
+		}
+		
+		return is_array($saved) ? $saved : [];
 	}
 
 	/**

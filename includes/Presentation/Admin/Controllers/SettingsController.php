@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Settings controller class
  * Creates settings page for admin area
@@ -17,13 +18,13 @@ defined('ABSPATH') || exit;
 final class SettingsController
 {
 
-    private SettingsService $settingsService;
+	private SettingsService $settingsService;
 
 	public function __construct(SettingsService $settingsService)
 	{
-        $this->settingsService = $settingsService;
+		$this->settingsService = $settingsService;
 
-        // NCF page and field registration.
+		// NCF page and field registration.
 		add_filter('native_custom_fields_options_pages',       [$this, 'registerSettingsPage']);
 		add_filter('native_custom_fields_options_page_fields', [$this, 'registerSettingsFields'], 10, 2);
 	}
@@ -44,10 +45,7 @@ final class SettingsController
 			'menu_title'  => __('Settings', 'agent-mod'),
 			'menu_slug'   => $this->settingsService->optionKey,
 			'capability'  => 'manage_options',
-			'icon_url'    => 'dashicons-admin-generic',
-			'layout'      => 'stacked',
-			'position'    => 10,
-			'created_by'  => 'external_plugin',
+			'layout'      => 'tab_panel',
 			'parent_slug' => 'agent-mod',
 		];
 
@@ -76,31 +74,76 @@ final class SettingsController
 				'section_icon'  => 'format-chat',
 				'fields'        => [
 					[
+						'fieldType'               => 'token_field',
+						'name'                    => 'personality_traits',
+						'fieldLabel'              => __('Personality Traits', 'agent-mod'),
+						'fieldHelpText'           => __('Add personality traits.', 'agent-mod'),
+						'maxSuggestions'          => 10,
+						'suggestions'             => 'helpful, friendly, professional, corporate, persuasive, curious, patient, analytical',
+						'__experimentalExpandOnFocus' => true,
+					],
+					[
 						'fieldType'  => 'toggle',
 						'name'       => 'site_context_enabled',
 						'fieldLabel' => __('Enable Site Context (RAG) by Default', 'agent-mod'),
-						'help'       => __('When enabled, the agent automatically includes site metadata (name, URL, WordPress version, etc.) in its system prompt.', 'agent-mod'),
+						'fieldHelpText'       => __('When enabled, the agent automatically includes site metadata (name, URL, WordPress version, etc.) in its system prompt.', 'agent-mod'),
 						'default'    => Constants::AI_CONTEXT_ENABLED,
 					],
 					[
-						'fieldType'   => 'text',
+						'fieldType'   => 'textarea',
 						'name'        => 'role',
 						'fieldLabel'  => __('Role', 'agent-mod'),
+						'fieldHelpText' => __('The role the agent should play. Describe the main function of the agent.', 'agent-mod'),
 						'default'     => Constants::AI_AGENT_DEFAULT_ROLE
 					],
 					[
-						'fieldType'   => 'text',
+						'fieldType'   => 'textarea',
 						'name'        => 'goal',
 						'fieldLabel'  => __('Goal', 'agent-mod'),
+						'fieldHelpText' => __('The goal of the agent. Describe what you want the agent to achieve.', 'agent-mod'),
 						'default'     => Constants::AI_AGENT_DEFAULT_GOAL
 					],
 					[
 						'fieldType'   => 'textarea',
 						'name'        => 'global_system_prompt',
 						'fieldLabel'  => __('Base System Prompt', 'agent-mod'),
-						'help'        => __('The core behaviour instructions sent to the AI with every message. Fully editable: change or remove directives to manage the assistant\'s behaviour. Leave empty to use the built-in defaults.', 'agent-mod'),
+						'fieldHelpText'        => __('The core behaviour instructions sent to the AI with every message. Fully editable: change or remove directives to manage the assistant\'s behaviour. Leave empty to use the built-in defaults.', 'agent-mod'),
 						'placeholder' => __('You are a helpful WordPress assistant.', 'agent-mod'),
 						'default'     => Constants::aiDefaultSystemPrompt(),
+					],
+				],
+			],
+			[
+				'section_name'  => 'agent_mod_abilities',
+				'section_title' => __('Abilities', 'agent-mod'),
+				'section_icon'  => 'admin-plugins',
+				'fields'        => [
+					[
+						'fieldType'   => 'select',
+						'name'        => 'ability_source',
+						'fieldLabel'  => __('Ability Source', 'agent-mod'),
+						'fieldHelpText'        => __('Choose whether to allow all abilities or only selected ones.', 'agent-mod'),
+						'options'     => 'All Abilities : all, Selected Abilities : selected',
+						'default'     => 'all',
+					],
+					[
+						'fieldType'    => 'select',
+						'multiple'     => true,
+						'name'         => 'allowed_abilities',
+						'fieldLabel'   => __('Allowed Abilities', 'agent-mod'),
+						'fieldHelpText'         => __('Select the abilities to allow. Used only when Ability Source is set to Selected Abilities.', 'agent-mod'),
+						'options'      => $this->getAbilityOptions(),
+						'default'      => [],
+						'dependencies' => [
+							'relation'   => 'and',
+							'conditions' => [
+								[
+									'field'    => 'ability_source',
+									'operator' => '==',
+									'value'    => 'selected',
+								],
+							],
+						],
 					],
 				],
 			],
@@ -113,21 +156,21 @@ final class SettingsController
 						'fieldType'  => 'number',
 						'name'       => 'max_tool_calls',
 						'fieldLabel' => __('Max Tool Calls per Turn', 'agent-mod'),
-						'help'       => __('Maximum agentic tool-calling iterations allowed per chat message. Default: 10.', 'agent-mod'),
+						'fieldHelpText'       => __('Maximum agentic tool-calling iterations allowed per chat message. Default: 10.', 'agent-mod'),
 						'default'    => Constants::AI_MAX_TOOL_CALLS,
 					],
 					[
 						'fieldType'  => 'number',
 						'name'       => 'max_search_results',
 						'fieldLabel' => __('Max Search Results', 'agent-mod'),
-						'help'       => __('Maximum items returned per search ability call. Default: 20.', 'agent-mod'),
+						'fieldHelpText'       => __('Maximum items returned per search ability call. Default: 20.', 'agent-mod'),
 						'default'    => Constants::AI_MAX_SEARCH_RESULTS,
 					],
 					[
 						'fieldType'  => 'number',
 						'name'       => 'max_full_content_posts',
 						'fieldLabel' => __('Max Full-Content Posts', 'agent-mod'),
-						'help'       => __('Maximum posts whose full body the agent may read in a single turn. Default: 5.', 'agent-mod'),
+						'fieldHelpText'       => __('Maximum posts whose full body the agent may read in a single turn. Default: 5.', 'agent-mod'),
 						'default'    => Constants::AI_MAX_FULL_CONTENT_POSTS,
 					],
 				],
@@ -141,25 +184,46 @@ final class SettingsController
 						'fieldType'  => 'number',
 						'name'       => 'attachment_max_count',
 						'fieldLabel' => __('Max Files per Message', 'agent-mod'),
-						'help'       => __('Maximum number of files a user may attach per chat turn. Default: 5.', 'agent-mod'),
+						'fieldHelpText'       => __('Maximum number of files a user may attach per chat turn. Default: 5.', 'agent-mod'),
 						'default'    => Constants::AI_ATTACHMENT_MAX_COUNT,
 					],
 					[
 						'fieldType'  => 'number',
 						'name'       => 'attachment_max_bytes',
 						'fieldLabel' => __('Max File Size (bytes)', 'agent-mod'),
-						'help'       => __('Maximum decoded size in bytes for a single attachment. Default: 5242880 (5 MB).', 'agent-mod'),
+						'fieldHelpText'       => __('Maximum decoded size in bytes for a single attachment. Default: 5242880 (5 MB).', 'agent-mod'),
 						'default'    => Constants::AI_ATTACHMENT_MAX_BYTES,
 					],
 					[
 						'fieldType'   => 'textarea',
 						'name'        => 'attachment_mime_types',
 						'fieldLabel'  => __('Allowed MIME Types', 'agent-mod'),
-						'help'        => __('One MIME type per line. Leave empty to use the built-in defaults (PNG, JPEG, GIF, WebP, PDF, TXT, Markdown, CSV).', 'agent-mod'),
+						'fieldHelpText'        => __('One MIME type per line. Leave empty to use the built-in defaults (PNG, JPEG, GIF, WebP, PDF, TXT, Markdown, CSV).', 'agent-mod'),
 						'default'     => implode("\n", Constants::AI_ATTACHMENT_MIME_TYPES),
 					],
 				],
 			],
 		];
+	}
+
+	/**
+	 * Get allowed abilities options for the settings field.
+	 *
+	 * @return array<int, array<string, string>>
+	 * @since 1.0.0
+	 */
+	private function getAbilityOptions(): array
+	{
+		$options = [];
+
+		$abilities = wp_get_abilities();
+		foreach ($abilities as $ability) {
+			$options[] = [
+				'label' => $ability->get_label(),
+				'value' => $ability->get_name(),
+			];
+		}
+
+		return $options;
 	}
 }

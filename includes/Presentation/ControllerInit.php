@@ -80,8 +80,12 @@ final class ControllerInit
 			DI::container()->get($controller);
 		}
 
-		// Admin-only controllers (menus, widgets, assets).
-		if (is_admin()) {
+		// Admin controllers (menus, widgets, assets) and REST API requests.
+		// is_admin() is false during REST API requests, so we explicitly check for JSON/REST requests
+		// to ensure controllers like SettingsController can register their fields for NCF.
+		$is_rest = (defined('REST_REQUEST') && REST_REQUEST) || (function_exists('wp_is_json_request') && wp_is_json_request());
+
+		if (is_admin() || $is_rest) {
 			foreach ($this->adminControllers as $controller) {
 				DI::container()->get($controller);
 			}

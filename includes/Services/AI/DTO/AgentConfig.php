@@ -167,7 +167,7 @@ final class AgentConfig
 		string $systemPrompt = '',
 		string $provider = Constants::AI_PROVIDER_DEFAULT,
 		?string $model = null,
-		string $abilitySource = 'all',
+		?string $abilitySource = null,
 		array $allowedAbilities = [],
 		?int $maxToolCalls = null,
 		?bool $autoIncludeSiteContext = null,
@@ -180,12 +180,13 @@ final class AgentConfig
 		$this->name                   = $name ?? Constants::AI_AGENT_DEFAULT_NAME;
 		$this->role                   = $role ?? $settingsService->getRole();
 		$this->goal                   = $goal ?? $settingsService->getGoal();
-		$this->personality            = $personality;
+		$this->personality            = empty($personality) ? $settingsService->getPersonalityTraits() : $personality;
 		$this->systemPrompt           = $systemPrompt;
 		$this->provider               = $provider;
 		$this->model                  = $model;
-		$this->abilitySource          = in_array($abilitySource, ['all', 'selected'], true) ? $abilitySource : 'all';
-		$this->allowedAbilities       = $allowedAbilities;
+		$resolvedAbilitySource        = $abilitySource ?? $settingsService->getAbilitySource();
+		$this->abilitySource          = in_array($resolvedAbilitySource, ['all', 'selected'], true) ? $resolvedAbilitySource : 'all';
+		$this->allowedAbilities       = empty($allowedAbilities) ? $settingsService->getAllowedAbilities() : $allowedAbilities;
 		$this->maxToolCalls           = ($maxToolCalls !== null && $maxToolCalls > 0) ? $maxToolCalls : $settingsService->getMaxToolCalls();
 		$this->autoIncludeSiteContext = $autoIncludeSiteContext ?? $settingsService->isSiteContextEnabled();
 		$this->mode                   = in_array($mode, ['ask', 'plan', 'execute'], true) ? $mode : 'execute';
@@ -228,7 +229,7 @@ final class AgentConfig
 			isset($data['systemPrompt']) ? (string) $data['systemPrompt'] : null,
 			isset($data['provider']) ? (string) $data['provider'] : null,
 			isset($data['model']) ? (string) $data['model'] : null,
-			isset($data['abilitySource']) ? (string) $data['ability_source'] : 'all',
+			isset($data['abilitySource']) ? (string) $data['abilitySource'] : (isset($data['ability_source']) ? (string) $data['ability_source'] : null),
 			array_values((array) $allowed),
 			isset($data['max_tool_calls']) ? (int) $data['max_tool_calls'] : null,
 			isset($data['autoIncludeSiteContext']) ? (bool) $data['auto_include_site_context'] : null,
