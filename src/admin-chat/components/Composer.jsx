@@ -5,11 +5,13 @@
  * delegated to AttachmentUploader. Enter sends, Shift+Enter inserts a newline.
  *
  * The textarea is paired with an aria-hidden overlay that mirrors its value
- * and highlights "@ability-name" mentions — the textarea's own text is made
- * transparent (only the caret stays visible) so the overlay's highlighted
- * text is what's actually seen. Typing "@" also opens/filters the ability
- * tray live, and picking an ability (from the tray, however it was opened)
- * inserts it at the current caret position rather than at the end of the text.
+ * and highlights "@ability-name" and "#skill-slug" mentions — the textarea's
+ * own text is made transparent (only the caret stays visible) so the
+ * overlay's highlighted text is what's actually seen. Typing "@" opens and
+ * filters the ability tray live; typing "#" does the same for extension
+ * trays (e.g. the Pro skill tray) via the composer-tools mention props.
+ * Picking an item (from a tray, however it was opened) inserts it at the
+ * current caret position rather than at the end of the text.
  */
 import { useEffect, useRef, useState } from '@wordpress/element';
 import { useDispatch, useSelect } from '@wordpress/data';
@@ -18,7 +20,7 @@ import { applyFilters } from '@wordpress/hooks';
 import { __ } from '@wordpress/i18n';
 
 import { STORE_NAME } from '../store';
-import { MENTION_PATTERN, findMentionTrigger } from '../utils/mentions';
+import { TOKEN_PATTERN, findMentionTrigger } from '../utils/mentions';
 import AttachmentUploader from './AttachmentUploader';
 import AgentSelector from './AgentSelector';
 import ProviderModelSelector from './ProviderModelSelector';
@@ -40,8 +42,9 @@ function splitMentions( value ) {
 export default function Composer() {
 	const [ text, setText ]               = useState( '' );
 	const [ attachments, setAttachments ] = useState( [] );
-	const [ mentionQuery, setMentionQuery ] = useState( null ); // in-progress "@" query, or null
-	const [ mentionStart, setMentionStart ] = useState( null ); // offset of "@" for the query above
+	const [ mentionQuery, setMentionQuery ]     = useState( null ); // in-progress mention query, or null
+	const [ mentionStart, setMentionStart ]     = useState( null ); // offset of the trigger char for the query above
+	const [ mentionTrigger, setMentionTrigger ] = useState( null ); // '@' | '#' | null
 
 	const uploaderRef  = useRef( null );
 	const textareaRef  = useRef( null );
@@ -64,6 +67,7 @@ export default function Composer() {
 	const clearMentionTrigger = () => {
 		setMentionQuery( null );
 		setMentionStart( null );
+		setMentionTrigger( null );
 	};
 
 	const submit = () => {
@@ -87,8 +91,9 @@ export default function Composer() {
 		}
 	};
 
-	// Re-detects the in-progress "@" mention (if any) at the current caret
-	// position, driving the ability tray's forced-open + live filter state.
+	// Re-detects the in-progress "@" or "#" mention (if any) at the current
+	// caret position, driving the matching tray's forced-open + live filter
+	// state.
 	const updateMentionTrigger = () => {
 		const node = textareaRef.current;
 		if ( ! node ) {
@@ -97,6 +102,7 @@ export default function Composer() {
 		const trigger = findMentionTrigger( node.value, node.selectionStart );
 		setMentionQuery( trigger ? trigger.query : null );
 		setMentionStart( trigger ? trigger.start : null );
+		setMentionTrigger( trigger ? trigger.trigger : null );
 	};
 
 	const onChangeText = ( value ) => {
@@ -115,10 +121,11 @@ export default function Composer() {
 
 	useEffect( syncHighlightScroll, [ text ] );
 
-	// Inserts (or, when triggered via an in-progress "@" query, replaces it
-	// with) an ability mention at the current caret position, then restores
-	// focus and moves the caret just past the inserted mention.
-	const insertMention = ( name ) => {
+	// Inserts (or, when triggered via an in-progress "@"/"#" query, replaces
+	// it with) a mention token at the current caret position, then restores
+	// focus and moves the caret just past the inserted mention. `token` must
+	// include its trigger character (e.g. "@core/get-posts", "#site-tone").
+	const insertToken = ( token ) => {
 		const node   = textareaRef.current;
 		const caret  = node ? node.selectionStart : text.length;
 		const hasTrigger = null !== mentionStart && null !== mentionQuery;
@@ -127,7 +134,7 @@ export default function Composer() {
 		const before = text.slice( 0, rangeStart );
 		const after  = text.slice( caret );
 		const needsLeadingSpace = ! hasTrigger && before && ! /\s$/.test( before );
-		const mention  = ( needsLeadingSpace ? ' ' : '' ) + '@' + name + ' ';
+		const mention  = ( needsLeadingSpace ? ' ' : '' ) + token + ' ';
 		const nextText = before + mention + after;
 		const nextCaret = before.length + mention.length;
 
@@ -143,7 +150,7 @@ export default function Composer() {
 		} );
 	};
 
-	const highlightParts = splitMentions( text ).split( MENTION_PATTERN );
+	const highlightParts = splitMentions( text ).split( TOKEN_PATTERN );
 
 	return (
 		<div className="agent-mod-chat__composer">
@@ -163,7 +170,7 @@ export default function Composer() {
 					{ highlightParts.map( ( part, index ) =>
 						1 === index % 2 ? (
 							<mark key={ index } className="agent-mod-chat__mention">
-								{ '@' + part }
+								{ part }
 							</mark>
 						) : (
 							part
@@ -194,11 +201,13 @@ export default function Composer() {
 					<ModeSelector />
 					<ProviderModelSelector />
 					<AbilityTray
-						onInsert={ insertMention }
+						onInsert={ ( name ) => insertToken( '@' + name ) }
 						disabled={ loading }
-						search={ null !== mentionQuery ? mentionQuery : undefined }
+						search={
+							'@' === mentionTrigger ? mentionQuery : undefined
+						}
 						onSearchChange={ setMentionQuery }
-						forceOpen={ null !== mentionQuery }
+						forceOpen={ '@' === mentionTrigger }
 						onForceOpenChange={ ( open ) => {
 							if ( ! open ) {
 								clearMentionTrigger();
@@ -217,16 +226,37 @@ export default function Composer() {
 					   * Filters the extra composer toolbar tools.
 					   *
 					   * Lets extensions (e.g. Pro) append their own React
-					   * components (such as a conversation history tray) to the
-					   * composer toolbar. Each entry must be a component; it is
-					   * rendered with a `disabled` prop reflecting the loading
-					   * state and reads/dispatches the chat store itself.
+					   * components (such as a conversation history tray or a
+					   * skill tray) to the composer toolbar. Each entry must be
+					   * a component; it reads/dispatches the chat store itself
+					   * and is rendered with:
+					   *
+					   * - `disabled`             Loading state of the chat.
+					   * - `insertMention`        (fullToken) => void — inserts a
+					   *                          mention token (including its
+					   *                          trigger char, e.g. "#my-skill")
+					   *                          at the caret.
+					   * - `mentionTrigger`       '@' | '#' | null — the trigger
+					   *                          of the in-progress mention.
+					   * - `mentionQuery`         The partial query typed after
+					   *                          the trigger, or null.
+					   * - `onMentionQueryChange` Updates the live query.
+					   * - `onMentionCancel`      Clears the in-progress mention
+					   *                          (e.g. when a tray closes).
 					   *
 					   * @param {Array} tools Extra tool components, default [].
 					   */ }
 					{ applyFilters( 'agent_mod.composer_tools', [] ).map(
 						( ToolComponent, index ) => (
-							<ToolComponent key={ index } disabled={ loading } />
+							<ToolComponent
+								key={ index }
+								disabled={ loading }
+								insertMention={ insertToken }
+								mentionTrigger={ mentionTrigger }
+								mentionQuery={ mentionQuery }
+								onMentionQueryChange={ setMentionQuery }
+								onMentionCancel={ clearMentionTrigger }
+							/>
 						)
 					) }
 

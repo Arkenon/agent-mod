@@ -148,7 +148,17 @@ class AIClientAdapter
 		$tokenUsage = [];
 
 		for ($i = 0; $i < $maxToolCalls; $i++) {
-			$this->reportProgress($requestId, 'thinking', '', $toolCalls);
+			// Only the first pass has no tool activity to show yet, so report
+			// the neutral "thinking" state (bare spinner). On later passes the
+			// previous "running_tool" status is intentionally left in place
+			// while the model reasons over the tool results: the model call
+			// (generate_result) dominates each iteration, and tool execution
+			// alone is far too brief for the ~1.2s poll interval to ever catch,
+			// so resetting to "thinking" here would make the tool status
+			// invisible in practice.
+			if (0 === $i) {
+				$this->reportProgress($requestId, 'thinking', '', $toolCalls);
+			}
 
 			$builder = wp_ai_client_prompt()
 				->with_history(...$history)
@@ -219,7 +229,10 @@ class AIClientAdapter
 			$toolCalls = array_merge($toolCalls, $requestedCalls);
 			$history[] = $resolver->execute_abilities($message);
 
-			$this->reportProgress($requestId, 'thinking', '', $toolCalls);
+			// Deliberately keep the "running_tool" status set here (no reset to
+			// "thinking"): it stays visible while the next generate_result()
+			// runs, which is the only window long enough for the client poll to
+			// reliably catch the tool-call feedback.
 		}
 
 		// Tool-call limit reached: do a final pass without abilities to force a text answer.

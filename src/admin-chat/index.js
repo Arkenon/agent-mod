@@ -15,6 +15,12 @@ import { createRoot } from '@wordpress/element';
 import { dispatch } from '@wordpress/data';
 
 import { STORE_NAME } from './store';
+import {
+	MENTION_PATTERN,
+	SKILL_MENTION_PATTERN,
+	parseAbilityMentions,
+	parseSkillMentions,
+} from './utils/mentions';
 import ChatApp from './components/ChatApp';
 import ChatPanel from './components/ChatPanel';
 import Composer from './components/Composer';
@@ -95,4 +101,10 @@ Object.assign( window.agentMod, {
 	MessageList,
 	ConfirmationModal,
 	storeName: STORE_NAME,
+	mentions: {
+		MENTION_PATTERN,
+		SKILL_MENTION_PATTERN,
+		parseAbilityMentions,
+		parseSkillMentions,
+	},
 } );
