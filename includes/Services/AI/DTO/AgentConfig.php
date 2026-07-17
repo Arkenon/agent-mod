@@ -22,6 +22,18 @@ defined('ABSPATH') || exit;
 final class AgentConfig
 {
 	/**
+	 * Stored agent post ID, or null when the default (settings-based) agent runs.
+	 *
+	 * Carried on the DTO so consumers that only receive the config (e.g. the
+	 * confirm-action flow reading it back from the ConfirmationStore) can still
+	 * relate the request to a stored agent.
+	 *
+	 * @var int|null
+	 * @since 1.2.0
+	 */
+	public ?int $id;
+
+	/**
 	 * Human-readable agent name.
 	 *
 	 * @var string
@@ -147,6 +159,7 @@ final class AgentConfig
 	 * @param string      $mode                   'ask', 'plan' or 'execute'.
 	 * @param string[]    $emphasizedAbilities    Ability names mentioned by the user.
 	 * @param string|null $baseSystemPrompt       Base system prompt.
+	 * @param int|null    $id                     Stored agent post ID, or null for the default agent.
 	 *
 	 * @since 1.0.0
 	 */
@@ -163,10 +176,12 @@ final class AgentConfig
 		?bool $autoIncludeSiteContext = true,
 		string $mode = 'execute',
 		array $emphasizedAbilities = [],
-		?string $baseSystemPrompt = null
+		?string $baseSystemPrompt = null,
+		?int $id = null
 	) {
 		$settingsService = new SettingsService();
 
+		$this->id                     = ($id !== null && $id > 0) ? $id : null;
 		$this->name                   = $name ?? Constants::AI_AGENT_DEFAULT_NAME;
 		$this->role                   = $role ?? $settingsService->getRole();
 		$this->goal                   = $goal ?? $settingsService->getGoal();
@@ -223,7 +238,8 @@ final class AgentConfig
 			isset($data['autoIncludeSiteContext']) ? (bool) $data['autoIncludeSiteContext'] : null,
 			isset($data['mode']) ? (string) $data['mode'] : 'execute',
 			array_values((array) $emphasized),
-			isset($data['baseSystemPrompt']) ? (string) $data['baseSystemPrompt'] : null
+			isset($data['baseSystemPrompt']) ? (string) $data['baseSystemPrompt'] : null,
+			isset($data['id']) ? (int) $data['id'] : null
 		);
 	}
 }

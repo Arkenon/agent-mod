@@ -225,9 +225,8 @@ final class AIChatRestController
 		if ($conversationId > 0) {
 			$history = (array) apply_filters('agent_mod_load_conversation_history', [], $conversationId);
 		} else {
-			$history        = $request->get_param('history');
-			$history        = is_array($history) ? $this->sanitizeHistory($history) : [];
-			$conversationId = (int) apply_filters('agent_mod_create_conversation', 0, (int) ($agentData['id'] ?? 0), 'admin_chat');
+			$history = $request->get_param('history');
+			$history = is_array($history) ? $this->sanitizeHistory($history) : [];
 		}
 
 		do_action('agent_mod_before_chat', $agent, $message, $history);
@@ -246,13 +245,40 @@ final class AIChatRestController
 
 		// Persist the new turns when the response is a normal answer.
 		// Pending-confirmation responses are not persisted yet — only saved to
-		// the transient store by AIOrchestratorService until confirmed.
-		if (! $response->isPendingConfirmation && $conversationId > 0) {
-			$newTurns = [
-				['role' => 'user',      'text' => $message,       'attachments' => $attachments],
-				['role' => 'assistant', 'text' => $response->text, 'attachments' => []],
-			];
-			do_action('agent_mod_append_messages', $conversationId, $newTurns);
+		// the transient store by AIOrchestratorService until confirmed. The
+		// conversation itself is created lazily here so failed or abandoned
+		// requests never leave empty conversation posts behind.
+		if (! $response->isPendingConfirmation) {
+			if ($conversationId <= 0) {
+				/**
+				 * Filters the conversation ID for a new chat session.
+				 *
+				 * Lets extensions (e.g. Pro) persist a new conversation and return
+				 * its ID. Returning 0 keeps the conversation ephemeral.
+				 *
+				 * @param int    $conversationId Default 0 (no persistence).
+				 * @param int    $agentId        Stored agent post ID, 0 for the default agent.
+				 * @param string $source         Origin of the conversation.
+				 * @param string $message        First user message, e.g. for deriving a title.
+				 *
+				 * @since 1.2.0
+				 */
+				$conversationId = (int) apply_filters('agent_mod_create_conversation', 0, (int) ($agentData['id'] ?? 0), 'admin_chat', $message);
+			}
+
+			if ($conversationId > 0) {
+				$newTurns = [
+					['role' => 'user', 'text' => $message, 'attachments' => $attachments],
+					[
+						'role'        => 'assistant',
+						'text'        => $response->text,
+						'attachments' => [],
+						'toolCalls'   => $response->toolCalls,
+						'tokenUsage'  => $response->tokenUsage,
+					],
+				];
+				do_action('agent_mod_append_messages', $conversationId, $newTurns);
+			}
 		}
 
 		$payload                 = $response->toArray();
@@ -339,12 +365,27 @@ final class AIChatRestController
 			return new WP_REST_Response($response->toArray(), $status);
 		}
 
-		if (! $response->isPendingConfirmation && $conversationId > 0) {
-			$newTurns = [
-				['role' => 'user',      'text' => $message,        'attachments' => $attachments],
-				['role' => 'assistant', 'text' => $response->text,  'attachments' => []],
-			];
-			do_action('agent_mod_append_messages', $conversationId, $newTurns);
+		if (! $response->isPendingConfirmation) {
+			// The confirmation may belong to the very first turn of a session, in
+			// which case no conversation exists yet — create it lazily, exactly
+			// like handleChat() does. This filter is documented in handleChat().
+			if ($conversationId <= 0) {
+				$conversationId = (int) apply_filters('agent_mod_create_conversation', 0, (int) ($agent->id ?? 0), 'admin_chat', $message);
+			}
+
+			if ($conversationId > 0) {
+				$newTurns = [
+					['role' => 'user', 'text' => $message, 'attachments' => $attachments],
+					[
+						'role'        => 'assistant',
+						'text'        => $response->text,
+						'attachments' => [],
+						'toolCalls'   => $response->toolCalls,
+						'tokenUsage'  => $response->tokenUsage,
+					],
+				];
+				do_action('agent_mod_append_messages', $conversationId, $newTurns);
+			}
 		}
 
 		$payload                 = $response->toArray();
