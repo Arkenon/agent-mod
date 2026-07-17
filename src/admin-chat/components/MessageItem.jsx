@@ -29,8 +29,12 @@ export default function MessageItem( { message } ) {
 			<div className="agent-mod-chat__message-content">
 				{ 0 < attachments.length && (
 					<ul className="agent-mod-chat__message-attachments">
+						{ /* Restored messages carry attachments without data (name +
+						     mimeType only) — those render as file rows, never as
+						     a broken <img>. */ }
 						{ attachments.map( ( item, index ) =>
-							item.isImage || ( item.mimeType || '' ).startsWith( 'image/' ) ? (
+							item.data &&
+							( item.isImage || ( item.mimeType || '' ).startsWith( 'image/' ) ) ? (
 								<li key={ index }>
 									<img
 										className="agent-mod-chat__message-image"

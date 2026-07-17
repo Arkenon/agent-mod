@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from '@wordpress/element';
 import { useDispatch, useSelect } from '@wordpress/data';
 import { Button, TextareaControl } from '@wordpress/components';
+import { applyFilters } from '@wordpress/hooks';
 import { __ } from '@wordpress/i18n';
 
 import { STORE_NAME } from '../store';
@@ -211,6 +212,23 @@ export default function Composer() {
 						onClick={ () => uploaderRef.current?.open() }
 						disabled={ loading || attachments.length >= maxCount }
 					/>
+
+					{ /**
+					   * Filters the extra composer toolbar tools.
+					   *
+					   * Lets extensions (e.g. Pro) append their own React
+					   * components (such as a conversation history tray) to the
+					   * composer toolbar. Each entry must be a component; it is
+					   * rendered with a `disabled` prop reflecting the loading
+					   * state and reads/dispatches the chat store itself.
+					   *
+					   * @param {Array} tools Extra tool components, default [].
+					   */ }
+					{ applyFilters( 'agent_mod.composer_tools', [] ).map(
+						( ToolComponent, index ) => (
+							<ToolComponent key={ index } disabled={ loading } />
+						)
+					) }
 
 					{ hasMessages && ! loading && (
 						<Button

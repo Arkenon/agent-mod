@@ -40,6 +40,19 @@ export function clearMessages() {
 	return { type: 'CLEAR_MESSAGES' };
 }
 
+/**
+ * Replaces the whole messages array, e.g. when restoring a stored conversation.
+ *
+ * @param {Array} messages Messages in the store shape
+ *                         ({ role, text, attachments?, toolCalls?, tokenUsage? }).
+ */
+export function setMessages( messages ) {
+	return {
+		type: 'SET_MESSAGES',
+		messages: Array.isArray( messages ) ? messages : [],
+	};
+}
+
 export function setSiteContext( enabled ) {
 	return { type: 'SET_SITE_CONTEXT', enabled };
 }

@@ -50,6 +50,9 @@ export default function reducer( state = DEFAULT_STATE, action ) {
 		case 'CLEAR_MESSAGES':
 			return { ...state, messages: [], error: null };
 
+		case 'SET_MESSAGES':
+			return { ...state, messages: action.messages, error: null };
+
 		case 'SET_SITE_CONTEXT':
 			return { ...state, isSiteContextEnabled: action.enabled };
 
