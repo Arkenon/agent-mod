@@ -85,4 +85,15 @@ class Helper
 			$array
 		));
 	}
+
+	/**
+	 * Returns the standard personality trait checkbox options array.
+	 *
+	 * @return string
+	 * @since 1.0.5
+	 */
+	public static function personalityTraitOptions(): string
+	{
+		return 'helpful, friendly, professional, corporate, persuasive, curious, patient, analytical';
+	}
 }

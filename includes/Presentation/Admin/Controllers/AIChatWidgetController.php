@@ -157,6 +157,12 @@ final class AIChatWidgetController
 				'restNamespace' => Constants::REST_NAMESPACE,
 				'providers'     => $this->providerInfo->getConnectedProviders(),
 				'connectorsUrl' => admin_url('options-connectors.php'),
+				'defaultAgent'  => [
+					'id'          => null,
+					'name'        => __('Default Agent', 'agent-mod'),
+					'description' => __('Uses the AgentMod settings configuration.', 'agent-mod'),
+					'avatar'      => AGENT_MOD_URL . 'includes/Presentation/Admin/Assets/img/agent_mod_colored_icon.png',
+				],
 				'attachments'  => [
 					'maxBytes'  => $this->settingsService->getAttachmentMaxBytes(),
 					'maxCount'  => $this->settingsService->getAttachmentMaxCount(),

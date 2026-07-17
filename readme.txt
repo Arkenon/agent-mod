@@ -4,7 +4,7 @@ Tags: ai, agent, chatbot, assistant, abilities
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.0.5
+Stable tag: 1.0.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -95,6 +95,12 @@ Under the AgentMod menu in your WordPress admin, there is a dedicated **Abilitie
 If you ask the agent to create a post, it will show you a confirmation modal summarizing the action before anything is written to the database. You must explicitly approve the action for it to proceed.
 
 == Changelog ==
+
+= 1.0.6 =
+* Added: Agent tray selector with avatars in the chat toolbar (always visible; shows the settings-driven Default Agent, extensions can add more agents)
+* Added: `agent_mod_agent_config_data` PHP filter — lets extensions resolve an agent's full configuration server-side before the AgentConfig DTO is built
+* Added: `agent_mod.agents` JS filter — lets extensions adjust the agent tray list client-side
+* Changed: Chat requests now send only request-level agent fields (id, mode, provider/model, emphasized abilities); agent configuration is always resolved server-side
 
 = 1.0.5 =
 * Feature: Added new settings

@@ -135,11 +135,23 @@ export function clearConfirmation() {
 export const fetchAgents = () => async ( { dispatch, select } ) => {
 	try {
 		const agents = await apiFetch( { path: select.getRestNamespace() + '/agents' } );
-		if ( Array.isArray( agents ) ) {
-			dispatch.setAgents( agents );
-		}
+
+		/**
+		 * Filters the agent list shown in the agent tray. Lets extensions add,
+		 * remove or reorder agents client-side. Each record needs at least
+		 * { id, name }; { description, avatar, icon } are used when present.
+		 */
+		const filtered = applyFilters(
+			'agent_mod.agents',
+			Array.isArray( agents ) ? agents : []
+		);
+		dispatch.setAgents( Array.isArray( filtered ) ? filtered : [] );
 	} catch {
-		// Silently ignore — agents list is optional
+		// Fetch failed — still run the filter so JS-only agents survive.
+		const filtered = applyFilters( 'agent_mod.agents', [] );
+		if ( Array.isArray( filtered ) && filtered.length ) {
+			dispatch.setAgents( filtered );
+		}
 	}
 };
 
@@ -296,18 +308,12 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 			...rest,
 		} ) );
 
-	// Everything the agent needs beyond `mode` (role, goal, personality,
-	// abilitySource, allowedAbilities, site context, ...) is already resolved
-	// server-side from the AgentMod settings — only a selected Pro agent record
-	// (below) legitimately overrides those per request.
-	const selectedAgentId = select.getSelectedAgentId();
-	const agents          = select.getAgents();
-	const selectedAgent   = selectedAgentId
-		? agents.find( ( a ) => a.id === selectedAgentId )
-		: null;
-
+	// The full agent configuration is resolved server-side: the AgentMod
+	// settings for the default agent, or — when an agent is selected in the
+	// tray — the agent post's stored config via the agent_mod_agent_config_data
+	// filter. Only request-level fields travel with the request.
 	const agent = {
-		...( selectedAgent || {} ),
+		id: select.getSelectedAgentId() || null,
 		mode: select.getSelectedMode() || 'execute',
 	};
 

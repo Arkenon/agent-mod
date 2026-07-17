@@ -203,7 +203,20 @@ final class AIChatRestController
 
 		$agentData = $request->get_param('agent');
 		$agentData = is_array($agentData) ? Helper::sanitizeArray($agentData) : [];
-		$agent     = AgentConfig::fromArray($agentData);
+
+		/**
+		 * Filters the agent configuration data before the AgentConfig DTO is built.
+		 *
+		 * Lets extensions (e.g. Pro) resolve a full agent configuration
+		 * server-side from the submitted agent id. Callbacks must preserve the
+		 * request-level keys: id, mode, provider, model and emphasizedAbilities.
+		 *
+		 * @param array $agentData Sanitized agent data from the request.
+		 * @since 1.2.0
+		 */
+		$agentData = (array) apply_filters('agent_mod_agent_config_data', $agentData);
+
+		$agent = AgentConfig::fromArray($agentData);
 
 		$conversationId = (int) $request->get_param('conversationId');
 
