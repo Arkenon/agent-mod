@@ -33,60 +33,60 @@ import AbilityTray from './AbilityTray';
  * @param {string} value Composer text.
  * @return {Array} Alternating plain-text strings and mention name strings.
  */
-function splitMentions( value ) {
+function splitMentions(value) {
 	// Ensures the overlay keeps a trailing blank line's height when the text
 	// ends with a newline (a bare trailing "\n" collapses visually otherwise).
-	return value.endsWith( '\n' ) ? value + ' ' : value;
+	return value.endsWith('\n') ? value + ' ' : value;
 }
 
 export default function Composer() {
-	const [ text, setText ]               = useState( '' );
-	const [ attachments, setAttachments ] = useState( [] );
-	const [ mentionQuery, setMentionQuery ]     = useState( null ); // in-progress mention query, or null
-	const [ mentionStart, setMentionStart ]     = useState( null ); // offset of the trigger char for the query above
-	const [ mentionTrigger, setMentionTrigger ] = useState( null ); // '@' | '#' | null
+	const [text, setText] = useState('');
+	const [attachments, setAttachments] = useState([]);
+	const [mentionQuery, setMentionQuery] = useState(null); // in-progress mention query, or null
+	const [mentionStart, setMentionStart] = useState(null); // offset of the trigger char for the query above
+	const [mentionTrigger, setMentionTrigger] = useState(null); // '@' | '#' | null
 
-	const uploaderRef  = useRef( null );
-	const textareaRef  = useRef( null );
-	const highlightRef = useRef( null );
+	const uploaderRef = useRef(null);
+	const textareaRef = useRef(null);
+	const highlightRef = useRef(null);
 
 	const { sendMessage, clearMessages, setConversationId } =
-		useDispatch( STORE_NAME );
-	const { loading, hasMessages, strings, maxCount } = useSelect( ( select ) => {
-		const storeSelect = select( STORE_NAME );
+		useDispatch(STORE_NAME);
+	const { loading, hasMessages, strings, maxCount } = useSelect((select) => {
+		const storeSelect = select(STORE_NAME);
 		return {
-			loading:     storeSelect.isLoading(),
+			loading: storeSelect.isLoading(),
 			hasMessages: storeSelect.getMessages().length > 0,
-			strings:     storeSelect.getStrings(),
-			maxCount:    storeSelect.getAttachmentLimits().maxCount,
+			strings: storeSelect.getStrings(),
+			maxCount: storeSelect.getAttachmentLimits().maxCount,
 		};
-	}, [] );
+	}, []);
 
-	const canSend = ( '' !== text.trim() || 0 < attachments.length ) && ! loading;
+	const canSend = ('' !== text.trim() || 0 < attachments.length) && !loading;
 
 	const clearMentionTrigger = () => {
-		setMentionQuery( null );
-		setMentionStart( null );
-		setMentionTrigger( null );
+		setMentionQuery(null);
+		setMentionStart(null);
+		setMentionTrigger(null);
 	};
 
 	const submit = () => {
-		if ( ! canSend ) {
+		if (!canSend) {
 			return;
 		}
-		sendMessage( text, attachments );
-		setText( '' );
-		setAttachments( [] );
+		sendMessage(text, attachments);
+		setText('');
+		setAttachments([]);
 		clearMentionTrigger();
 	};
 
-	const onKeyDown = ( event ) => {
-		if ( 'Enter' === event.key && ! event.shiftKey ) {
+	const onKeyDown = (event) => {
+		if ('Enter' === event.key && !event.shiftKey) {
 			event.preventDefault();
 			submit();
 			return;
 		}
-		if ( 'Escape' === event.key && null !== mentionQuery ) {
+		if ('Escape' === event.key && null !== mentionQuery) {
 			clearMentionTrigger();
 		}
 	};
@@ -96,133 +96,177 @@ export default function Composer() {
 	// state.
 	const updateMentionTrigger = () => {
 		const node = textareaRef.current;
-		if ( ! node ) {
+		if (!node) {
 			return;
 		}
-		const trigger = findMentionTrigger( node.value, node.selectionStart );
-		setMentionQuery( trigger ? trigger.query : null );
-		setMentionStart( trigger ? trigger.start : null );
-		setMentionTrigger( trigger ? trigger.trigger : null );
+		const trigger = findMentionTrigger(node.value, node.selectionStart);
+		setMentionQuery(trigger ? trigger.query : null);
+		setMentionStart(trigger ? trigger.start : null);
+		setMentionTrigger(trigger ? trigger.trigger : null);
 	};
 
-	const onChangeText = ( value ) => {
-		setText( value );
+	const onChangeText = (value) => {
+		setText(value);
 		// The DOM's caret position already reflects this keystroke by the time
 		// React's onChange fires, so it can be read straight off the ref.
 		updateMentionTrigger();
 	};
 
 	const syncHighlightScroll = () => {
-		if ( highlightRef.current && textareaRef.current ) {
-			highlightRef.current.scrollTop  = textareaRef.current.scrollTop;
+		if (highlightRef.current && textareaRef.current) {
+			highlightRef.current.scrollTop = textareaRef.current.scrollTop;
 			highlightRef.current.scrollLeft = textareaRef.current.scrollLeft;
 		}
 	};
 
-	useEffect( syncHighlightScroll, [ text ] );
+	useEffect(syncHighlightScroll, [text]);
 
 	// Inserts (or, when triggered via an in-progress "@"/"#" query, replaces
 	// it with) a mention token at the current caret position, then restores
 	// focus and moves the caret just past the inserted mention. `token` must
 	// include its trigger character (e.g. "@core/get-posts", "#site-tone").
-	const insertToken = ( token ) => {
-		const node   = textareaRef.current;
-		const caret  = node ? node.selectionStart : text.length;
+	const insertToken = (token) => {
+		const node = textareaRef.current;
+		const caret = node ? node.selectionStart : text.length;
 		const hasTrigger = null !== mentionStart && null !== mentionQuery;
 		const rangeStart = hasTrigger ? mentionStart : caret;
 
-		const before = text.slice( 0, rangeStart );
-		const after  = text.slice( caret );
-		const needsLeadingSpace = ! hasTrigger && before && ! /\s$/.test( before );
-		const mention  = ( needsLeadingSpace ? ' ' : '' ) + token + ' ';
+		const before = text.slice(0, rangeStart);
+		const after = text.slice(caret);
+		const needsLeadingSpace = !hasTrigger && before && ! /\s$/.test(before);
+		const mention = (needsLeadingSpace ? ' ' : '') + token + ' ';
 		const nextText = before + mention + after;
 		const nextCaret = before.length + mention.length;
 
-		setText( nextText );
+		setText(nextText);
 		clearMentionTrigger();
 
-		requestAnimationFrame( () => {
+		requestAnimationFrame(() => {
 			const el = textareaRef.current;
-			if ( el ) {
+			if (el) {
 				el.focus();
-				el.setSelectionRange( nextCaret, nextCaret );
+				el.setSelectionRange(nextCaret, nextCaret);
 			}
-		} );
+		});
 	};
 
-	const highlightParts = splitMentions( text ).split( TOKEN_PATTERN );
+	// Fills the composer with a preset prompt (appends when the user already
+	// typed something, so their text is never destroyed), then focuses the
+	// textarea with the caret at the end.
+	const applyPreset = (prompt) => {
+		const nextText = text.trim()
+			? text.replace(/\s*$/, '') + '\n' + prompt
+			: prompt;
+
+		setText(nextText);
+		clearMentionTrigger();
+
+		requestAnimationFrame(() => {
+			const el = textareaRef.current;
+			if (el) {
+				el.focus();
+				el.setSelectionRange(nextText.length, nextText.length);
+			}
+		});
+	};
+
+	const presetPrompts = window.agentModChat?.presetPrompts || [];
+
+	const highlightParts = splitMentions(text).split(TOKEN_PATTERN);
 
 	return (
-		<div className="agent-mod-chat__composer">
-			<AttachmentUploader
-				ref={ uploaderRef }
-				attachments={ attachments }
-				onChange={ setAttachments }
-				disabled={ loading }
-			/>
 
-			<div className="agent-mod-chat__input-wrapper">
-				<div
-					className="agent-mod-chat__input-highlight"
-					ref={ highlightRef }
-					aria-hidden="true"
-				>
-					{ highlightParts.map( ( part, index ) =>
-						1 === index % 2 ? (
-							<mark key={ index } className="agent-mod-chat__mention">
-								{ part }
-							</mark>
-						) : (
-							part
-						)
-					) }
+		<>
+			{0 < presetPrompts.length && (
+				<div className="agent-mod-chat__presets">
+					{presetPrompts.map((preset, index) => (
+						<Button
+							key={index}
+							className="agent-mod-chat__preset"
+							variant="secondary"
+							size="small"
+							disabled={loading}
+							title={preset.prompt}
+							onClick={() => applyPreset(preset.prompt)}
+						>
+							{preset.label}
+						</Button>
+					))}
+				</div>
+			)}
+
+			<div className="agent-mod-chat__composer">
+				<AttachmentUploader
+					ref={uploaderRef}
+					attachments={attachments}
+					onChange={setAttachments}
+					disabled={loading}
+				/>
+
+
+
+				<div className="agent-mod-chat__input-wrapper">
+					<div
+						className="agent-mod-chat__input-highlight"
+						ref={highlightRef}
+						aria-hidden="true"
+					>
+						{highlightParts.map((part, index) =>
+							1 === index % 2 ? (
+								<mark key={index} className="agent-mod-chat__mention">
+									{part}
+								</mark>
+							) : (
+								part
+							)
+						)}
+					</div>
+
+					<TextareaControl
+						ref={textareaRef}
+						className="agent-mod-chat__input"
+						value={text}
+						onChange={onChangeText}
+						onKeyDown={onKeyDown}
+						onKeyUp={updateMentionTrigger}
+						onClick={updateMentionTrigger}
+						onScroll={syncHighlightScroll}
+						placeholder={
+							strings.placeholder || __('Type your message…', 'agent-mod')
+						}
+						rows={2}
+						disabled={loading}
+					/>
 				</div>
 
-				<TextareaControl
-					ref={ textareaRef }
-					className="agent-mod-chat__input"
-					value={ text }
-					onChange={ onChangeText }
-					onKeyDown={ onKeyDown }
-					onKeyUp={ updateMentionTrigger }
-					onClick={ updateMentionTrigger }
-					onScroll={ syncHighlightScroll }
-					placeholder={
-						strings.placeholder || __( 'Type your message…', 'agent-mod' )
-					}
-					rows={ 2 }
-					disabled={ loading }
-				/>
-			</div>
-
-			<div className="agent-mod-chat__composer-actions">
-				<div className="agent-mod-chat__tools">
-					<AgentSelector />
-					<ModeSelector />
-					<ProviderModelSelector />
-					<AbilityTray
-						onInsert={ ( name ) => insertToken( '@' + name ) }
-						disabled={ loading }
-						search={
-							'@' === mentionTrigger ? mentionQuery : undefined
-						}
-						onSearchChange={ setMentionQuery }
-						forceOpen={ '@' === mentionTrigger }
-						onForceOpenChange={ ( open ) => {
-							if ( ! open ) {
-								clearMentionTrigger();
+				<div className="agent-mod-chat__composer-actions">
+					<div className="agent-mod-chat__tools">
+						<AgentSelector />
+						<ModeSelector />
+						<ProviderModelSelector />
+						<AbilityTray
+							onInsert={(name) => insertToken('@' + name)}
+							disabled={loading}
+							search={
+								'@' === mentionTrigger ? mentionQuery : undefined
 							}
-						} }
-					/>
+							onSearchChange={setMentionQuery}
+							forceOpen={'@' === mentionTrigger}
+							onForceOpenChange={(open) => {
+								if (!open) {
+									clearMentionTrigger();
+								}
+							}}
+						/>
 
-					<Button
-						icon="paperclip"
-						label={ strings.attach || __( 'Attach files', 'agent-mod' ) }
-						onClick={ () => uploaderRef.current?.open() }
-						disabled={ loading || attachments.length >= maxCount }
-					/>
+						<Button
+							icon="paperclip"
+							label={strings.attach || __('Attach files', 'agent-mod')}
+							onClick={() => uploaderRef.current?.open()}
+							disabled={loading || attachments.length >= maxCount}
+						/>
 
-					{ /**
+						{ /**
 					   * Filters the extra composer toolbar tools.
 					   *
 					   * Lets extensions (e.g. Pro) append their own React
@@ -246,38 +290,40 @@ export default function Composer() {
 					   *
 					   * @param {Array} tools Extra tool components, default [].
 					   */ }
-					{ applyFilters( 'agent_mod.composer_tools', [] ).map(
-						( ToolComponent, index ) => (
-							<ToolComponent
-								key={ index }
-								disabled={ loading }
-								insertMention={ insertToken }
-								mentionTrigger={ mentionTrigger }
-								mentionQuery={ mentionQuery }
-								onMentionQueryChange={ setMentionQuery }
-								onMentionCancel={ clearMentionTrigger }
-							/>
-						)
-					) }
+						{applyFilters('agent_mod.composer_tools', []).map(
+							(ToolComponent, index) => (
+								<ToolComponent
+									key={index}
+									disabled={loading}
+									insertMention={insertToken}
+									mentionTrigger={mentionTrigger}
+									mentionQuery={mentionQuery}
+									onMentionQueryChange={setMentionQuery}
+									onMentionCancel={clearMentionTrigger}
+								/>
+							)
+						)}
 
-					{ hasMessages && ! loading && (
-						<Button
-							variant="tertiary"
-							size="small"
-							onClick={ () => {
-								clearMessages();
-								setConversationId( null );
-							} }
-						>
-							{ __( 'New Topic', 'agent-mod' ) }
-						</Button>
-					) }
+						{hasMessages && !loading && (
+							<Button
+								variant="tertiary"
+								size="small"
+								onClick={() => {
+									clearMessages();
+									setConversationId(null);
+								}}
+							>
+								{__('New Topic', 'agent-mod')}
+							</Button>
+						)}
+					</div>
+
+					<Button variant="primary" onClick={submit} disabled={!canSend}>
+						{strings.send || __('Send', 'agent-mod')}
+					</Button>
 				</div>
-
-				<Button variant="primary" onClick={ submit } disabled={ ! canSend }>
-					{ strings.send || __( 'Send', 'agent-mod' ) }
-				</Button>
 			</div>
-		</div>
+		</>
+
 	);
 }

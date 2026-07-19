@@ -54,5 +54,10 @@ module.exports = {
 			'src/ability-list',
 			'index.js'
 		),
+		'settings-editor/index': path.resolve(
+			process.cwd(),
+			'src/settings-editor',
+			'index.js'
+		),
 	},
 };

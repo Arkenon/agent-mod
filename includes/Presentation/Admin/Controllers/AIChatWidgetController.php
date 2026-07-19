@@ -173,6 +173,7 @@ final class AIChatWidgetController
 					'abilitySource'      => $this->settingsService->getAbilitySource(),
 					'selectedAbilities'  => $this->settingsService->getAllowedAbilitiesDetailed(),
 				],
+				'presetPrompts' => $this->settingsService->getPresetPrompts(),
 				'strings'      => [
 					'title'             => __('AgentMod Assistant', 'agent-mod'),
 					'placeholder'       => __('Type your message…', 'agent-mod'),

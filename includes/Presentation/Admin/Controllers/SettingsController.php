@@ -27,6 +27,65 @@ final class SettingsController
 		// NCF page and field registration.
 		add_filter('native_custom_fields_options_pages',       [$this, 'registerSettingsPage']);
 		add_filter('native_custom_fields_options_page_fields', [$this, 'registerSettingsFields'], 10, 2);
+
+		// Markdown editor for the prompt textareas on the settings page.
+		add_action('admin_enqueue_scripts', [$this, 'enqueueMarkdownEditor']);
+	}
+
+	/**
+	 * Registers (always) and enqueues (settings page only) the markdown
+	 * editor bundle.
+	 *
+	 * The bundle enhances long-form textareas that carry an "agent-mod-md-"
+	 * id with an EasyMDE markdown editor. It is registered on every admin
+	 * page so that extensions (e.g. PRO's agent/skill edit screens, which tag
+	 * their own NCF fields with the same id prefix) can enqueue the
+	 * `agent-mod-settings-editor` script/style handles themselves; it is
+	 * enqueued here only on the NCF settings page, including when that page
+	 * is embedded in the PRO workspace iframe.
+	 *
+	 * @return void
+	 * @since 1.0.7
+	 */
+	public function enqueueMarkdownEditor(): void
+	{
+		if (! current_user_can('manage_options')) {
+			return;
+		}
+
+		$asset_path = AGENT_MOD_PATH . 'build/settings-editor/index.asset.php';
+
+		// Silently bail if the bundle has not been built yet.
+		if (! is_readable($asset_path)) {
+			return;
+		}
+
+		$asset = require $asset_path;
+
+		wp_register_script(
+			'agent-mod-settings-editor',
+			AGENT_MOD_URL . 'build/settings-editor/index.js',
+			array_merge($asset['dependencies'], ['jquery']),
+			$asset['version'],
+			true
+		);
+
+		wp_register_style(
+			'agent-mod-settings-editor',
+			AGENT_MOD_URL . 'build/settings-editor/style-index.css',
+			['dashicons'],
+			$asset['version']
+		);
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only URL parameter check to determine current admin page; no form data is processed.
+		$current_page = isset($_GET['page']) ? sanitize_key(wp_unslash($_GET['page'])) : '';
+
+		if ($this->settingsService->optionKey !== $current_page) {
+			return;
+		}
+
+		wp_enqueue_script('agent-mod-settings-editor');
+		wp_enqueue_style('agent-mod-settings-editor');
 	}
 
 
@@ -92,6 +151,7 @@ final class SettingsController
 					[
 						'fieldType'   => 'textarea',
 						'name'        => 'role',
+						'id'          => 'agent-mod-md-role',
 						'fieldLabel'  => __('Role', 'agent-mod'),
 						'fieldHelpText' => __('The role the agent should play. Describe the main function of the agent.', 'agent-mod'),
 						'default'     => Constants::AI_AGENT_DEFAULT_ROLE
@@ -99,6 +159,7 @@ final class SettingsController
 					[
 						'fieldType'   => 'textarea',
 						'name'        => 'goal',
+						'id'          => 'agent-mod-md-goal',
 						'fieldLabel'  => __('Goal', 'agent-mod'),
 						'fieldHelpText' => __('The goal of the agent. Describe what you want the agent to achieve.', 'agent-mod'),
 						'default'     => Constants::AI_AGENT_DEFAULT_GOAL
@@ -106,10 +167,40 @@ final class SettingsController
 					[
 						'fieldType'   => 'textarea',
 						'name'        => 'global_system_prompt',
+						'id'          => 'agent-mod-md-global-system-prompt',
 						'fieldLabel'  => __('Base System Prompt', 'agent-mod'),
 						'fieldHelpText'        => __('The core behaviour instructions sent to the AI with every message. Fully editable: change or remove directives to manage the assistant\'s behaviour. Leave empty to use the built-in defaults.', 'agent-mod'),
 						'placeholder' => __('You are a helpful WordPress assistant.', 'agent-mod'),
 						'default'     => Constants::aiDefaultSystemPrompt(),
+					],
+				],
+			],
+			[
+				'section_name'  => 'agent_mod_chat_panel',
+				'section_title' => __('Chat Panel', 'agent-mod'),
+				'section_icon'  => 'admin-comments',
+				'fields'        => [
+					[
+						'fieldType'     => 'repeater',
+						'name'          => 'preset_prompts',
+						'fieldLabel'    => __('Preset Prompts', 'agent-mod'),
+						'fieldHelpText' => __('Quick-start prompts shown above the chat input. Clicking one fills the message box with the prompt text.', 'agent-mod'),
+						'layout'        => 'table',
+						'addButtonText' => __('Add Prompt', 'agent-mod'),
+						'min'           => 0,
+						'max'           => 10,
+						'fields'        => [
+							[
+								'fieldType'  => 'text',
+								'name'       => 'label',
+								'fieldLabel' => __('Label', 'agent-mod'),
+							],
+							[
+								'fieldType'  => 'textarea',
+								'name'       => 'prompt',
+								'fieldLabel' => __('Prompt', 'agent-mod'),
+							],
+						],
 					],
 				],
 			],

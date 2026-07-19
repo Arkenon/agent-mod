@@ -1,0 +1,70 @@
+/**
+ * Settings panel markdown editor styles.
+ *
+ * Bundles the EasyMDE base stylesheet and blends the editor chrome into the
+ * wp-admin design language (input borders, focus ring, Dashicons toolbar).
+ */
+// Extension deliberately omitted: with ".css" sass emits a plain CSS @import
+// that postcss-import then fails to resolve; without it sass inlines the file.
+@import "~easymde/dist/easymde.min";
+
+// Editor host we own — always a sibling of the React textarea, never a child.
+.agent-mod-mde {
+	width: 100%;
+}
+
+// The React-rendered source textarea stays in the DOM (React keeps managing
+// it; the editor syncs into it) but must not be visible.
+textarea.agent-mod-mde-source-hidden {
+	display: none !important;
+}
+
+.EasyMDEContainer {
+	background: #fff;
+
+	.CodeMirror {
+		border: 1px solid #949494;
+		border-radius: 0 0 2px 2px;
+		font-family: Consolas, Monaco, monospace;
+		font-size: 13px;
+
+		&.CodeMirror-focused {
+			border-color: var(--wp-admin-theme-color, #3858e9);
+			box-shadow: 0 0 0 1px var(--wp-admin-theme-color, #3858e9);
+			outline: 2px solid transparent;
+		}
+	}
+
+	.editor-toolbar {
+		border: 1px solid #949494;
+		border-bottom: 0;
+		border-radius: 2px 2px 0 0;
+		background: #f6f7f7;
+
+		button {
+			color: #1e1e1e;
+
+			&.active,
+			&:hover {
+				background: #fff;
+				border-color: #949494;
+			}
+
+			.dashicons {
+				font-size: 16px;
+				width: 16px;
+				height: 16px;
+				vertical-align: middle;
+			}
+		}
+
+		i.separator {
+			border-left-color: #c3c4c7;
+			border-right-color: transparent;
+		}
+	}
+
+	.editor-preview {
+		background: #fff;
+	}
+}

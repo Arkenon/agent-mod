@@ -242,6 +242,57 @@ final class SettingsService
 	}
 
 	/**
+	 * Returns the configured preset prompts for the chat composer.
+	 *
+	 * The NCF repeater stores its rows as a JSON string (older saves may hold a
+	 * real array) — both shapes are accepted. Rows without a prompt are
+	 * dropped; a missing label falls back to a truncated prompt excerpt.
+	 *
+	 * @return array<int, array{label: string, prompt: string}>
+	 * @since 1.0.7
+	 */
+	public function getPresetPrompts(): array
+	{
+		$raw = $this->getSettings()['agent_mod_chat_panel']['preset_prompts'] ?? [];
+
+		if (is_string($raw)) {
+			$decoded = json_decode($raw, true);
+			$raw     = is_array($decoded) ? $decoded : [];
+		}
+
+		if (! is_array($raw)) {
+			return [];
+		}
+
+		$presets = [];
+
+		foreach ($raw as $row) {
+			if (! is_array($row)) {
+				continue;
+			}
+
+			$prompt = sanitize_textarea_field((string) ($row['prompt'] ?? ''));
+
+			if ('' === trim($prompt)) {
+				continue;
+			}
+
+			$label = sanitize_text_field((string) ($row['label'] ?? ''));
+
+			if ('' === trim($label)) {
+				$label = wp_html_excerpt($prompt, 30, '…');
+			}
+
+			$presets[] = [
+				'label'  => $label,
+				'prompt' => $prompt,
+			];
+		}
+
+		return $presets;
+	}
+
+	/**
 	 * Returns the saved settings array, or an empty array when no settings are saved yet.
 	 *
 	 * @return array<string, mixed>

@@ -80,7 +80,7 @@
 
 // Markdown content styles inside assistant bubbles.
 .agent-mod-chat__bubble--markdown {
-	> * {
+	>* {
 		&:first-child {
 			margin-top: 0;
 		}
@@ -94,17 +94,31 @@
 		margin: 0 0 0.65em;
 	}
 
-	h1, h2, h3, h4, h5, h6 {
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
 		margin: 0.8em 0 0.4em;
 		font-weight: 600;
 		line-height: 1.3;
 	}
 
-	h1 { font-size: 1.25em; }
-	h2 { font-size: 1.15em; }
-	h3 { font-size: 1.05em; }
+	h1 {
+		font-size: 1.25em;
+	}
 
-	ul, ol {
+	h2 {
+		font-size: 1.15em;
+	}
+
+	h3 {
+		font-size: 1.05em;
+	}
+
+	ul,
+	ol {
 		margin: 0 0 0.65em;
 		padding-left: 1.5em;
 	}
@@ -145,7 +159,8 @@
 		font-size: 0.9em;
 	}
 
-	th, td {
+	th,
+	td {
 		padding: 5px 10px;
 		border: 1px solid #dcdcde;
 		text-align: left;
@@ -274,8 +289,13 @@
 
 // Spin animation for the loading dashicon in MessageActions.
 @keyframes agent-mod-spin {
-	from { transform: rotate( 0deg ); }
-	to   { transform: rotate( 360deg ); }
+	from {
+		transform: rotate(0deg);
+	}
+
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 .agent-mod-spin {
@@ -345,6 +365,25 @@
 	gap: 8px;
 	border-top: 1px solid #e0e0e0;
 	padding-top: 12px;
+}
+
+// Preset prompt chips shown above the input (configured under Settings >
+// Chat Panel). Clicking one fills the composer with the prompt text.
+.agent-mod-chat__presets {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	justify-content: center;
+	align-items: center;
+}
+
+.agent-mod-chat__preset.components-button {
+	display: block;
+	max-width: 260px;
+	border-radius: 12px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 // Wraps the highlight overlay and the (visually transparent) textarea so the
