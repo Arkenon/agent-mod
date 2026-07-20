@@ -289,7 +289,9 @@ final class SettingsService
 			];
 		}
 
-		return $presets;
+		$value = ! empty($presets) ? $presets : Constants::aiDefaultPresetPrompts();
+
+		return $value;
 	}
 
 	/**

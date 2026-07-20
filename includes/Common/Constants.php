@@ -163,4 +163,28 @@ class Constants
 
 		return implode("\n\n", $directives);
 	}
+
+	/**
+	 * Default chat panel preset prompts.
+	 *
+	 * @since 1.0.7
+	 * @return array<array{label: string, prompt: string}>
+	 */
+	public static function aiDefaultPresetPrompts(): array
+	{
+		return [
+			[
+				'label' => __('Create a draft post.', 'agent-mod'),
+				'prompt' => __('Create a draft post about ..... via using @agent-mod/create-draft-post tool. Details: .....', 'agent-mod'),
+			],
+			[
+				'label' => __('Get site information of my web site.', 'agent-mod'),
+				'prompt' => __('What is my WordPress site information?', 'agent-mod'),
+			],
+			[
+				'label' => __('What is the environment information of my web site?', 'agent-mod'),
+				'prompt' => __('What is the environment information of my web site? Use related ability tools to fetch environment info.', 'agent-mod'),
+			],
+		];
+	}
 }
