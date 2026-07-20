@@ -22,6 +22,8 @@ const DEFAULT_STATE = {
 	// populated instantly across page loads; refreshed by the background prefetch.
 	providerModels: loadProviderModels(),
 	modelsLoading: null, // providerId currently being fetched, or null
+	providers: [],
+	providersLoaded: false,
 };
 
 export default function reducer( state = DEFAULT_STATE, action ) {
@@ -76,6 +78,9 @@ export default function reducer( state = DEFAULT_STATE, action ) {
 
 		case 'SET_MODELS_LOADING':
 			return { ...state, modelsLoading: action.providerId };
+
+		case 'SET_PROVIDERS':
+			return { ...state, providers: action.providers, providersLoaded: true };
 
 		case 'SELECT_PROVIDER_MODEL':
 			return {

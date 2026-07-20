@@ -97,6 +97,8 @@ If you ask the agent to create a post, it will show you a confirmation modal sum
 == Changelog ==
 = 1.0.7 =
 * Added: Pro version announcement into dashboard.
+* Fixed: Page loading issue while fetching provider model lists.
+* Added: Default preset prompts into plugin settings.
 
 = 1.0.6 =
 * Added: Agent tray selector with avatars in the chat toolbar (always visible; shows the settings-driven Default Agent, extensions can add more agents)

@@ -173,8 +173,12 @@ export function getStrings() {
 	return config.strings || {};
 }
 
-export function getProviders() {
-	return Array.isArray( config.providers ) ? config.providers : [];
+export function getProviders( state ) {
+	return state.providers || [];
+}
+
+export function getProvidersLoaded( state ) {
+	return state.providersLoaded || false;
 }
 
 /**

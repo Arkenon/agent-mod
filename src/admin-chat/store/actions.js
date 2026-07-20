@@ -86,6 +86,10 @@ export function setProviderModels( providerId, models ) {
 	return { type: 'SET_PROVIDER_MODELS', providerId, models };
 }
 
+export function setProviders( providers ) {
+	return { type: 'SET_PROVIDERS', providers };
+}
+
 export function setModelsLoading( providerId ) {
 	return { type: 'SET_MODELS_LOADING', providerId };
 }
@@ -135,6 +139,26 @@ export const fetchProviderModels = ( providerId ) => async ( { dispatch, select 
 		dispatch.setProviderModels( providerId, [] );
 	} finally {
 		dispatch.setModelsLoading( null );
+	}
+};
+
+/**
+ * Lazily fetches the list of connected AI providers and caches them in the store.
+ */
+export const fetchProviders = () => async ( { dispatch, select } ) => {
+	if ( select.getProvidersLoaded() ) {
+		return;
+	}
+
+	try {
+		const providers = await apiFetch( {
+			path: select.getRestNamespace() + '/providers',
+		} );
+		const list = Array.isArray( providers ) ? providers : [];
+		dispatch.setProviders( list );
+		list.forEach( ( provider ) => dispatch.fetchProviderModels( provider.id ) );
+	} catch {
+		dispatch.setProviders( [] );
 	}
 };
 

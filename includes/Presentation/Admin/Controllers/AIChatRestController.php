@@ -123,6 +123,17 @@ final class AIChatRestController
 			]
 		);
 
+		// Returns the list of connected AI providers.
+		register_rest_route(
+			Constants::REST_NAMESPACE,
+			'/providers',
+			[
+				'methods'             => 'GET',
+				'callback'            => [$this, 'handleProviders'],
+				'permission_callback' => [$this, 'checkPermission'],
+			]
+		);
+
 		// Returns the text-generation models for a connected provider.
 		register_rest_route(
 			Constants::REST_NAMESPACE,
@@ -296,6 +307,17 @@ final class AIChatRestController
 	public function handleAgents(): WP_REST_Response
 	{
 		return rest_ensure_response((array) apply_filters('agent_mod_get_agents', []));
+	}
+
+	/**
+	 * Returns the list of connected AI providers.
+	 *
+	 * @return WP_REST_Response
+	 * @since 1.0.0
+	 */
+	public function handleProviders(): WP_REST_Response
+	{
+		return rest_ensure_response($this->providerInfo->getConnectedProviders());
 	}
 
 	/**

@@ -16,14 +16,15 @@ import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 
 export default function ProviderModelSelector() {
-	const { fetchProviderModels, selectProviderModel } = useDispatch( STORE_NAME );
+	const { fetchProviderModels, selectProviderModel, fetchProviders } = useDispatch( STORE_NAME );
 
-	const { selectedProvider, selectedModel, providers, connectorsUrl } = useSelect( ( select ) => {
+	const { selectedProvider, selectedModel, providers, providersLoaded, connectorsUrl } = useSelect( ( select ) => {
 		const storeSelect = select( STORE_NAME );
 		return {
 			selectedProvider: storeSelect.getSelectedProvider(),
 			selectedModel:    storeSelect.getSelectedModel(),
 			providers:        storeSelect.getProviders(),
+			providersLoaded:  storeSelect.getProvidersLoaded(),
 			connectorsUrl:    storeSelect.getConnectorsUrl(),
 		};
 	}, [] );
@@ -39,17 +40,15 @@ export default function ProviderModelSelector() {
 		};
 	}, [ activeProvider ] );
 
-	// Warm the cache in the background as soon as the panel mounts, so the picker
-	// shows models instantly (no spinner) when the user opens it. Providers whose
-	// models are already cached (in the store or hydrated from localStorage) are a
-	// no-op inside the thunk, so this is cheap to run on every open.
+	// Load providers as soon as the panel mounts. If already loaded, this is a
+	// no-op. Models are warmed up automatically when providers load.
 	useEffect( () => {
-		providers.forEach( ( provider ) => fetchProviderModels( provider.id ) );
+		fetchProviders();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [] );
 
 	// No provider connected: link to the Connectors settings screen.
-	if ( 0 === providers.length ) {
+	if ( providersLoaded && 0 === providers.length ) {
 		return (
 			<a
 				className="agent-mod-chat__provider agent-mod-chat__provider--empty"
@@ -63,6 +62,7 @@ export default function ProviderModelSelector() {
 	}
 
 	const openProvider = ( id ) => {
+		if ( ! id ) return;
 		setActiveProvider( id );
 		fetchProviderModels( id );
 	};
@@ -84,7 +84,8 @@ export default function ProviderModelSelector() {
 					aria-expanded={ isOpen }
 					onClick={ () => {
 						if ( ! isOpen ) {
-							openProvider( selectedProvider || providers[ 0 ].id );
+							const fallbackId = providers.length > 0 ? providers[ 0 ].id : null;
+							openProvider( selectedProvider || fallbackId );
 						}
 						onToggle();
 					} }
