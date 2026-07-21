@@ -18,7 +18,7 @@ import {
 
 function DashboardSidebar() {
 	const links = [
-		{ label: __('Plugin Homepage', 'agent-mod'), url: 'https://agentmodwp.com' },
+		//{ label: __('Plugin Homepage', 'agent-mod'), url: 'https://agentmodwp.com' },
 		{ label: __('GitHub Repository', 'agent-mod'), url: 'https://github.com/Arkenon/agent-mod' },
 		{ label: __('Report a Bug', 'agent-mod'), url: 'https://wordpress.org/support/plugin/agent-mod' },
 		{ label: __('Rate the Plugin', 'agent-mod'), url: 'https://wordpress.org/plugins/agent-mod/#reviews' },
@@ -99,7 +99,7 @@ function DashboardSidebar() {
 								justifyContent: 'center',
 								border: 'none',
 							}}
-							href="https://agentmodwp.com/pro"
+							href="https://checkout.freemius.com/plugin/35032/plan/57576/"
 							target="_blank"
 						>
 							{__('Upgrade to Pro →', 'agent-mod')}
@@ -145,6 +145,7 @@ export default function Dashboard() {
 								<Button
 									variant="primary"
 									onClick={() => dispatch('agent-mod/chat').openChat()}
+									style={{marginTop:15}}
 								>
 									{__('Chat with Your Agent', 'agent-mod')}
 								</Button>
