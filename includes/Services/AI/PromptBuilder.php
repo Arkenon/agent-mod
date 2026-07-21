@@ -121,7 +121,10 @@ class PromptBuilder
 	 * Unregistered names are dropped so nothing user-controlled is injected
 	 * into the system instruction; the list is deduped and capped at 10. In
 	 * ask/plan modes write abilities are dropped too, mirroring the tool list
-	 * resolved for those modes.
+	 * resolved for those modes. The registry is indexed once via
+	 * wp_get_abilities() instead of calling wp_get_ability() per name, so
+	 * unregistered names (e.g. a select field's placeholder value) are
+	 * silently dropped instead of raising a _doing_it_wrong notice.
 	 *
 	 * @param AgentConfig $agent The agent configuration.
 	 *
@@ -130,8 +133,13 @@ class PromptBuilder
 	 */
 	private function resolveEmphasized(AgentConfig $agent): array
 	{
-		if (empty($agent->emphasizedAbilities) || ! function_exists('wp_get_ability')) {
+		if (empty($agent->emphasizedAbilities) || ! function_exists('wp_get_abilities')) {
 			return [];
+		}
+
+		$registry = [];
+		foreach (wp_get_abilities() as $ability) {
+			$registry[$ability->get_name()] = $ability;
 		}
 
 		$readonlyOnly = 'execute' !== $agent->mode;
@@ -144,7 +152,7 @@ class PromptBuilder
 				continue;
 			}
 
-			$ability = wp_get_ability($name);
+			$ability = $registry[$name] ?? null;
 
 			if (null === $ability) {
 				continue;

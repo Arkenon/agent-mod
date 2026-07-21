@@ -72,6 +72,11 @@ class AbilityResolver
 	/**
 	 * Resolves the subset of abilities whose names are in the allowed list.
 	 *
+	 * Indexes the registry once via wp_get_abilities() instead of calling
+	 * wp_get_ability() per name, so stale or invalid names (e.g. a select
+	 * field's placeholder value) are silently dropped instead of raising a
+	 * _doing_it_wrong notice for every unregistered name.
+	 *
 	 * @param string[] $allowedAbilities Allowed ability names.
 	 *
 	 * @return WP_Ability[]
@@ -79,10 +84,15 @@ class AbilityResolver
 	 */
 	private function resolveSelected(array $allowedAbilities): array
 	{
+		$registry = [];
+		foreach (wp_get_abilities() as $ability) {
+			$registry[$ability->get_name()] = $ability;
+		}
+
 		$abilities = [];
 
 		foreach ($allowedAbilities as $name) {
-			$ability = wp_get_ability((string) $name);
+			$ability = $registry[(string) $name] ?? null;
 			if ($ability instanceof WP_Ability) {
 				$abilities[] = $ability;
 			}

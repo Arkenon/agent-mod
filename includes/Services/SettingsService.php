@@ -185,24 +185,33 @@ final class SettingsService
 	/**
 	 * Resolves the allowed abilities to their display details.
 	 *
-	 * Uses wp_get_ability() directly (not the REST abilities list), so an
-	 * allowed ability is always included here even when it is excluded from
-	 * REST discovery (e.g. core/get-user-info, which core registers with
-	 * show_in_rest => false for privacy reasons).
+	 * Uses wp_get_abilities() to index the registry once (not the REST
+	 * abilities list), so an allowed ability is always included here even
+	 * when it is excluded from REST discovery (e.g. core/get-user-info,
+	 * which core registers with show_in_rest => false for privacy reasons).
+	 * Names that are no longer registered (stale entries, or garbage values
+	 * such as a select field's placeholder) are dropped without calling
+	 * wp_get_ability() per name, which would raise a _doing_it_wrong notice
+	 * for every unregistered name.
 	 *
 	 * @return array<int, array{name: string, label: string, meta: array{annotations: array{readonly: bool}}}>
 	 * @since 1.2.0
 	 */
 	public function getAllowedAbilitiesDetailed(): array
 	{
-		if (! function_exists('wp_get_ability')) {
+		if (! function_exists('wp_get_abilities')) {
 			return [];
+		}
+
+		$registry = [];
+		foreach (wp_get_abilities() as $ability) {
+			$registry[$ability->get_name()] = $ability;
 		}
 
 		$details = [];
 
 		foreach ($this->getAllowedAbilities() as $name) {
-			$ability = wp_get_ability((string) $name);
+			$ability = $registry[(string) $name] ?? null;
 
 			if (null === $ability) {
 				continue;
