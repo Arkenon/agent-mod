@@ -1,10 +1,10 @@
 /**
- * Icon action buttons rendered below assistant messages.
+ * Icon action buttons rendered below chat messages.
  *
- * Default actions: "Copy text" (clipboard icon) and "Create draft post"
- * (writing icon). Buttons are icon-only; tooltip appears on hover via the
- * WordPress Tooltip component. Pro can add, remove, or reorder actions via the
- * `agent_mod.message_actions` JS filter.
+ * Assistant messages get "Copy text" (clipboard icon) and "Create draft post"
+ * (writing icon); user messages get "Copy text" only. Buttons are icon-only;
+ * tooltip appears on hover via the WordPress Tooltip component. Pro can add,
+ * remove, or reorder actions via the `agent_mod.message_actions` JS filter.
  *
  * Filter signature:
  *   applyFilters( 'agent_mod.message_actions', defaultActions, message )
@@ -50,15 +50,14 @@ function execCommandCopy( text, onSuccess ) {
 }
 
 /**
- * Inner component — hooks always called at top level.
+ * Copy-to-clipboard state shared by user and assistant message actions.
+ *
+ * @param {string} text
  */
-function AssistantActions( { message } ) {
+function useCopyAction( text ) {
 	const [ copied, setCopied ] = useState( false );
-	// null | 'loading' | { editUrl: string } | { error: string }
-	const [ draftState, setDraftState ] = useState( null );
 
 	function handleCopy() {
-		const text = message.text || '';
 		function onSuccess() {
 			setCopied( true );
 			setTimeout( () => setCopied( false ), COPY_RESET_MS );
@@ -72,6 +71,73 @@ function AssistantActions( { message } ) {
 			execCommandCopy( text, onSuccess );
 		}
 	}
+
+	return { copied, handleCopy };
+}
+
+/**
+ * Renders a row of icon buttons from an actions array.
+ */
+function ActionButtons( { actions } ) {
+	return (
+		<div className="agent-mod-message-actions__buttons">
+			{ actions.map( ( action ) => (
+				<Tooltip key={ action.key } text={ action.label }>
+					<button
+						type="button"
+						className="agent-mod-message-actions__btn"
+						onClick={ action.onClick }
+						disabled={ !! action.disabled }
+						aria-label={ action.label }
+					>
+						<span
+							className={ `dashicons ${ action.iconClass }` }
+							aria-hidden="true"
+						/>
+					</button>
+				</Tooltip>
+			) ) }
+		</div>
+	);
+}
+
+/**
+ * Copy-only actions rendered below user messages.
+ */
+function UserActions( { message } ) {
+	const { copied, handleCopy } = useCopyAction( message.text || '' );
+
+	const defaultActions = [
+		{
+			key: 'copy',
+			iconClass: copied ? 'dashicons-yes' : 'dashicons-clipboard',
+			label: copied
+				? __( 'Copied!', 'agent-mod' )
+				: __( 'Copy text', 'agent-mod' ),
+			onClick: handleCopy,
+		},
+	];
+
+	const actions = applyFilters(
+		'agent_mod.message_actions',
+		defaultActions,
+		message
+	);
+
+	return (
+		<div className="agent-mod-message-actions">
+			<ActionButtons actions={ actions } />
+		</div>
+	);
+}
+
+/**
+ * Inner component — hooks always called at top level.
+ */
+function AssistantActions( { message } ) {
+	const { copied, handleCopy } = useCopyAction( message.text || '' );
+	// null | 'loading' | { editUrl: string } | { error: string }
+	const [ draftState, setDraftState ] = useState( null );
 
 	async function handleCreateDraft() {
 		if ( 'loading' === draftState ) {
@@ -134,24 +200,7 @@ function AssistantActions( { message } ) {
 
 	return (
 		<div className="agent-mod-message-actions">
-			<div className="agent-mod-message-actions__buttons">
-				{ actions.map( ( action ) => (
-					<Tooltip key={ action.key } text={ action.label }>
-						<button
-							type="button"
-							className="agent-mod-message-actions__btn"
-							onClick={ action.onClick }
-							disabled={ !! action.disabled }
-							aria-label={ action.label }
-						>
-							<span
-								className={ `dashicons ${ action.iconClass }` }
-								aria-hidden="true"
-							/>
-						</button>
-					</Tooltip>
-				) ) }
-			</div>
+			<ActionButtons actions={ actions } />
 
 			{ draftState && 'loading' !== draftState && (
 				<div
@@ -178,11 +227,16 @@ function AssistantActions( { message } ) {
 }
 
 /**
- * Wrapper that skips rendering for non-assistant or empty messages.
+ * Wrapper that skips rendering for empty messages and picks the action set
+ * for the message's role.
  */
 export default function MessageActions( { message } ) {
-	if ( 'assistant' !== message.role || ! ( message.text || '' ).trim() ) {
+	if ( ! ( message.text || '' ).trim() ) {
 		return null;
 	}
-	return <AssistantActions message={ message } />;
+	return 'assistant' === message.role ? (
+		<AssistantActions message={ message } />
+	) : (
+		<UserActions message={ message } />
+	);
 }
