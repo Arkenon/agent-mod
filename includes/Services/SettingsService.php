@@ -35,6 +35,34 @@ final class SettingsService
 	public function __construct(string $optionKey = 'agent_mod_settings')
 	{
 		$this->optionKey = $optionKey;
+
+		add_filter('ncf_sanitize_field_value', [$this, 'allowHtmlInMarkdownFields'], 10, 4);
+	}
+
+	/**
+	 * Allows HTML in the markdown-editor-backed textarea fields.
+	 *
+	 * NCF's default textarea sanitizer strips HTML; the "agent-mod-md-" fields
+	 * on the settings page are rendered with EasyMDE and expect their HTML
+	 * output preserved on save.
+	 *
+	 * @param mixed  $sanitized  NCF's default sanitized value.
+	 * @param mixed  $raw_value  Raw, unslashed input value.
+	 * @param string $field_type NCF field type.
+	 * @param string $field_name NCF field (meta key) name.
+	 *
+	 * @return mixed
+	 * @since 1.0.8
+	 */
+	public function allowHtmlInMarkdownFields($sanitized, $raw_value, string $field_type, string $field_name)
+	{
+		$markdown_fields = ['role', 'goal', 'global_system_prompt'];
+
+		if ('textarea' === $field_type && in_array($field_name, $markdown_fields, true)) {
+			return wp_kses_post($raw_value);
+		}
+
+		return $sanitized;
 	}
 
 	// -------------------------------------------------------------------------

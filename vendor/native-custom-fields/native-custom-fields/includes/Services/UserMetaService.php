@@ -330,7 +330,7 @@ class UserMetaService implements BaseMetaServiceInterface, UserMetaServiceInterf
 			}
 
 			// Sanitize according to the field's fieldType (preserves line breaks for textarea, etc.)
-			$value = Helper::sanitizeFieldValue($value, $field['fieldType'] ?? 'text', $field['fields'] ?? []);
+			$value = Helper::sanitizeFieldValue($value, $field['fieldType'] ?? 'text', $field['fields'] ?? [], $meta_key);
 
 			// Save the value to the database
 			$this->userMetaRepository->saveUserMeta($user_id, $meta_key, $value);

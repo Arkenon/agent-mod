@@ -121,7 +121,12 @@ export function selectMode( mode ) {
  * @param {string} providerId Provider id.
  */
 export const fetchProviderModels = ( providerId ) => async ( { dispatch, select } ) => {
-	if ( ! providerId || null !== select.getProviderModels( providerId ) ) {
+	// Only skip when a *non-empty* list is already cached. An empty array can
+	// mean a prior fetch failed (see catch below) — treating it as "loaded"
+	// would permanently skip retrying, since it's persisted to localStorage
+	// (see ./persistence.js) and survives page reloads for up to 6 hours.
+	const cached = select.getProviderModels( providerId );
+	if ( ! providerId || ( Array.isArray( cached ) && cached.length > 0 ) ) {
 		return;
 	}
 

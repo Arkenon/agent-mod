@@ -127,19 +127,20 @@ class Helper
      * @param mixed $value Raw (already unslashed) value
      * @param string $field_type Field type, e.g. 'text', 'textarea', 'number', 'toggle', 'group', 'repeater'
      * @param array $fields Sub-field configuration (for 'group'/'repeater' fields), each with 'name', 'fieldType', and optionally 'fields'
+     * @param string $field_name Field name/meta key, used only to give integrators context in the 'ncf_sanitize_field_value' filter
      *
      * @return mixed
      * @since 1.2.9
      */
-    public static function sanitizeFieldValue($value, string $field_type = 'text', array $fields = [])
+    public static function sanitizeFieldValue($value, string $field_type = 'text', array $fields = [], string $field_name = '')
     {
         if (! is_array($value)) {
-            return self::sanitizeScalarValue($value, $field_type);
+            return self::sanitizeScalarValue($value, $field_type, $field_name);
         }
 
         if ($field_type === 'repeater') {
-            return array_map(function ($item) use ($fields) {
-                return is_array($item) ? self::sanitizeFieldsByConfig($item, $fields) : self::sanitizeScalarValue($item, 'text');
+            return array_map(function ($item) use ($fields, $field_name) {
+                return is_array($item) ? self::sanitizeFieldsByConfig($item, $fields) : self::sanitizeScalarValue($item, 'text', $field_name);
             }, $value);
         }
 
@@ -147,8 +148,8 @@ class Helper
             return self::sanitizeFieldsByConfig($value, $fields);
         }
 
-        return array_map(function ($item) use ($field_type) {
-            return is_array($item) ? self::sanitizeArray($item) : self::sanitizeScalarValue($item, $field_type);
+        return array_map(function ($item) use ($field_type, $field_name) {
+            return is_array($item) ? self::sanitizeArray($item) : self::sanitizeScalarValue($item, $field_type, $field_name);
         }, $value);
     }
 
@@ -181,7 +182,7 @@ class Helper
             $field_type = $field['fieldType'] ?? 'text';
             $sub_fields = $field['fields'] ?? [];
 
-            $result[$sanitized_key] = self::sanitizeFieldValue($value, $field_type, $sub_fields);
+            $result[$sanitized_key] = self::sanitizeFieldValue($value, $field_type, $sub_fields, is_string($key) ? $key : '');
         }
 
         return $result;
@@ -192,35 +193,59 @@ class Helper
      *
      * @param mixed $value
      * @param string $field_type
+     * @param string $field_name Field name/meta key, if known (for filter context only)
      *
      * @return mixed
      * @since 1.2.9
      */
-    private static function sanitizeScalarValue($value, string $field_type)
+    private static function sanitizeScalarValue($value, string $field_type, string $field_name = '')
     {
         if (! is_scalar($value)) {
             return $value;
         }
 
         if (in_array($field_type, self::MULTILINE_FIELD_TYPES, true)) {
-            return sanitize_textarea_field((string) $value);
+            $sanitized = sanitize_textarea_field((string) $value);
+        } else {
+            switch ($field_type) {
+                case 'url':
+                case 'external_link':
+                    $sanitized = esc_url_raw((string) $value);
+                    break;
+                case 'email':
+                    $sanitized = sanitize_email((string) $value);
+                    break;
+                case 'number':
+                case 'range':
+                    $sanitized = is_numeric($value) ? $value + 0 : sanitize_text_field((string) $value);
+                    break;
+                case 'toggle':
+                case 'checkbox':
+                    $sanitized = rest_sanitize_boolean($value);
+                    break;
+                default:
+                    $sanitized = sanitize_text_field((string) $value);
+                    break;
+            }
         }
 
-        switch ($field_type) {
-            case 'url':
-            case 'external_link':
-                return esc_url_raw((string) $value);
-            case 'email':
-                return sanitize_email((string) $value);
-            case 'number':
-            case 'range':
-                return is_numeric($value) ? $value + 0 : sanitize_text_field((string) $value);
-            case 'toggle':
-            case 'checkbox':
-                return rest_sanitize_boolean($value);
-            default:
-                return sanitize_text_field((string) $value);
-        }
+        /**
+         * Filters the sanitized value of a single field before it is persisted.
+         *
+         * NCF strips HTML from 'textarea' (and 'code'/'wysiwyg') values via sanitize_textarea_field(),
+         * which also removes HTML comments such as Gutenberg's `<!-- wp:heading -->` block markers.
+         * Integrators who need to allow that content (e.g. storing Gutenberg block markup or Markdown-with-HTML
+         * in a textarea field) can hook this filter and return their own sanitized value — built from $value,
+         * the raw unslashed input — instead of NCF's default.
+         *
+         * @since 1.3.2
+         *
+         * @param mixed  $sanitized  NCF's default-sanitized value.
+         * @param mixed  $value      Raw (unslashed) value, prior to sanitization.
+         * @param string $field_type Field type, e.g. 'text', 'textarea', 'code', 'wysiwyg', 'number'.
+         * @param string $field_name Field name/meta key, empty string if not available in this context.
+         */
+        return apply_filters('ncf_sanitize_field_value', $sanitized, $value, $field_type, $field_name);
     }
 
     /**

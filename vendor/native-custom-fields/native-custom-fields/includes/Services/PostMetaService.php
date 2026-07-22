@@ -661,7 +661,7 @@ class PostMetaService implements BaseMetaServiceInterface, PostMetaServiceInterf
 					}
 
 					// Sanitize according to the field's fieldType (preserves line breaks for textarea, etc.)
-					$value = Helper::sanitizeFieldValue($value, $field['fieldType'] ?? 'text', $field['fields'] ?? []);
+					$value = Helper::sanitizeFieldValue($value, $field['fieldType'] ?? 'text', $field['fields'] ?? [], $meta_key);
 
 					// Save the value to the database
 					$this->postMetaRepository->savePostMeta($post_id, $meta_key, $value);
