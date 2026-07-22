@@ -124,8 +124,9 @@ class UserMetaService implements BaseMetaServiceInterface, UserMetaServiceInterf
 		//Get saved configurations from database
 		$get_user_meta_fields = $this->userMetaRepository->getConfigurations('native_custom_fields_user_meta_fields_config');
 
-		// Apply filter
-		$filtered = apply_filters('native_custom_fields_user_meta_fields_config', $get_user_meta_fields);
+		// Apply filter (matches the documented hook name, same naming pattern as
+		// native_custom_fields_post_meta_fields / native_custom_fields_term_meta_fields)
+		$filtered = apply_filters('native_custom_fields_user_meta_fields', $get_user_meta_fields);
 
 		// Normalize: Convert model objects to arrays (backward compatibility)
 		if (is_array($filtered)) {
@@ -320,22 +321,16 @@ class UserMetaService implements BaseMetaServiceInterface, UserMetaServiceInterf
 				continue;
 			}
 
-			$meta_value = Helper::sanitize($meta_key, 'post');
-
 			// Always save the value, even if it's empty (important for checkboxes and radios)
-			$value = wp_unslash($meta_value);
+			$value = Helper::getRawValue($meta_key, 'post') ?? '';
 
-			// Try to decode JSON if the value is a JSON string
-			if (Helper::isJson($value)) {
+			// Try to decode JSON if the value is a JSON string (group/repeater fields are posted as JSON)
+			if (is_string($value) && Helper::isJson($value)) {
 				$value = json_decode($value, true);
 			}
 
-			// Check if the value is an array and sanitize it
-			if (is_array($value)) {
-				$value = Helper::sanitizeArray($value);
-			} else {
-				$value = sanitize_text_field($value);
-			}
+			// Sanitize according to the field's fieldType (preserves line breaks for textarea, etc.)
+			$value = Helper::sanitizeFieldValue($value, $field['fieldType'] ?? 'text', $field['fields'] ?? []);
 
 			// Save the value to the database
 			$this->userMetaRepository->saveUserMeta($user_id, $meta_key, $value);

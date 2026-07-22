@@ -225,7 +225,30 @@ class OptionsController
     {
 
         $menu_slug = sanitize_text_field($request->get_param('menu_slug'));
-        $values = Helper::sanitizeArray($request->get_param('values'));
+        $raw_values = $request->get_param('values');
+        $sections = $this->optionService->getSectionsForMenuSlug($menu_slug);
+
+        // Values are submitted nested per section (values[section_name][field_name] = value),
+        // so sanitize each section's values against that section's own field list.
+        $section_fields_map = [];
+        foreach ($sections as $section) {
+            if (isset($section['section_name'])) {
+                $section_fields_map[$section['section_name']] = $section['fields'] ?? [];
+            }
+        }
+
+        $values = [];
+        if (is_array($raw_values)) {
+            foreach ($raw_values as $section_name => $section_values) {
+                $sanitized_section_name = is_string($section_name) ? sanitize_text_field($section_name) : $section_name;
+                $section_fields         = $section_fields_map[$section_name] ?? [];
+
+                $values[$sanitized_section_name] = is_array($section_values)
+                    ? Helper::sanitizeFieldsByConfig($section_values, $section_fields)
+                    : Helper::sanitizeFieldValue($section_values, 'text');
+            }
+        }
+
         $reset = rest_sanitize_boolean($request->get_param('reset'));
 
         $result = $this->optionService->saveOptions($menu_slug, $values, $reset);

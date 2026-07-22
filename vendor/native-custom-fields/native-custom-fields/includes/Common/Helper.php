@@ -18,6 +18,37 @@ class Helper
 {
 
     /**
+     * Field types whose value must keep line breaks (sanitized with sanitize_textarea_field()
+     * instead of sanitize_text_field(), which collapses \r\n\t and repeated spaces into a single space).
+     *
+     * @since 1.2.9
+     */
+    private const MULTILINE_FIELD_TYPES = ['textarea', 'code', 'wysiwyg'];
+
+    /**
+     * Get the raw (unslashed, unsanitized) value of a GET/POST/REQUEST input
+     *
+     * @param string $name Input name
+     * @param string $method GET or POST or REQUEST
+     *
+     * @return mixed|null
+     * @since 1.2.9
+     */
+    public static function getRawValue(string $name, string $method = 'post')
+    {
+        $method = strtolower($method);
+
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing -- This is a helper method for sanitization, not directly processing form data.
+        $input = $method === 'post' ? $_POST : ($method === 'get' ? $_GET : $_REQUEST);
+
+        if (! isset($input[$name])) {
+            return null;
+        }
+
+        return wp_unslash($input[$name]);
+    }
+
+    /**
      * Sanitize input
      *
      * @param string $name Input name
@@ -29,46 +60,43 @@ class Helper
      */
     public static function sanitize(string $name, string $method, string $type = "text")
     {
+        $value = self::getRawValue($name, $method);
 
-        $value = "";
-        $method = strtolower($method);
-
-        // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing -- This is a helper method for sanitization, not directly processing form data.
-        $input = $method === 'post' ? $_POST : ($method === 'get' ? $_GET : $_REQUEST);
-
-        if (isset($input[$name])) {
-            $value = wp_unslash($input[$name]);
-            $value = is_array($value) ? self::sanitizeArray($value) : sanitize_text_field($value);
+        if ($value === null) {
+            return null;
         }
 
-        if (isset($value)) {
-            switch ($type) {
-                case "title":
-                    return sanitize_title($value);
-                case "id":
-                    return absint($value);
-                case "textarea":
-                    return sanitize_textarea_field($value);
-                case "url":
-                    return esc_url_raw($value);
-                case "email":
-                    return sanitize_email($value);
-                case "username":
-                    return sanitize_user($value);
-                case "bool":
-                    return rest_sanitize_boolean($value);
-                case "key":
-                    return sanitize_key($value);
-                default:
-                    return $value;
-            }
+        if (is_array($value)) {
+            return self::sanitizeArray($value);
         }
 
-        return null;
+        switch ($type) {
+            case "title":
+                return sanitize_title($value);
+            case "id":
+                return absint($value);
+            case "textarea":
+                return sanitize_textarea_field($value);
+            case "url":
+                return esc_url_raw($value);
+            case "email":
+                return sanitize_email($value);
+            case "username":
+                return sanitize_user($value);
+            case "bool":
+                return rest_sanitize_boolean($value);
+            case "key":
+                return sanitize_key($value);
+            default:
+                return sanitize_text_field($value);
+        }
     }
 
     /**
      * Sanitize array recursively
+     * Blind, field-type-agnostic sanitization (everything treated as single-line text).
+     * Use sanitizeFieldValue()/sanitizeFieldsByConfig() instead when field type configuration
+     * (e.g. textarea) is available and line breaks must be preserved.
      *
      * @param array $array
      *
@@ -87,6 +115,112 @@ class Helper
             array_map('sanitize_text_field', array_keys($array)),
             $array
         ));
+    }
+
+    /**
+     * Sanitize a single field value according to its field type.
+     * Arrays are handled recursively: 'repeater' values are lists of items each matching $fields,
+     * 'group' values (or any array paired with $fields) are associative and matched by sub-field name.
+     * Arrays without a matching $fields configuration (e.g. plain multi-select values) are sanitized
+     * per-item using $field_type.
+     *
+     * @param mixed $value Raw (already unslashed) value
+     * @param string $field_type Field type, e.g. 'text', 'textarea', 'number', 'toggle', 'group', 'repeater'
+     * @param array $fields Sub-field configuration (for 'group'/'repeater' fields), each with 'name', 'fieldType', and optionally 'fields'
+     *
+     * @return mixed
+     * @since 1.2.9
+     */
+    public static function sanitizeFieldValue($value, string $field_type = 'text', array $fields = [])
+    {
+        if (! is_array($value)) {
+            return self::sanitizeScalarValue($value, $field_type);
+        }
+
+        if ($field_type === 'repeater') {
+            return array_map(function ($item) use ($fields) {
+                return is_array($item) ? self::sanitizeFieldsByConfig($item, $fields) : self::sanitizeScalarValue($item, 'text');
+            }, $value);
+        }
+
+        if ($field_type === 'group' || ! empty($fields)) {
+            return self::sanitizeFieldsByConfig($value, $fields);
+        }
+
+        return array_map(function ($item) use ($field_type) {
+            return is_array($item) ? self::sanitizeArray($item) : self::sanitizeScalarValue($item, $field_type);
+        }, $value);
+    }
+
+    /**
+     * Sanitize an associative array of field values against a field configuration tree,
+     * dispatching each value to sanitizeFieldValue() using its matching field's 'fieldType'
+     * (and recursing into 'fields' for nested group/repeater sub-fields).
+     * Keys without a matching field fall back to plain text sanitization.
+     *
+     * @param array $values Values keyed by field name
+     * @param array $fields Field configuration list, each with 'name', 'fieldType', and optionally 'fields'
+     *
+     * @return array
+     * @since 1.2.9
+     */
+    public static function sanitizeFieldsByConfig(array $values, array $fields): array
+    {
+        $field_map = [];
+        foreach ($fields as $field) {
+            if (isset($field['name'])) {
+                $field_map[$field['name']] = $field;
+            }
+        }
+
+        $result = [];
+        foreach ($values as $key => $value) {
+            $sanitized_key = is_string($key) ? sanitize_text_field($key) : $key;
+
+            $field      = $field_map[$key] ?? null;
+            $field_type = $field['fieldType'] ?? 'text';
+            $sub_fields = $field['fields'] ?? [];
+
+            $result[$sanitized_key] = self::sanitizeFieldValue($value, $field_type, $sub_fields);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Sanitize a scalar field value according to its field type
+     *
+     * @param mixed $value
+     * @param string $field_type
+     *
+     * @return mixed
+     * @since 1.2.9
+     */
+    private static function sanitizeScalarValue($value, string $field_type)
+    {
+        if (! is_scalar($value)) {
+            return $value;
+        }
+
+        if (in_array($field_type, self::MULTILINE_FIELD_TYPES, true)) {
+            return sanitize_textarea_field((string) $value);
+        }
+
+        switch ($field_type) {
+            case 'url':
+            case 'external_link':
+                return esc_url_raw((string) $value);
+            case 'email':
+                return sanitize_email((string) $value);
+            case 'number':
+            case 'range':
+                return is_numeric($value) ? $value + 0 : sanitize_text_field((string) $value);
+            case 'toggle':
+            case 'checkbox':
+                return rest_sanitize_boolean($value);
+            default:
+                return sanitize_text_field((string) $value);
+        }
     }
 
     /**

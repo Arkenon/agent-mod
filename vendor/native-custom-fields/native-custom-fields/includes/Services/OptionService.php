@@ -301,6 +301,31 @@ class OptionService implements OptionServiceInterface
 	}
 
 	/**
+	 * Get the section configuration list (each with 'section_name' and 'fields') for an options page,
+	 * used to sanitize submitted option values according to each field's fieldType.
+	 * Mirrors buildConfigModel(): starts from the DB-stored builder config and applies the
+	 * 'native_custom_fields_options_page_fields' filter, since consumer plugins may inject/replace
+	 * sections entirely via that filter instead of the options page builder UI.
+	 *
+	 * Options page values are submitted nested per section (values[section_name][field_name] = value,
+	 * see DataForm.js's initializeValuesFromConfig()/handleChange()), so callers must sanitize each
+	 * section's values against that section's own 'fields', not a flattened list.
+	 *
+	 * @param string $menu_slug
+	 *
+	 * @return array
+	 * @since 1.3.1
+	 */
+	public function getSectionsForMenuSlug(string $menu_slug): array
+	{
+		$fields_config = $this->getOptionsPagesFieldsConfigurations();
+		$sections      = $fields_config[$menu_slug]['sections'] ?? [];
+
+		// Apply filter to allow modification/injection of sections (same filter buildConfigModel() applies)
+		return apply_filters('native_custom_fields_options_page_fields', $sections, $menu_slug);
+	}
+
+	/**
 	 * Create option page fields from the builder
 	 *
 	 * @param string $menu_slug

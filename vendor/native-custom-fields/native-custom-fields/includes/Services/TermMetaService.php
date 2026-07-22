@@ -780,22 +780,16 @@ class TermMetaService implements BaseMetaServiceInterface, TermMetaServiceInterf
 				continue;
 			}
 
-			$meta_value = Helper::sanitize($meta_key, 'post');
-
 			// Always save the value, even if it's empty (important for checkboxes and radios)
-			$value = wp_unslash($meta_value);
+			$value = Helper::getRawValue($meta_key, 'post') ?? '';
 
-			// Try to decode JSON if the value is a JSON string
-			if (Helper::isJson($value)) {
+			// Try to decode JSON if the value is a JSON string (group/repeater fields are posted as JSON)
+			if (is_string($value) && Helper::isJson($value)) {
 				$value = json_decode($value, true);
 			}
 
-			// Check if the value is an array and sanitize it
-			if (is_array($value)) {
-				$value = Helper::sanitizeArray($value);
-			} else {
-				$value = sanitize_text_field($value);
-			}
+			// Sanitize according to the field's fieldType (preserves line breaks for textarea, etc.)
+			$value = Helper::sanitizeFieldValue($value, $field['fieldType'] ?? 'text', $field['fields'] ?? []);
 
 			// Save the value to the database
 			$this->termMetaRepository->saveTermMeta($term_id, $meta_key, $value);
