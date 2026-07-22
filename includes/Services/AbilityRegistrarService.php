@@ -405,7 +405,7 @@ class AbilityRegistrarService
 			'agent-mod/create-post',
 			[
 				'label'               => __('Create Post or Page', 'agent-mod'),
-				'description'         => __('Creates a new post/page. Provide title and optionally html. The html is converted to blocks server-side, avoiding innerHTML/attributes validation errors. Returns the new post_id for use with get-post/update-post.', 'agent-mod'),
+				'description'         => __('Creates a new post/page. Provide title and optionally html. The html parameter must be complete, valid serialized block markup; it is parsed with parse_blocks() and re-serialized as-is — attribute/innerHTML consistency is NOT validated server-side. Returns the new post_id for use with get-post/update-post.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeCreatePost'],
 				'permission_callback' => static function (): bool {
@@ -457,7 +457,7 @@ class AbilityRegistrarService
 			'agent-mod/update-post',
 			[
 				'label'               => __('Update Post or Page', 'agent-mod'),
-				'description'         => __('Saves content to a post/page. Provide post_id and html. The html is converted to blocks server-side, avoiding innerHTML/attributes validation errors.', 'agent-mod'),
+				'description'         => __('Saves content to a post/page. Provide post_id and html. The html parameter must be complete, valid serialized block markup; it is parsed with parse_blocks() and re-serialized as-is — attribute/innerHTML consistency is NOT validated server-side.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeUpdatePost'],
 				'permission_callback' => static function (): bool {
@@ -601,7 +601,7 @@ class AbilityRegistrarService
 			'agent-mod/update-pattern',
 			[
 				'label'               => __('Update Pattern', 'agent-mod'),
-				'description'         => __('Updates a database pattern (wp_block). Provide post_id and html. The html is converted to blocks server-side, avoiding innerHTML/attributes validation errors.', 'agent-mod'),
+				'description'         => __('Updates a database pattern (wp_block). Provide post_id and html. The html parameter must be complete, valid serialized block markup; it is parsed with parse_blocks() and re-serialized as-is — attribute/innerHTML consistency is NOT validated server-side.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeUpdatePattern'],
 				'permission_callback' => static function (): bool {
@@ -1935,7 +1935,44 @@ class AbilityRegistrarService
 	private function resolveBlocks(array $input)
 	{
 		if (! empty($input['html'])) {
-			$blocks = parse_blocks($input['html']);
+			$html = (string) $input['html'];
+
+			// parse_blocks() silently nulls the attributes when the JSON is
+			// malformed while still recognizing the block, so the editor later
+			// fails validation — check every attribute object directly. Serialized
+			// attributes can never contain "-->" (the serializer escapes "--").
+			if (preg_match_all('#<!--\s+wp:[a-z][a-z0-9/-]*\s+({.*?})\s*/?-->#s', $html, $matches)) {
+				foreach ($matches[1] as $attributeJson) {
+					json_decode($attributeJson);
+
+					if (JSON_ERROR_NONE !== json_last_error()) {
+						return new WP_Error(
+							'invalid_attributes',
+							sprintf(
+								/* translators: %s: excerpt of the invalid attribute object. */
+								__('Invalid JSON attribute object: "%s" — attributes must be strict JSON: double-quoted keys and strings, no trailing commas, no single quotes.', 'agent-mod'),
+								mb_substr($attributeJson, 0, 80)
+							)
+						);
+					}
+				}
+			}
+
+			$blocks = parse_blocks($html);
+
+			foreach ($blocks as $block) {
+				if (empty($block['blockName']) && '' !== trim((string) $block['innerHTML'])) {
+					return new WP_Error(
+						'stray_content',
+						sprintf(
+							/* translators: %s: excerpt of the stray content. */
+							__('Content exists outside block delimiters and would be dropped: "%s". Wrap it in proper block markup and retry.', 'agent-mod'),
+							mb_substr(trim((string) $block['innerHTML']), 0, 80)
+						)
+					);
+				}
+			}
+
 			$blocks = array_values(array_filter($blocks, static function ($block) {
 				return ! empty($block['blockName']);
 			}));

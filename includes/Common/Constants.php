@@ -47,7 +47,7 @@ class Constants
 	 *
 	 * @since 1.0.0
 	 */
-	public const AI_MAX_TOOL_CALLS = 10;
+	public const AI_MAX_TOOL_CALLS = 30;
 
 	/**
 	 * Maximum results per ability call that returns a list of posts or items.
