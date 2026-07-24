@@ -62,6 +62,17 @@ final class AgentResponse
 	public ?WP_Error $error;
 
 	/**
+	 * Provider finish/stop reason for the final candidate.
+	 *
+	 * One of the WP AI Client FinishReasonEnum values ('stop', 'length',
+	 * 'content_filter', 'tool_calls', 'error'). Empty string when unknown.
+	 *
+	 * @var string
+	 * @since 1.2.0
+	 */
+	public string $stopReason = '';
+
+	/**
 	 * Whether this response is paused waiting for user confirmation before
 	 * a write ability is executed.
 	 *
@@ -94,6 +105,7 @@ final class AgentResponse
 	 * @param Message[]                         $messages   Updated message history.
 	 * @param array<string, int>                $tokenUsage Token usage.
 	 * @param WP_Error|null                     $error      Error, if any.
+	 * @param string                            $stopReason Provider finish/stop reason.
 	 *
 	 * @since 1.0.0
 	 */
@@ -102,13 +114,15 @@ final class AgentResponse
 		array $toolCalls = [],
 		array $messages = [],
 		array $tokenUsage = [],
-		?WP_Error $error = null
+		?WP_Error $error = null,
+		string $stopReason = ''
 	) {
 		$this->text       = $text;
 		$this->toolCalls  = $toolCalls;
 		$this->messages   = $messages;
 		$this->tokenUsage = $tokenUsage;
 		$this->error      = $error;
+		$this->stopReason = $stopReason;
 	}
 
 	/**
@@ -196,11 +210,17 @@ final class AgentResponse
 			];
 		}
 
-		return [
+		$payload = [
 			'success'    => true,
 			'text'       => $this->text,
 			'toolCalls'  => $this->toolCalls,
 			'tokenUsage' => $this->tokenUsage,
 		];
+
+		if ('' !== $this->stopReason) {
+			$payload['stopReason'] = $this->stopReason;
+		}
+
+		return $payload;
 	}
 }

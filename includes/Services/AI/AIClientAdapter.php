@@ -244,7 +244,9 @@ class AIClientAdapter
 					$this->extractText($result),
 					$toolCalls,
 					$history,
-					$tokenUsage
+					$tokenUsage,
+					null,
+					$this->extractStopReason($result)
 				);
 			}
 
@@ -325,7 +327,9 @@ class AIClientAdapter
 			$this->extractText($finalResult),
 			$toolCalls,
 			$history,
-			$this->extractTokenUsage($finalResult)
+			$this->extractTokenUsage($finalResult),
+			null,
+			$this->extractStopReason($finalResult)
 		);
 	}
 
@@ -493,6 +497,31 @@ class AIClientAdapter
 				}
 			)
 		);
+	}
+
+	/**
+	 * Extracts the finish/stop reason of the first candidate as a plain string.
+	 *
+	 * Returns one of the WP AI Client FinishReasonEnum values ('stop', 'length',
+	 * 'content_filter', 'tool_calls', 'error'), or '' when it cannot be resolved.
+	 *
+	 * @param GenerativeAiResult $result The result.
+	 *
+	 * @return string
+	 * @since 1.2.0
+	 */
+	private function extractStopReason(GenerativeAiResult $result): string
+	{
+		try {
+			$candidates = $result->getCandidates();
+			if (empty($candidates)) {
+				return '';
+			}
+
+			return (string) $candidates[0]->getFinishReason()->value;
+		} catch (Throwable $e) {
+			return '';
+		}
 	}
 
 	/**
