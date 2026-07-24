@@ -1937,6 +1937,27 @@ class AbilityRegistrarService
 		if (! empty($input['html'])) {
 			$html = (string) $input['html'];
 
+			/**
+			 * Filters the serialized block markup before it is parsed and saved.
+			 *
+			 * Extensions (e.g. AgentMod Pro) may inspect the markup and either
+			 * return a corrected string or a WP_Error to reject the write — the
+			 * error surfaces to the calling agent exactly like the built-in
+			 * invalid_attributes / stray_content errors below.
+			 *
+			 * @since 1.1.0
+			 *
+			 * @param string               $html  Serialized block markup.
+			 * @param array<string, mixed> $input The write ability input.
+			 */
+			$html = apply_filters('agent_mod_resolve_blocks_html', $html, $input);
+
+			if (is_wp_error($html)) {
+				return $html;
+			}
+
+			$html = (string) $html;
+
 			// parse_blocks() silently nulls the attributes when the JSON is
 			// malformed while still recognizing the block, so the editor later
 			// fails validation — check every attribute object directly. Serialized

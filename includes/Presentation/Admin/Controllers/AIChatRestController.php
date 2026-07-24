@@ -162,6 +162,24 @@ final class AIChatRestController
 			]
 		);
 
+		// Requests cancellation of an in-flight chat request. The orchestration
+		// loop checks the flag between iterations and bails out early.
+		register_rest_route(
+			Constants::REST_NAMESPACE,
+			'/chat-stop',
+			[
+				'methods'             => 'POST',
+				'callback'            => [$this, 'handleChatStop'],
+				'permission_callback' => [$this, 'checkPermission'],
+				'args'                => [
+					'requestId' => [
+						'type'     => 'string',
+						'required' => true,
+					],
+				],
+			]
+		);
+
 		// Live tool-call progress for an in-flight chat request (polled by the widget).
 		register_rest_route(
 			Constants::REST_NAMESPACE,
@@ -414,6 +432,31 @@ final class AIChatRestController
 		$payload['conversationId'] = $conversationId ?: null;
 
 		return rest_ensure_response($payload);
+	}
+
+	/**
+	 * Flags an in-flight chat request as stop-requested.
+	 *
+	 * The frontend additionally aborts its own fetch; this flag makes the
+	 * server-side tool-calling loop bail out at the next iteration boundary so
+	 * no further provider calls or ability executions happen for the request.
+	 *
+	 * @param WP_REST_Request $request The REST request.
+	 *
+	 * @return WP_REST_Response|WP_Error
+	 * @since 1.2.0
+	 */
+	public function handleChatStop(WP_REST_Request $request)
+	{
+		$requestId = $this->sanitizeRequestId($request);
+
+		if ('' === $requestId) {
+			return new WP_Error('invalid_request_id', __('Invalid request id.', 'agent-mod'), ['status' => 400]);
+		}
+
+		$this->progressStore->requestStop($requestId);
+
+		return rest_ensure_response(['success' => true]);
 	}
 
 	/**

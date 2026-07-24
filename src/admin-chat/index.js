@@ -20,6 +20,9 @@ import {
 	SKILL_MENTION_PATTERN,
 	parseAbilityMentions,
 	parseSkillMentions,
+	extractMentionTokens,
+	splitMentionParts,
+	resolveKnownAbilityNames,
 } from './utils/mentions';
 import ChatApp from './components/ChatApp';
 import ChatPanel from './components/ChatPanel';
@@ -106,5 +109,8 @@ Object.assign( window.agentMod, {
 		SKILL_MENTION_PATTERN,
 		parseAbilityMentions,
 		parseSkillMentions,
+		extractMentionTokens,
+		splitMentionParts,
+		resolveKnownAbilityNames,
 	},
 } );

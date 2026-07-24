@@ -43,30 +43,177 @@ const MENTION_TRIGGER_PATTERN = /(?:^|\s)@([a-z0-9-]*(?:\/[a-z0-9-]*)?)$/i;
 const SKILL_TRIGGER_PATTERN = /(?:^|\s)#([a-z0-9-]*)$/i;
 
 /**
- * Extracts namespaced ability names mentioned as "@namespace/ability" in a
- * message. Names are deduped; validity is enforced server-side.
+ * True when the character before offset `index` allows a mention to start
+ * there — i.e. the trigger char is at the start of the text or right after
+ * whitespace. Mirrors the boundary the live trigger patterns already require.
+ */
+const hasLeadingBoundary = ( text, index ) =>
+	0 === index || /\s/.test( text[ index - 1 ] );
+
+/**
+ * True when the character at offset `index` (the one right after a token)
+ * doesn't extend the token — anything outside the slug/namespace alphabet
+ * counts as a boundary, so trailing punctuation ("#my-skill.") is fine but
+ * partial matches ("#my-skillX", "@ns/name/extra") are not.
+ */
+const hasTrailingBoundary = ( text, index ) =>
+	index >= text.length || ! /[A-Za-z0-9_/-]/.test( text[ index ] );
+
+/**
+ * Core mention tokenizer. A grammar-shaped token only counts as a mention
+ * when it is properly delimited (whitespace/start before, non-slug char or
+ * end after) AND — when the matching known list is provided — its value is a
+ * member of that list. This is what keeps ordinary prose like a "#000000"
+ * color code from being treated as a skill mention.
  *
- * @param {string} text The message text.
+ * @param {string} text                   The text to scan.
+ * @param {Object} [options]              Known values per mention type.
+ * @param {?string[]} options.abilityNames Known "@namespace/name" ability
+ *   names, [] for "none valid", or null to skip the membership check.
+ * @param {?string[]} options.skillSlugs   Known "#slug" skill slugs, [] for
+ *   "none valid", or null to skip the membership check.
+ * @return {Array<{start: number, end: number, token: string, type: string, value: string}>}
+ *   Mention tokens in order of appearance; `token` includes the trigger char,
+ *   `value` doesn't, `type` is 'ability' or 'skill'.
+ */
+export function extractMentionTokens(
+	text,
+	{ abilityNames = null, skillSlugs = null } = {}
+) {
+	const source = text || '';
+	const known = {
+		ability: null === abilityNames ? null : new Set( abilityNames ),
+		skill: null === skillSlugs ? null : new Set( skillSlugs ),
+	};
+	const tokens = [];
+
+	for ( const match of source.matchAll( TOKEN_PATTERN ) ) {
+		const token = match[ 0 ];
+		const start = match.index;
+		const end = start + token.length;
+
+		if (
+			! hasLeadingBoundary( source, start ) ||
+			! hasTrailingBoundary( source, end )
+		) {
+			continue;
+		}
+
+		const type = '@' === token[ 0 ] ? 'ability' : 'skill';
+		const value = token.slice( 1 );
+
+		if ( null !== known[ type ] && ! known[ type ].has( value ) ) {
+			continue;
+		}
+
+		tokens.push( { start, end, token, type, value } );
+	}
+
+	return tokens;
+}
+
+/**
+ * Splits text into ordered parts for the highlight overlay, marking which
+ * parts are validated mentions.
+ *
+ * @param {string} text      The text to split.
+ * @param {Object} [options] Same options as extractMentionTokens().
+ * @return {Array<{text: string, isMention: boolean}>} Ordered parts covering
+ *   the whole text.
+ */
+export function splitMentionParts( text, options ) {
+	const source = text || '';
+	const parts = [];
+	let cursor = 0;
+
+	for ( const { start, end, token } of extractMentionTokens( source, options ) ) {
+		if ( start > cursor ) {
+			parts.push( { text: source.slice( cursor, start ), isMention: false } );
+		}
+		parts.push( { text: token, isMention: true } );
+		cursor = end;
+	}
+
+	if ( cursor < source.length ) {
+		parts.push( { text: source.slice( cursor ), isMention: false } );
+	}
+
+	return parts;
+}
+
+/**
+ * Resolves the known ability-name list for mention validation, mirroring the
+ * AbilityTray's data sourcing: with "Selected Abilities" the list is fully
+ * known from settings; with "All Abilities" the site-wide list is only known
+ * once it has been lazily loaded (the tray bootstraps it on first open) — if
+ * it hasn't loaded yet, return null so validation falls back to grammar +
+ * boundaries only (the server re-validates against the registry anyway).
+ *
+ * @param {string} abilitySource     'all' or 'selected'.
+ * @param {Array}  selectedAbilities Ability records from the settings/agent.
+ * @param {Array}  allAbilities      Site-wide ability records (may be empty
+ *   until lazily loaded).
+ * @return {?string[]} Known ability names, or null when unknown.
+ */
+export function resolveKnownAbilityNames(
+	abilitySource,
+	selectedAbilities,
+	allAbilities
+) {
+	if ( 'selected' === abilitySource ) {
+		return ( selectedAbilities || [] ).map( ( ability ) => ability.name );
+	}
+
+	if ( Array.isArray( allAbilities ) && 0 < allAbilities.length ) {
+		return allAbilities.map( ( ability ) => ability.name );
+	}
+
+	return null;
+}
+
+/**
+ * Extracts namespaced ability names mentioned as "@namespace/ability" in a
+ * message. Names are deduped; when `knownNames` is given only members of it
+ * count as mentions (validity is additionally enforced server-side).
+ *
+ * @param {string}    text         The message text.
+ * @param {?string[]} [knownNames] Known ability names, or null to skip the
+ *   membership check.
  * @return {string[]} Mentioned ability names.
  */
-export function parseAbilityMentions( text ) {
-	const matches = ( text || '' ).matchAll( MENTION_PATTERN );
+export function parseAbilityMentions( text, knownNames = null ) {
+	const tokens = extractMentionTokens( text, { abilityNames: knownNames } );
 
-	return [ ...new Set( [ ...matches ].map( ( match ) => match[ 1 ] ) ) ];
+	return [
+		...new Set(
+			tokens
+				.filter( ( { type } ) => 'ability' === type )
+				.map( ( { value } ) => value )
+		),
+	];
 }
 
 /**
  * Extracts skill slugs mentioned as "#skill-slug" in a message. Slugs are
- * deduped; validity is enforced server-side against the selected agent's
- * attached skills.
+ * deduped; when `knownSlugs` is given only members of it count as mentions
+ * (validity is additionally enforced server-side against the selected
+ * agent's attached skills).
  *
- * @param {string} text The message text.
+ * @param {string}    text         The message text.
+ * @param {?string[]} [knownSlugs] Known skill slugs, or null to skip the
+ *   membership check.
  * @return {string[]} Mentioned skill slugs.
  */
-export function parseSkillMentions( text ) {
-	const matches = ( text || '' ).matchAll( SKILL_MENTION_PATTERN );
+export function parseSkillMentions( text, knownSlugs = null ) {
+	const tokens = extractMentionTokens( text, { skillSlugs: knownSlugs } );
 
-	return [ ...new Set( [ ...matches ].map( ( match ) => match[ 1 ] ) ) ];
+	return [
+		...new Set(
+			tokens
+				.filter( ( { type } ) => 'skill' === type )
+				.map( ( { value } ) => value )
+		),
+	];
 }
 
 /**

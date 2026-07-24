@@ -10,8 +10,11 @@
  * overlay's highlighted text is what's actually seen. Typing "@" opens and
  * filters the ability tray live; typing "#" does the same for extension
  * trays (e.g. the Pro skill tray) via the composer-tools mention props.
- * Picking an item (from a tray, however it was opened) inserts it at the
- * current caret position rather than at the end of the text.
+ * Typing-triggered trays never steal focus (the caret stays in the
+ * textarea), only actual typing may open one (caret clicks/arrow moves
+ * don't), and Escape dismisses the tray for that mention until it is
+ * retyped. Picking an item (from a tray, however it was opened) inserts it
+ * at the current caret position rather than at the end of the text.
  */
 import { useEffect, useRef, useState } from '@wordpress/element';
 import { useDispatch, useSelect } from '@wordpress/data';
@@ -19,8 +22,14 @@ import { Button, TextareaControl } from '@wordpress/components';
 import { applyFilters } from '@wordpress/hooks';
 import { __ } from '@wordpress/i18n';
 
+import { store as abilitiesStore } from '@wordpress/abilities';
+
 import { STORE_NAME } from '../store';
-import { TOKEN_PATTERN, findMentionTrigger } from '../utils/mentions';
+import {
+	splitMentionParts,
+	resolveKnownAbilityNames,
+	findMentionTrigger,
+} from '../utils/mentions';
 import AttachmentUploader from './AttachmentUploader';
 import AgentSelector from './AgentSelector';
 import ProviderModelSelector from './ProviderModelSelector';
@@ -45,20 +54,34 @@ export default function Composer() {
 	const [mentionQuery, setMentionQuery] = useState(null); // in-progress mention query, or null
 	const [mentionStart, setMentionStart] = useState(null); // offset of the trigger char for the query above
 	const [mentionTrigger, setMentionTrigger] = useState(null); // '@' | '#' | null
+	const [dismissedStart, setDismissedStart] = useState(null); // trigger offset of a mention the user dismissed
 
 	const uploaderRef = useRef(null);
 	const textareaRef = useRef(null);
 	const highlightRef = useRef(null);
 
-	const { sendMessage, clearMessages, setConversationId } =
+	const { sendMessage, stopGeneration, clearMessages, setConversationId } =
 		useDispatch(STORE_NAME);
-	const { loading, hasMessages, strings, maxCount } = useSelect((select) => {
+	const {
+		loading,
+		hasMessages,
+		strings,
+		maxCount,
+		abilitySource,
+		selectedAbilities,
+		allAbilities,
+		agentSkills,
+	} = useSelect((select) => {
 		const storeSelect = select(STORE_NAME);
 		return {
 			loading: storeSelect.isLoading(),
 			hasMessages: storeSelect.getMessages().length > 0,
 			strings: storeSelect.getStrings(),
 			maxCount: storeSelect.getAttachmentLimits().maxCount,
+			abilitySource: storeSelect.getAbilitySource(),
+			selectedAbilities: storeSelect.getSelectedAbilities(),
+			allAbilities: select(abilitiesStore).getAbilities(),
+			agentSkills: storeSelect.getSelectedAgent()?.skills || [],
 		};
 	}, []);
 
@@ -68,6 +91,15 @@ export default function Composer() {
 		setMentionQuery(null);
 		setMentionStart(null);
 		setMentionTrigger(null);
+	};
+
+	// Closes the tray for the in-progress mention AND remembers its trigger
+	// offset, so further typing or caret moves over that same token don't
+	// immediately reopen it. The dismissal is forgotten as soon as the caret
+	// leaves the token or a different mention starts.
+	const dismissMentionTrigger = () => {
+		setDismissedStart(mentionStart);
+		clearMentionTrigger();
 	};
 
 	const submit = () => {
@@ -87,29 +119,61 @@ export default function Composer() {
 			return;
 		}
 		if ('Escape' === event.key && null !== mentionQuery) {
-			clearMentionTrigger();
+			// Swallow the key so dismissing the tray doesn't also close the
+			// chat modal.
+			event.preventDefault();
+			event.stopPropagation();
+			dismissMentionTrigger();
 		}
 	};
 
 	// Re-detects the in-progress "@" or "#" mention (if any) at the current
 	// caret position, driving the matching tray's forced-open + live filter
-	// state.
-	const updateMentionTrigger = () => {
+	// state. Only actual typing (`allowOpen`) may open a tray for a mention
+	// that isn't already active: placing the caret inside an existing token
+	// with a click or the arrow keys must not pop the tray open (clicking
+	// back into a "#000000" color code used to reopen it endlessly). A
+	// mention the user dismissed stays closed while the caret remains on it.
+	const updateMentionTrigger = ({ allowOpen = false } = {}) => {
 		const node = textareaRef.current;
 		if (!node) {
 			return;
 		}
 		const trigger = findMentionTrigger(node.value, node.selectionStart);
-		setMentionQuery(trigger ? trigger.query : null);
-		setMentionStart(trigger ? trigger.start : null);
-		setMentionTrigger(trigger ? trigger.trigger : null);
+
+		if (!trigger) {
+			if (null !== mentionQuery) {
+				clearMentionTrigger();
+			}
+			if (null !== dismissedStart) {
+				setDismissedStart(null);
+			}
+			return;
+		}
+
+		if (trigger.start === dismissedStart) {
+			return;
+		}
+		if (null !== dismissedStart) {
+			setDismissedStart(null);
+		}
+
+		const isActive =
+			null !== mentionQuery && trigger.start === mentionStart;
+		if (!allowOpen && !isActive) {
+			return;
+		}
+
+		setMentionQuery(trigger.query);
+		setMentionStart(trigger.start);
+		setMentionTrigger(trigger.trigger);
 	};
 
 	const onChangeText = (value) => {
 		setText(value);
 		// The DOM's caret position already reflects this keystroke by the time
 		// React's onChange fires, so it can be read straight off the ref.
-		updateMentionTrigger();
+		updateMentionTrigger({ allowOpen: true });
 	};
 
 	const syncHighlightScroll = () => {
@@ -172,7 +236,19 @@ export default function Composer() {
 
 	const presetPrompts = window.agentModChat?.presetPrompts || [];
 
-	const highlightParts = splitMentions(text).split(TOKEN_PATTERN);
+	// Only tokens that match a known ability/skill (and are properly
+	// delimited) are highlighted — a "#000000" color code in prose stays
+	// plain text. Skills come from the selected agent's record (default
+	// agent has none); the ability list may be null until the site-wide
+	// list is lazily loaded, in which case membership isn't checked yet.
+	const highlightParts = splitMentionParts(splitMentions(text), {
+		abilityNames: resolveKnownAbilityNames(
+			abilitySource,
+			selectedAbilities,
+			allAbilities
+		),
+		skillSlugs: agentSkills.map((skill) => skill.slug),
+	});
 
 	return (
 
@@ -212,12 +288,12 @@ export default function Composer() {
 						aria-hidden="true"
 					>
 						{highlightParts.map((part, index) =>
-							1 === index % 2 ? (
+							part.isMention ? (
 								<mark key={index} className="agent-mod-chat__mention">
-									{part}
+									{part.text}
 								</mark>
 							) : (
-								part
+								part.text
 							)
 						)}
 					</div>
@@ -228,8 +304,8 @@ export default function Composer() {
 						value={text}
 						onChange={onChangeText}
 						onKeyDown={onKeyDown}
-						onKeyUp={updateMentionTrigger}
-						onClick={updateMentionTrigger}
+						onKeyUp={() => updateMentionTrigger()}
+						onClick={() => updateMentionTrigger()}
 						onScroll={syncHighlightScroll}
 						placeholder={
 							strings.placeholder || __('Type your message…', 'agent-mod')
@@ -254,7 +330,7 @@ export default function Composer() {
 							forceOpen={'@' === mentionTrigger}
 							onForceOpenChange={(open) => {
 								if (!open) {
-									clearMentionTrigger();
+									dismissMentionTrigger();
 								}
 							}}
 						/>
@@ -299,7 +375,7 @@ export default function Composer() {
 									mentionTrigger={mentionTrigger}
 									mentionQuery={mentionQuery}
 									onMentionQueryChange={setMentionQuery}
-									onMentionCancel={clearMentionTrigger}
+									onMentionCancel={dismissMentionTrigger}
 								/>
 							)
 						)}
@@ -318,9 +394,22 @@ export default function Composer() {
 						)}
 					</div>
 
-					<Button variant="primary" onClick={submit} disabled={!canSend}>
-						{strings.send || __('Send', 'agent-mod')}
-					</Button>
+					{loading ? (
+						// While a request is in flight the send button becomes a
+						// Stop button, aborting the fetch and flagging the server
+						// loop so a wrong prompt can be cancelled immediately.
+						<Button
+							variant="secondary"
+							isDestructive
+							onClick={() => stopGeneration()}
+						>
+							{strings.stop || __('Stop', 'agent-mod')}
+						</Button>
+					) : (
+						<Button variant="primary" onClick={submit} disabled={!canSend}>
+							{strings.send || __('Send', 'agent-mod')}
+						</Button>
+					)}
 				</div>
 			</div>
 		</>

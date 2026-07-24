@@ -50,8 +50,6 @@ export default function AbilityTray( {
 	const search    = isSearchControlled ? controlledSearch : internalSearch;
 	const setSearch = isSearchControlled ? ( onSearchChange || ( () => {} ) ) : setInternalSearch;
 
-	const isOpen = forceOpen || manualOpen;
-
 	const { selectedMode, abilitySource, selectedAbilities, allAbilities } = useSelect( ( select ) => {
 		const storeSelect = select( STORE_NAME );
 		return {
@@ -79,12 +77,23 @@ export default function AbilityTray( {
 		)
 		: items;
 
+	// While the tray is driven by typing "@…", a query that matches nothing
+	// auto-hides it, so prose that merely looks like a mention doesn't pin a
+	// "No abilities found." popup to the screen. Manual (button) opens always
+	// stay open so the user can refine their search.
+	const typingOpen =
+		forceOpen && ( loadingAll || '' === term || 0 < filtered.length );
+	const isOpen = typingOpen || manualOpen;
+
 	// The full site-wide list is only needed for "All Abilities"; loaded lazily
 	// (once) whenever the tray opens — whether via the toolbar button or a
 	// composer-driven "@" trigger — so "Selected Abilities" never triggers a
 	// request.
 	useEffect( () => {
-		if ( ! isOpen || selectedOnly || bootstrapped ) {
+		// Keyed off forceOpen too: a typing-driven open whose query matches
+		// nothing yet (typingOpen false because the list isn't loaded) must
+		// still bootstrap the site-wide list.
+		if ( ( ! isOpen && ! forceOpen ) || selectedOnly || bootstrapped ) {
 			return;
 		}
 		setBootstrapped( true );
@@ -97,12 +106,17 @@ export default function AbilityTray( {
 				setLoadingAll( false );
 			}
 		} )();
-	}, [ isOpen, selectedOnly, bootstrapped ] );
+	}, [ isOpen, forceOpen, selectedOnly, bootstrapped ] );
 
 	return (
 		<Dropdown
 			className="agent-mod-chat__ability-tray-picker"
 			popoverProps={ { placement: 'top-start' } }
+			// A typing-driven open must not steal focus from the textarea —
+			// the live "@query" already filters the list, and yanking the
+			// caret into the tray's search box mid-sentence was the single
+			// most disruptive part of the old behaviour.
+			focusOnMount={ forceOpen ? false : 'firstElement' }
 			open={ isOpen }
 			onToggle={ ( willOpen ) => {
 				setManualOpen( willOpen );

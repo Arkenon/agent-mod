@@ -114,6 +114,14 @@ final class AgentConfig
 	public bool $autoIncludeSiteContext;
 
 	/**
+	 * Whether the agent may use the provider's native web search tool.
+	 *
+	 * @var bool
+	 * @since 1.0.6
+	 */
+	public bool $webSearchEnabled;
+
+	/**
 	 * Interaction mode: 'ask', 'plan' or 'execute'.
 	 *
 	 * In 'ask' and 'plan' modes only read-only abilities are resolved and the
@@ -156,6 +164,7 @@ final class AgentConfig
 	 * @param string[]    $allowedAbilities       Allowed ability names for 'selected'.
 	 * @param int|null    $maxToolCalls           Max tool-calling iterations.
 	 * @param bool|null   $autoIncludeSiteContext Include site context flag.
+	 * @param bool|null   $webSearchEnabled       Enable native web search flag.
 	 * @param string      $mode                   'ask', 'plan' or 'execute'.
 	 * @param string[]    $emphasizedAbilities    Ability names mentioned by the user.
 	 * @param string|null $baseSystemPrompt       Base system prompt.
@@ -174,6 +183,7 @@ final class AgentConfig
 		array $allowedAbilities = [],
 		?int $maxToolCalls = null,
 		?bool $autoIncludeSiteContext = true,
+		?bool $webSearchEnabled = null,
 		string $mode = 'execute',
 		array $emphasizedAbilities = [],
 		?string $baseSystemPrompt = null,
@@ -193,6 +203,7 @@ final class AgentConfig
 		$this->allowedAbilities       = empty($allowedAbilities) ? $settingsService->getAllowedAbilities() : $allowedAbilities;
 		$this->maxToolCalls           = ($maxToolCalls !== null && $maxToolCalls > 0) ? $maxToolCalls : $settingsService->getMaxToolCalls();
 		$this->autoIncludeSiteContext = $autoIncludeSiteContext ?? $settingsService->isSiteContextEnabled();
+		$this->webSearchEnabled       = $webSearchEnabled ?? $settingsService->isWebSearchEnabled();
 		$this->mode                   = in_array($mode, ['ask', 'plan', 'execute'], true) ? $mode : 'execute';
 		$this->emphasizedAbilities    = $emphasizedAbilities;
 		$this->baseSystemPrompt       = $baseSystemPrompt ?? $settingsService->getSystemPrompt();
@@ -236,6 +247,7 @@ final class AgentConfig
 			array_values((array) $allowed),
 			isset($data['maxToolCalls']) ? (int) $data['maxToolCalls'] : (isset($data['max_tool_calls']) ? (int) $data['max_tool_calls'] : null),
 			isset($data['autoIncludeSiteContext']) ? (bool) $data['autoIncludeSiteContext'] : null,
+			isset($data['webSearchEnabled']) ? (bool) $data['webSearchEnabled'] : (isset($data['web_search_enabled']) ? (bool) $data['web_search_enabled'] : null),
 			isset($data['mode']) ? (string) $data['mode'] : 'execute',
 			array_values((array) $emphasized),
 			isset($data['baseSystemPrompt']) ? (string) $data['baseSystemPrompt'] : null,

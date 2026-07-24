@@ -177,6 +177,7 @@ final class AIChatWidgetController
 					'title'             => __('AgentMod Assistant', 'agent-mod'),
 					'placeholder'       => __('Type your message…', 'agent-mod'),
 					'send'              => __('Send', 'agent-mod'),
+					'stop'              => __('Stop', 'agent-mod'),
 					'error'             => __('An unexpected error occurred.', 'agent-mod'),
 					'attach'            => __('Attach files', 'agent-mod'),
 					'removeAttachment'  => __('Remove attachment', 'agent-mod'),

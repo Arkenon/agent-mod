@@ -140,7 +140,8 @@ class AIOrchestratorService
 			$agent->model,
 			$agent->maxToolCalls,
 			$requestId,
-			$approvedCalls
+			$approvedCalls,
+			$agent->webSearchEnabled
 		);
 
 		// When a write ability requires confirmation, persist the wire-format

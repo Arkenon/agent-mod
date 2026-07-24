@@ -22,8 +22,10 @@ use WP_Ability;
 use AgentMod\Services\AI\DTO\AgentResponse;
 use AgentMod\Services\AI\Http\ToolCallRepairManager;
 use WordPress\AiClient\Messages\DTO\Message;
+use WordPress\AiClient\Providers\Models\DTO\ModelConfig;
 use WordPress\AiClient\Results\DTO\GenerativeAiResult;
 use WordPress\AiClient\Tools\DTO\FunctionCall;
+use WordPress\AiClient\Tools\DTO\WebSearch;
 
 defined('ABSPATH') || exit;
 
@@ -72,6 +74,7 @@ class AIClientAdapter
 	 * @param array<int, array<string, mixed>> $approvedCalls Tool calls the user has already confirmed
 	 *                                                          (each ['name' => string, 'args' => array]).
 	 *                                                          Bypasses the confirmation gate once per match.
+	 * @param bool        $webSearchEnabled  Whether to enable the provider's native web search tool.
 	 *
 	 * @return AgentResponse
 	 * @since 1.0.0
@@ -84,7 +87,8 @@ class AIClientAdapter
 		?string $model,
 		int $maxToolCalls,
 		string $requestId = '',
-		array $approvedCalls = []
+		array $approvedCalls = [],
+		bool $webSearchEnabled = false
 	): AgentResponse {
 		if (! function_exists('wp_ai_client_prompt')) {
 			return AgentResponse::fromError(
@@ -104,16 +108,42 @@ class AIClientAdapter
 				$model,
 				$maxToolCalls,
 				$requestId,
-				$approvedCalls
+				$approvedCalls,
+				$webSearchEnabled
 			);
 		} finally {
 			$this->toolCallRepairs->unregister();
 
-			// Progress is only meaningful while the request is in flight.
+			// Progress and stop flags are only meaningful while the request is
+			// in flight.
 			if ('' !== $requestId) {
 				$this->progressStore->delete($requestId);
+				$this->progressStore->clearStop($requestId);
 			}
 		}
+	}
+
+	/**
+	 * Builds the canonical "stopped by the user" error response.
+	 *
+	 * The frontend aborts its own fetch when the user presses Stop, so this
+	 * response usually goes nowhere — its purpose is to end the tool-calling
+	 * loop early (no further provider calls or ability executions) and to keep
+	 * the stopped turn out of conversation persistence (error responses are
+	 * never persisted).
+	 *
+	 * @return AgentResponse
+	 * @since 1.2.0
+	 */
+	private function stoppedResponse(): AgentResponse
+	{
+		return AgentResponse::fromError(
+			new \WP_Error(
+				'agent_mod_request_stopped',
+				__('The request was stopped by the user.', 'agent-mod'),
+				['status' => 400]
+			)
+		);
 	}
 
 	/**
@@ -128,6 +158,7 @@ class AIClientAdapter
 	 * @param string      $requestId         Optional client-generated UUID for live progress reporting.
 	 * @param array<int, array<string, mixed>> $approvedCalls Tool calls the user has already confirmed;
 	 *                                                          each is exempted from the confirmation gate once.
+	 * @param bool        $webSearchEnabled  Whether to enable the provider's native web search tool.
 	 *
 	 * @return AgentResponse
 	 * @since 1.0.0
@@ -140,7 +171,8 @@ class AIClientAdapter
 		?string $model,
 		int $maxToolCalls,
 		string $requestId = '',
-		array $approvedCalls = []
+		array $approvedCalls = [],
+		bool $webSearchEnabled = false
 	): AgentResponse {
 		$resolver   = new WP_AI_Client_Ability_Function_Resolver(...$abilities);
 		$history    = $messages;
@@ -148,6 +180,14 @@ class AIClientAdapter
 		$tokenUsage = [];
 
 		for ($i = 0; $i < $maxToolCalls; $i++) {
+			// The user may press Stop at any time; the flag is written by the
+			// chat-stop endpoint from a separate request. Model calls already
+			// in flight cannot be interrupted, so the loop bails at the next
+			// iteration boundary instead.
+			if ('' !== $requestId && $this->progressStore->isStopRequested($requestId)) {
+				return $this->stoppedResponse();
+			}
+
 			// Only the first pass has no tool activity to show yet, so report
 			// the neutral "thinking" state (bare spinner). On later passes the
 			// previous "running_tool" status is intentionally left in place
@@ -174,6 +214,11 @@ class AIClientAdapter
 
 			if (! empty($abilities)) {
 				$builder->using_abilities(...$abilities);
+			}
+
+			// Enable the provider's native web search when requested.
+			if ($webSearchEnabled) {
+				$this->applyWebSearch($builder, $provider);
 			}
 
 			$result = $builder->generate_result();
@@ -217,6 +262,12 @@ class AIClientAdapter
 				);
 			}
 
+			// A stop pressed while the model was generating must also prevent
+			// the tools it just requested from executing.
+			if ('' !== $requestId && $this->progressStore->isStopRequested($requestId)) {
+				return $this->stoppedResponse();
+			}
+
 			// Record the requested tool calls, then execute them and feed responses back.
 			$this->reportProgress(
 				$requestId,
@@ -235,7 +286,12 @@ class AIClientAdapter
 			// reliably catch the tool-call feedback.
 		}
 
-		// Tool-call limit reached: do a final pass without abilities to force a text answer.
+		// Tool-call limit reached: do a final pass without abilities to force a
+		// text answer — unless the user stopped the request meanwhile.
+		if ('' !== $requestId && $this->progressStore->isStopRequested($requestId)) {
+			return $this->stoppedResponse();
+		}
+
 		$finalBuilder = wp_ai_client_prompt()
 			->with_history(...$history)
 			->using_system_instruction($systemInstruction);
@@ -246,6 +302,12 @@ class AIClientAdapter
 			if ($model) {
 				$finalBuilder->using_model_preference([$provider, $model]);
 			}
+		}
+
+		// Keep web search available on the forced-text final pass so the answer
+		// can still ground on live results even after the tool-call limit.
+		if ($webSearchEnabled) {
+			$this->applyWebSearch($finalBuilder, $provider);
 		}
 
 		$finalResult = $finalBuilder->generate_result();
@@ -265,6 +327,39 @@ class AIClientAdapter
 			$history,
 			$this->extractTokenUsage($finalResult)
 		);
+	}
+
+	/**
+	 * Enables the provider's native web search on the given prompt builder.
+	 *
+	 * The single WebSearch config is translated by each connector into its own
+	 * server tool (OpenAI web_search, Google googleSearch, …), so no
+	 * provider-specific payload is built here.
+	 *
+	 * Google/Gemini exception: when a built-in server tool (googleSearch) is
+	 * combined with function calling (our abilities), the Gemini API rejects the
+	 * request with "enable tool_config.include_server_side_tool_invocations".
+	 * The Google connector does not expose that flag, so we pass it through the
+	 * SDK's sanctioned customOptions channel, which the connector splices
+	 * verbatim into the request body (no third-party code is modified). This is
+	 * scoped to Google only — sending the flag to other providers would add an
+	 * unknown parameter and break them.
+	 *
+	 * @param WP_AI_Client_Prompt_Builder $builder  WP AI Client prompt builder.
+	 * @param string                      $provider Provider id, or '' for auto-select.
+	 *
+	 * @return void
+	 * @since 1.0.6
+	 */
+	private function applyWebSearch($builder, string $provider): void
+	{
+		$builder->using_web_search(new WebSearch());
+
+		if (in_array($provider, ['google', 'gemini'], true)) {
+			$config = new ModelConfig();
+			$config->setCustomOption('toolConfig', ['includeServerSideToolInvocations' => true]);
+			$builder->using_model_config($config);
+		}
 	}
 
 	/**

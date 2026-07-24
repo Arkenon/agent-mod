@@ -168,6 +168,17 @@ final class SettingsService
 	}
 
 	/**
+	 * @return bool
+	 * @since 1.0.6
+	 */
+	public function isWebSearchEnabled(): bool
+	{
+		$saved = $this->getSettings()['agent_mod_chat_behaviour']['web_search_enabled'] ?? null;
+		$value = $saved !== null ? (bool) $saved : Constants::AI_WEB_SEARCH_ENABLED;
+		return (bool) $value;
+	}
+
+	/**
 	 * @return string
 	 * @since 1.0.5
 	 */

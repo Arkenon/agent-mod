@@ -149,6 +149,13 @@ final class SettingsController
 						'default'    => Constants::AI_CONTEXT_ENABLED,
 					],
 					[
+						'fieldType'  => 'toggle',
+						'name'       => 'web_search_enabled',
+						'fieldLabel' => __('Enable Web Search', 'agent-mod'),
+						'fieldHelpText'       => __('When enabled, the agent can search the live web to answer questions. Uses the AI provider\'s native web search (OpenAI web_search / Google googleSearch). Availability depends on the selected model.', 'agent-mod'),
+						'default'    => Constants::AI_WEB_SEARCH_ENABLED,
+					],
+					[
 						'fieldType'   => 'textarea',
 						'name'        => 'role',
 						'id'          => 'agent-mod-md-role',

@@ -115,6 +115,17 @@ class Constants
 	public const AI_CONTEXT_ENABLED = true;
 
 	/**
+	 * Default web search enabled state of AgentMod Assistant.
+	 *
+	 * Opt-in by default: web search adds latency and cost, and native support
+	 * depends on the selected provider/model.
+	 *
+	 * @since 1.0.6
+	 * @var bool
+	 */
+	public const AI_WEB_SEARCH_ENABLED = false;
+
+	/**
 	 * Default role of AgentMod Assistant.
 	 *
 	 * @since 1.0.5

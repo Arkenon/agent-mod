@@ -8,8 +8,12 @@
 import apiFetch from '@wordpress/api-fetch';
 import { applyFilters, doAction } from '@wordpress/hooks';
 import { __ } from '@wordpress/i18n';
+import { store as abilitiesStore } from '@wordpress/abilities';
 
-import { parseAbilityMentions } from '../utils/mentions';
+import {
+	parseAbilityMentions,
+	resolveKnownAbilityNames,
+} from '../utils/mentions';
 
 export function openChat() {
 	return { type: 'OPEN_CHAT' };
@@ -211,6 +215,7 @@ export const confirmAction = ( token, conversationId ) => async ( { dispatch, se
 	dispatch.setLoading( true );
 
 	const requestId   = generateRequestId();
+	const signal      = trackRequest( requestId );
 	const stopPolling = startProgressPolling( requestId, dispatch, select );
 
 	try {
@@ -218,6 +223,7 @@ export const confirmAction = ( token, conversationId ) => async ( { dispatch, se
 			path:   select.getRestNamespace() + '/confirm-action',
 			method: 'POST',
 			data:   { token, conversationId, requestId },
+			signal,
 		} );
 
 		dispatch.clearConfirmation();
@@ -248,11 +254,15 @@ export const confirmAction = ( token, conversationId ) => async ( { dispatch, se
 		}
 	} catch ( err ) {
 		dispatch.clearConfirmation();
-		dispatch.setError(
-			( err && err.message ) ||
-			__( 'Request failed. Please try again.', 'agent-mod' )
-		);
+		// A user-initiated Stop is not an error: release the UI quietly.
+		if ( ! isStopError( err ) ) {
+			dispatch.setError(
+				( err && err.message ) ||
+				__( 'Request failed. Please try again.', 'agent-mod' )
+			);
+		}
 	} finally {
+		untrackRequest( requestId );
 		stopPolling();
 		dispatch.setLoading( false );
 	}
@@ -267,6 +277,85 @@ export const confirmAction = ( token, conversationId ) => async ( { dispatch, se
 function toWireAttachment( { name, mimeType, data } ) {
 	return { name, mimeType, data };
 }
+
+/**
+ * The single in-flight chat/confirm request, or null. Kept module-level (not
+ * in store state) because an AbortController is not serializable; only one
+ * request can be in flight at a time — the composer is disabled while loading.
+ *
+ * @type {?{controller: ?AbortController, requestId: string}}
+ */
+let activeRequest = null;
+
+/**
+ * Registers a chat request as the in-flight one and returns the fetch signal.
+ *
+ * @param {string} requestId Client-generated UUID of the request.
+ * @return {?AbortSignal} Signal to pass to apiFetch, when supported.
+ */
+function trackRequest( requestId ) {
+	const controller =
+		'undefined' !== typeof window.AbortController
+			? new window.AbortController()
+			: null;
+
+	activeRequest = { controller, requestId };
+
+	return controller ? controller.signal : undefined;
+}
+
+/**
+ * Clears the in-flight request tracking, but only when it still belongs to
+ * the given request (a newer request may have replaced it).
+ *
+ * @param {string} requestId The request being cleaned up.
+ */
+function untrackRequest( requestId ) {
+	if ( activeRequest && activeRequest.requestId === requestId ) {
+		activeRequest = null;
+	}
+}
+
+/**
+ * True when the caught error means "the user pressed Stop" — either the local
+ * fetch abort (AbortError) or the server-side stop response, which can reach
+ * the client when the local abort lost the race.
+ *
+ * @param {Object} err The caught error.
+ * @return {boolean} Whether the error is a user-initiated stop.
+ */
+function isStopError( err ) {
+	return (
+		'AbortError' === err?.name ||
+		'agent_mod_request_stopped' === err?.code ||
+		'agent_mod_request_stopped' === err?.error?.code
+	);
+}
+
+/**
+ * Stops the in-flight chat request, if any.
+ *
+ * Two-pronged: flags the request server-side (so the orchestration loop stops
+ * calling the provider and executing tools at the next iteration boundary)
+ * and aborts the local fetch (so the UI is released immediately). The stopped
+ * turn is never persisted server-side.
+ */
+export const stopGeneration = () => async ( { select } ) => {
+	if ( ! activeRequest ) {
+		return;
+	}
+
+	const { controller, requestId } = activeRequest;
+
+	// Fire-and-forget: the local abort must not wait for this round-trip.
+	apiFetch( {
+		path: select.getRestNamespace() + '/chat-stop',
+		method: 'POST',
+		data: { requestId },
+	} ).catch( () => {} );
+
+	controller?.abort();
+};
 
 /**
  * Generates a UUID v4 request id for live progress polling.
@@ -329,6 +418,7 @@ function startProgressPolling( requestId, dispatch, select ) {
 export const sendMessage = ( text, attachments = [] ) => async ( {
 	dispatch,
 	select,
+	registry,
 } ) => {
 	const trimmed = ( text || '' ).trim();
 	const files = Array.isArray( attachments ) ? attachments : [];
@@ -361,7 +451,15 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 
 	// @-mentioned abilities (e.g. "@agent-mod/list-posts") are emphasized in the
 	// system prompt server-side; the mention text itself stays in the message.
-	const mentionedAbilities = parseAbilityMentions( trimmed );
+	// Candidates are validated against the known ability list so grammar-shaped
+	// prose isn't mistaken for a mention (null list = site-wide list not loaded
+	// yet — grammar/boundary checks only, the server re-validates anyway).
+	const knownAbilityNames = resolveKnownAbilityNames(
+		select.getAbilitySource(),
+		select.getSelectedAbilities(),
+		registry.select( abilitiesStore ).getAbilities()
+	);
+	const mentionedAbilities = parseAbilityMentions( trimmed, knownAbilityNames );
 	if ( 0 < mentionedAbilities.length ) {
 		agent.emphasizedAbilities = mentionedAbilities;
 	}
@@ -379,6 +477,7 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 	dispatch.setLoading( true );
 
 	const requestId    = generateRequestId();
+	const signal       = trackRequest( requestId );
 	const stopPolling  = startProgressPolling( requestId, dispatch, select );
 
 	try {
@@ -397,6 +496,7 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 			path: select.getRestPath(),
 			method: 'POST',
 			data: payload,
+			signal,
 		} );
 
 		const data = applyFilters( 'agent_mod.receive_message_response', rawData );
@@ -431,11 +531,15 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 			dispatch.setError( message );
 		}
 	} catch ( err ) {
-		const message =
-			( err && err.message ) ||
-			__( 'Request failed. Please try again.', 'agent-mod' );
-		dispatch.setError( message );
+		// A user-initiated Stop is not an error: release the UI quietly.
+		if ( ! isStopError( err ) ) {
+			const message =
+				( err && err.message ) ||
+				__( 'Request failed. Please try again.', 'agent-mod' );
+			dispatch.setError( message );
+		}
 	} finally {
+		untrackRequest( requestId );
 		stopPolling();
 		dispatch.setLoading( false );
 	}
