@@ -467,8 +467,15 @@ class AIClientAdapter
 	 *
 	 * Other plugins register write abilities via the agent_mod_ability_requires_confirmation
 	 * filter, returning true for ability names that must not be executed silently. A call
-	 * matching an already-approved entry (by ability name) is exempted once and removed
-	 * from $approvedCalls, so re-requesting the same ability later still requires confirmation.
+	 * matching an already-approved entry is exempted once and removed from $approvedCalls,
+	 * so re-requesting the same ability later still requires confirmation.
+	 *
+	 * The match is on ability name *and* arguments. Confirmation does not execute the
+	 * stored call directly: it re-prompts the model to request it again (see
+	 * AIChatRestController::handleConfirmAction()). Matching on the name alone would let
+	 * the model come back on that turn with different arguments — approving the deletion
+	 * of one plugin and having another deleted. Comparing fingerprints keeps the approved
+	 * arguments binding; anything else falls through and prompts the user again.
 	 *
 	 * @param array<int, array<string, mixed>> $toolCalls     Extracted tool calls.
 	 * @param array<int, array<string, mixed>> $approvedCalls Tool calls already confirmed by the user.
@@ -481,13 +488,15 @@ class AIClientAdapter
 		return array_values(
 			array_filter(
 				$toolCalls,
-				static function (array $call) use (&$approvedCalls): bool {
+				function (array $call) use (&$approvedCalls): bool {
 					if (! (bool) apply_filters('agent_mod_ability_requires_confirmation', false, $call['name'])) {
 						return false;
 					}
 
+					$fingerprint = $this->toolCallFingerprint($call);
+
 					foreach ($approvedCalls as $index => $approved) {
-						if (($approved['name'] ?? '') === $call['name']) {
+						if ($this->toolCallFingerprint($approved) === $fingerprint) {
 							unset($approvedCalls[$index]);
 							return false;
 						}
@@ -497,6 +506,53 @@ class AIClientAdapter
 				}
 			)
 		);
+	}
+
+	/**
+	 * Builds a stable identity for a tool call from its name and arguments.
+	 *
+	 * Argument keys are sorted recursively so that a provider reordering them
+	 * between turns does not invalidate an approval. Values are compared as
+	 * encoded, so "5" and 5 are treated as different — erring towards asking
+	 * the user again rather than executing something they did not see.
+	 *
+	 * @param array<string, mixed> $call Tool call with 'name' and 'args'.
+	 *
+	 * @return string
+	 * @since 1.1.0
+	 */
+	private function toolCallFingerprint(array $call): string
+	{
+		$args = $call['args'] ?? [];
+
+		if (! is_array($args)) {
+			$args = [$args];
+		}
+
+		$this->sortKeysRecursive($args);
+
+		return (string) ($call['name'] ?? '') . '|' . (string) wp_json_encode($args);
+	}
+
+	/**
+	 * Recursively sorts an array by key, in place.
+	 *
+	 * @param array<mixed> $value Array to sort.
+	 *
+	 * @return void
+	 * @since 1.1.0
+	 */
+	private function sortKeysRecursive(array &$value): void
+	{
+		ksort($value);
+
+		foreach ($value as &$item) {
+			if (is_array($item)) {
+				$this->sortKeysRecursive($item);
+			}
+		}
+
+		unset($item);
 	}
 
 	/**

@@ -4,7 +4,7 @@ Tags: ai, agent, chatbot, assistant, abilities
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.0.9
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -38,6 +38,15 @@ When an agent triggers a database-modifying ability such as `create_post` or `se
 **Smart Response Rendering**
 - Plain text responses are rendered as Markdown with "Copy Text" and "Create Draft" action buttons.
 - Code block responses (HTML, CSS, PHP, etc.) are displayed in a syntax-highlighted `<pre>` container with a "Copy Code" button.
+
+**Site Management Abilities**
+A group of abilities that let the agent administer the WordPress installation itself, covering the same ground as the `wp plugin`, `wp theme`, `wp option`, `wp user`, `wp core` and `wp cron` command families — without needing shell access or WP-CLI:
+- Plugins and themes: list, look up, search the WordPress.org directory, install from a slug or a .zip, activate, deactivate, update and delete.
+- Settings: browse WordPress' registered settings with their declared types, and update them with schema validation. Individual options can be read and written too.
+- System: report the WordPress, PHP and MySQL versions, pending updates and whether the site permits file modifications; list scheduled cron events; flush the object cache and rewrite rules.
+- Users: list accounts, create users, edit profiles, change roles, send password resets and delete accounts with content reassignment.
+
+Every destructive or state-changing ability in this group goes through the approval modal, and guards refuse the operations that would break the site: writing `siteurl`, deactivating AgentMod itself, deleting the active theme, removing the last administrator or the account you are signed in as. Passwords are never generated into a response — WordPress sends its standard emails instead.
 
 **Ability Registry Browser**
 A dedicated sub-menu page under AgentMod lists all abilities currently registered on WordPress Core Registry, with detailed information for each.
@@ -95,6 +104,11 @@ Under the AgentMod menu in your WordPress admin, there is a dedicated **Abilitie
 If you ask the agent to create a post, it will show you a confirmation modal summarizing the action before anything is written to the database. You must explicitly approve the action for it to proceed.
 
 == Changelog ==
+= 1.1.0 =
+* Added: Site Management abilities (new "AgentMod — Site Management" category, 24 abilities) covering plugins, themes, settings/options, system status, cron and users — the native equivalent of the WP-CLI management commands, with no shell access required.
+* Added: Guards for site management operations — protected options, self-protection for AgentMod's own plugins, active/parent/default theme protection, last-administrator protection and privilege-escalation checks on user roles.
+* Fixed: An approved write action is now matched by ability name *and* arguments before it is exempted from confirmation. Previously the model could return different arguments on the confirmation turn and have them executed without a second prompt.
+
 = 1.0.9 =
 Added: Web search capability. Agent can search the web for information and use it in responses.
 Added: Stop Chat button into composer.

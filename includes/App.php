@@ -17,6 +17,7 @@ use AgentMod\Common\DI;
 use AgentMod\Presentation\ControllerInit;
 use AgentMod\Services\LibraryService;
 use AgentMod\Services\SettingsService;
+use AgentMod\Services\SiteManagementAbilityService;
 
 defined('ABSPATH') || exit;
 
@@ -30,6 +31,7 @@ final class App
 	 */
 	private array $services = [
 		AbilityRegistrarService::class,
+		SiteManagementAbilityService::class,
 		LibraryService::class,
 		SettingsService::class,
 	];
