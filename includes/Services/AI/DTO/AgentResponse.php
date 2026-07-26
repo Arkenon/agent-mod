@@ -145,6 +145,8 @@ final class AgentResponse
 	 * @param array<int, array<string, mixed>> $pendingToolCalls Tool calls awaiting approval.
 	 * @param Message[]                        $messages         Message history at the time of detection.
 	 * @param array<string, int>               $tokenUsage       Token usage so far.
+	 * @param array<int, array<string, mixed>> $toolCalls        Tool calls already executed in this run,
+	 *                                                           before the pending one was requested.
 	 *
 	 * @return self
 	 * @since 1.0.0
@@ -153,9 +155,10 @@ final class AgentResponse
 		string $token,
 		array $pendingToolCalls,
 		array $messages,
-		array $tokenUsage
+		array $tokenUsage,
+		array $toolCalls = []
 	): self {
-		$instance                       = new self('', [], $messages, $tokenUsage);
+		$instance                       = new self('', $toolCalls, $messages, $tokenUsage);
 		$instance->isPendingConfirmation = true;
 		$instance->confirmationToken    = $token;
 		$instance->pendingToolCalls     = $pendingToolCalls;
@@ -207,6 +210,9 @@ final class AgentResponse
 					'args' => $first['args'] ?? [],
 				],
 				'pendingToolCalls'    => $this->pendingToolCalls,
+				// Calls already executed before the pending one was requested, so a
+				// resumed multi-step run can report everything that has run so far.
+				'toolCalls'           => $this->toolCalls,
 			];
 		}
 

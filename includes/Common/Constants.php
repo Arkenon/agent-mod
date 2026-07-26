@@ -186,7 +186,7 @@ class Constants
 		return [
 			[
 				'label' => __('Create a draft post.', 'agent-mod'),
-				'prompt' => __('Create a draft post about ..... via using @agent-mod/create-draft-post tool. Details: .....', 'agent-mod'),
+				'prompt' => __('Create a draft post about ..... via using @agent-mod/create-post tool. Details: .....', 'agent-mod'),
 			],
 			[
 				'label' => __('Get site information of my web site.', 'agent-mod'),

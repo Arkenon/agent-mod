@@ -7,7 +7,7 @@
  */
 import { Button, Modal } from '@wordpress/components';
 import { useDispatch, useSelect } from '@wordpress/data';
-import { __ } from '@wordpress/i18n';
+import { __, _n } from '@wordpress/i18n';
 
 import { STORE_NAME } from '../store';
 
@@ -26,7 +26,15 @@ export default function ConfirmationModal() {
 		return null;
 	}
 
-	const { token, actionName, args } = pendingConfirmation;
+	const { token, actionName, args, pendingToolCalls } = pendingConfirmation;
+
+	// A provider may batch several write calls into one turn; confirming approves
+	// all of them, so all of them have to be on screen. Older payloads carry only
+	// the single pendingAction shape.
+	const actions =
+		Array.isArray( pendingToolCalls ) && pendingToolCalls.length
+			? pendingToolCalls
+			: [ { name: actionName, args } ];
 
 	const onConfirm = () => {
 		confirmAction( token, conversationId );
@@ -45,17 +53,27 @@ export default function ConfirmationModal() {
 			isDismissible={ false }
 		>
 			<p>
-				{ __( 'The agent wants to perform the following action. Do you confirm?', 'agent-mod' ) }
+				{ _n(
+					'The agent wants to perform the following action. Do you confirm?',
+					'The agent wants to perform the following actions. Do you confirm?',
+					actions.length,
+					'agent-mod'
+				) }
 			</p>
 
-			<div className="agent-mod-chat__confirm-action">
-				<strong>{ actionName }</strong>
-				{ 0 < Object.keys( args ).length && (
-					<pre className="agent-mod-chat__confirm-args">
-						{ JSON.stringify( args, null, 2 ) }
-					</pre>
-				) }
-			</div>
+			{ actions.map( ( action, index ) => (
+				<div
+					className="agent-mod-chat__confirm-action"
+					key={ `${ action.name }-${ index }` }
+				>
+					<strong>{ action.name }</strong>
+					{ 0 < Object.keys( action.args || {} ).length && (
+						<pre className="agent-mod-chat__confirm-args">
+							{ JSON.stringify( action.args, null, 2 ) }
+						</pre>
+					) }
+				</div>
+			) ) }
 
 			<div className="agent-mod-chat__confirm-buttons">
 				<Button variant="primary" onClick={ onConfirm }>

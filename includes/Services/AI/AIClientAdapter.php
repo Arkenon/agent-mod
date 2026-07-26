@@ -256,11 +256,14 @@ class AIClientAdapter
 			$writeCalls     = $this->filterWriteToolCalls($requestedCalls, $approvedCalls);
 
 			if (! empty($writeCalls)) {
+				// $toolCalls carries what already ran in this iteration set; the
+				// resume path needs it so the model is told what is already done.
 				return AgentResponse::pendingConfirmation(
 					wp_generate_uuid4(),
 					$writeCalls,
 					$history,
-					$tokenUsage
+					$tokenUsage,
+					$toolCalls
 				);
 			}
 
@@ -465,10 +468,13 @@ class AIClientAdapter
 	/**
 	 * Filters tool calls that require user confirmation before execution.
 	 *
-	 * Other plugins register write abilities via the agent_mod_ability_requires_confirmation
-	 * filter, returning true for ability names that must not be executed silently. A call
-	 * matching an already-approved entry is exempted once and removed from $approvedCalls,
-	 * so re-requesting the same ability later still requires confirmation.
+	 * The default comes from the ability's own MCP-style annotations: anything that
+	 * declares `readonly => false` is a write and is gated. Plugins refine that
+	 * verdict through the agent_mod_ability_requires_confirmation filter — forcing
+	 * true for abilities whose annotations are missing or too permissive, or false
+	 * to let a specific write through silently. A call matching an already-approved
+	 * entry is exempted once and removed from $approvedCalls, so re-requesting the
+	 * same ability later still requires confirmation.
 	 *
 	 * The match is on ability name *and* arguments. Confirmation does not execute the
 	 * stored call directly: it re-prompts the model to request it again (see
@@ -489,7 +495,18 @@ class AIClientAdapter
 			array_filter(
 				$toolCalls,
 				function (array $call) use (&$approvedCalls): bool {
-					if (! (bool) apply_filters('agent_mod_ability_requires_confirmation', false, $call['name'])) {
+					$requires = $this->isWriteAbility((string) $call['name']);
+
+					/**
+					 * Filters whether an ability must be confirmed by the user before it runs.
+					 *
+					 * @param bool   $requires Default verdict, derived from the ability's
+					 *                         `readonly` annotation.
+					 * @param string $name     Ability name.
+					 *
+					 * @since 1.0.0
+					 */
+					if (! (bool) apply_filters('agent_mod_ability_requires_confirmation', $requires, $call['name'])) {
 						return false;
 					}
 
@@ -506,6 +523,47 @@ class AIClientAdapter
 				}
 			)
 		);
+	}
+
+	/**
+	 * Whether an ability declares itself as a write operation.
+	 *
+	 * Reads the MCP-style `readonly` annotation from the ability registry, so a
+	 * newly registered write ability is gated without anyone maintaining a list of
+	 * names. Only an explicit `readonly => false` counts: many abilities — core
+	 * ones and those from other plugins — ship no annotations at all, and treating
+	 * a missing hint as a write would put a modal in front of ordinary read calls.
+	 * Those cases are covered by the agent_mod_ability_requires_confirmation
+	 * filter instead.
+	 *
+	 * @param string $name Ability name.
+	 *
+	 * @return bool True when the ability is annotated as not read-only.
+	 * @since x.x.x
+	 */
+	private function isWriteAbility(string $name): bool
+	{
+		if ('' === $name || ! function_exists('wp_get_ability')) {
+			return false;
+		}
+
+		$ability = wp_get_ability($name);
+
+		// An unregistered name cannot be executed either, so there is nothing to
+		// confirm — the resolver rejects it on its own.
+		if (! $ability instanceof WP_Ability) {
+			return false;
+		}
+
+		$annotations = $ability->get_meta_item('annotations', []);
+
+		if (! is_array($annotations) || ! array_key_exists('readonly', $annotations)) {
+			return false;
+		}
+
+		// The hint has to be present, but its falsy form is not standardised
+		// (false, 0, ''), so anything not truthy counts as a write.
+		return ! (bool) $annotations['readonly'];
 	}
 
 	/**

@@ -107,11 +107,20 @@ class AIOrchestratorService
 	 * @param array<int, array<string, mixed>>  $approvedCalls Tool calls the user has already confirmed
 	 *                                                          (each ['name' => string, 'args' => array]); exempted
 	 *                                                          once from the write-confirmation gate.
+	 * @param array<string, mixed>              $pendingStateOverrides Values that replace the derived keys of the
+	 *                                                          confirmation state when this run pauses for
+	 *                                                          approval. A resumed run passes the *original* user
+	 *                                                          message, history and attachments here, so a chain of
+	 *                                                          confirmations keeps referring to what the user
+	 *                                                          actually asked for instead of the synthetic
+	 *                                                          "execute this now" instruction. An 'executedCalls'
+	 *                                                          entry is treated as the calls that ran *before* this
+	 *                                                          run and is merged with this run's own calls.
 	 *
 	 * @return AgentResponse
 	 * @since 1.0.0
 	 */
-	public function chat(AgentConfig $agent, string $message, array $history = [], array $attachments = [], string $requestId = '', array $approvedCalls = []): AgentResponse
+	public function chat(AgentConfig $agent, string $message, array $history = [], array $attachments = [], string $requestId = '', array $approvedCalls = [], array $pendingStateOverrides = []): AgentResponse
 	{
 		$guard = $this->guard($agent->provider);
 		if ($guard instanceof WP_Error) {
@@ -149,13 +158,26 @@ class AIOrchestratorService
 		if ($response->isPendingConfirmation) {
 			$this->confirmationStore->save(
 				$response->confirmationToken,
-				[
-					'agent'        => $agent,
-					'history'      => $history,
-					'message'      => $message,
-					'attachments'  => $attachments,
-					'pendingCalls' => $response->pendingToolCalls,
-				]
+				array_merge(
+					[
+						'agent'       => $agent,
+						'history'     => $history,
+						'message'     => $message,
+						'attachments' => $attachments,
+					],
+					$pendingStateOverrides,
+					[
+						'pendingCalls' => $response->pendingToolCalls,
+						// Everything executed so far in this turn, across the whole
+						// confirmation chain — never overridable by the caller.
+						'executedCalls' => array_merge(
+							isset($pendingStateOverrides['executedCalls']) && is_array($pendingStateOverrides['executedCalls'])
+								? $pendingStateOverrides['executedCalls']
+								: [],
+							$response->toolCalls
+						),
+					]
+				)
 			);
 		}
 

@@ -356,6 +356,14 @@ final class AIChatRestController
 	/**
 	 * Resumes a write operation after the user has confirmed it.
 	 *
+	 * The resumed run is a re-prompt, not a direct execution of the stored call:
+	 * the model is asked to request the approved ability again, which it can only
+	 * do sensibly if it still knows what the user originally wanted. The original
+	 * user message (plus the calls that already ran) is therefore replayed in the
+	 * resume message — without it a multi-step request ("create five posts") would
+	 * stop after the first approved step, because the model would see nothing but
+	 * the synthetic "execute this now" instruction.
+	 *
 	 * @param WP_REST_Request $request The REST request.
 	 *
 	 * @return WP_REST_Response|WP_Error
@@ -376,26 +384,42 @@ final class AIChatRestController
 			return new WP_Error('invalid_token', __('The confirmation token is invalid or has expired.', 'agent-mod'), ['status' => 404]);
 		}
 
-		$agent       = $state['agent'];
-		$history     = $state['history'] ?? [];
-		$message     = $state['message'] ?? '';
-		$attachments = $state['attachments'] ?? [];
-		$pendingCall = $state['pendingCalls'][0] ?? [];
+		$agent         = $state['agent'];
+		$history       = is_array($state['history'] ?? null) ? $state['history'] : [];
+		$message       = (string) ($state['message'] ?? '');
+		$attachments   = is_array($state['attachments'] ?? null) ? $state['attachments'] : [];
+		$pendingCalls  = $this->normalizeToolCalls($state['pendingCalls'] ?? []);
+		$executedCalls = $this->normalizeToolCalls($state['executedCalls'] ?? []);
 
-		if (! $agent instanceof AgentConfig || empty($pendingCall)) {
+		if (! $agent instanceof AgentConfig || empty($pendingCalls)) {
 			return new WP_Error('corrupt_state', __('The pending confirmation state is invalid.', 'agent-mod'), ['status' => 500]);
 		}
 
 		// Inject a confirmation message so the AI re-requests and executes the
-		// approved tool on the next loop iteration.
-		$confirmInstruction = sprintf(
-			/* translators: 1: ability name, 2: JSON-encoded arguments. */
-			__('The user has confirmed this action. Please execute it now: %1$s with arguments: %2$s', 'agent-mod'),
-			esc_html($pendingCall['name'] ?? ''),
-			wp_json_encode($pendingCall['args'] ?? [])
+		// approved tools on the next loop iteration. Every pending call is
+		// approved: a provider may batch several write calls in one turn, and
+		// dropping all but the first would silently discard work the user saw and
+		// agreed to in the modal.
+		$confirmMessage = $this->buildConfirmMessage($message, $pendingCalls, $executedCalls);
+
+		$response = $this->orchestrator->chat(
+			$agent,
+			$confirmMessage,
+			$history,
+			$attachments,
+			$this->sanitizeRequestId($request),
+			$pendingCalls,
+			[
+				'history'       => $history,
+				'message'       => $message,
+				'attachments'   => $attachments,
+				'executedCalls' => $executedCalls,
+			]
 		);
 
-		$response = $this->orchestrator->chat($agent, $confirmInstruction, $history, $attachments, $this->sanitizeRequestId($request), [$pendingCall]);
+		// Everything that ran across the whole confirmation chain, so the UI and
+		// the persisted turn list all steps, not just the last one.
+		$allExecutedCalls = array_merge($executedCalls, $response->toolCalls);
 
 		if ($response->isError()) {
 			$error  = $response->error;
@@ -420,7 +444,7 @@ final class AIChatRestController
 						'role'        => 'assistant',
 						'text'        => $response->text,
 						'attachments' => [],
-						'toolCalls'   => $response->toolCalls,
+						'toolCalls'   => $allExecutedCalls,
 						'tokenUsage'  => $response->tokenUsage,
 					],
 				];
@@ -428,10 +452,120 @@ final class AIChatRestController
 			}
 		}
 
-		$payload                 = $response->toArray();
+		$payload                   = $response->toArray();
+		$payload['toolCalls']      = $allExecutedCalls;
 		$payload['conversationId'] = $conversationId ?: null;
 
 		return rest_ensure_response($payload);
+	}
+
+	/**
+	 * Builds the user message that resumes a confirmed run.
+	 *
+	 * Three things go into one message rather than several history turns: the
+	 * original request (so a multi-step task survives the pause), the calls that
+	 * already ran (so an approved-and-executed step is not repeated on a chained
+	 * confirmation), and the approval itself. Keeping it to a single turn avoids
+	 * emitting two consecutive user turns, which some providers reject.
+	 *
+	 * @param string                           $message       Original user message of the paused turn.
+	 * @param array<int, array<string, mixed>> $pendingCalls  Approved tool calls to execute now.
+	 * @param array<int, array<string, mixed>> $executedCalls Calls already executed for this request.
+	 *
+	 * @return string
+	 * @since x.x.x
+	 */
+	private function buildConfirmMessage(string $message, array $pendingCalls, array $executedCalls): string
+	{
+		$blocks = [];
+
+		if ('' !== trim($message)) {
+			$blocks[] = __('My original request was:', 'agent-mod') . "\n" . $message;
+		}
+
+		if (! empty($executedCalls)) {
+			$blocks[] = __('These steps of it are already done — do not repeat them:', 'agent-mod')
+				. "\n" . $this->describeToolCalls($executedCalls);
+		}
+
+		if (1 === count($pendingCalls)) {
+			$blocks[] = sprintf(
+				/* translators: 1: ability name, 2: JSON-encoded arguments. */
+				__('The user has confirmed this action. Please execute it now: %1$s with arguments: %2$s', 'agent-mod'),
+				esc_html((string) $pendingCalls[0]['name']),
+				wp_json_encode($pendingCalls[0]['args'])
+			);
+		} else {
+			$blocks[] = __('The user has confirmed the following actions. Please execute them all now, exactly as listed:', 'agent-mod')
+				. "\n" . $this->describeToolCalls($pendingCalls);
+		}
+
+		$blocks[] = __('Afterwards continue with whatever remains of my original request; ask for confirmation again for each further action that needs it.', 'agent-mod');
+
+		return implode("\n\n", $blocks);
+	}
+
+	/**
+	 * Renders tool calls as one "name with arguments" line each.
+	 *
+	 * @param array<int, array<string, mixed>> $calls Normalized tool calls.
+	 *
+	 * @return string
+	 * @since x.x.x
+	 */
+	private function describeToolCalls(array $calls): string
+	{
+		$lines = [];
+
+		foreach ($calls as $call) {
+			$lines[] = sprintf(
+				/* translators: 1: ability name, 2: JSON-encoded arguments. */
+				__('- %1$s with arguments: %2$s', 'agent-mod'),
+				esc_html((string) $call['name']),
+				wp_json_encode($call['args'])
+			);
+		}
+
+		return implode("\n", $lines);
+	}
+
+	/**
+	 * Normalizes a stored tool-call list to ['name' => string, 'args' => array] entries.
+	 *
+	 * Anything without a name is dropped: the confirmation state comes from a
+	 * transient written by an earlier request, so it is treated as untrusted shape.
+	 *
+	 * @param mixed $raw Raw tool-call list.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 * @since x.x.x
+	 */
+	private function normalizeToolCalls($raw): array
+	{
+		if (! is_array($raw)) {
+			return [];
+		}
+
+		$calls = [];
+
+		foreach ($raw as $call) {
+			if (! is_array($call)) {
+				continue;
+			}
+
+			$name = isset($call['name']) ? (string) $call['name'] : '';
+
+			if ('' === $name) {
+				continue;
+			}
+
+			$calls[] = [
+				'name' => $name,
+				'args' => is_array($call['args'] ?? null) ? $call['args'] : [],
+			];
+		}
+
+		return $calls;
 	}
 
 	/**
