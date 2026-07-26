@@ -14,7 +14,7 @@
  *
  * @package AgentMod
  * @subpackage Services\SiteManagement
- * @since 1.1.0
+ * @since x.x.x
  */
 
 namespace AgentMod\Services\SiteManagement;
@@ -31,7 +31,7 @@ class UserManager
 	 * Upgrader context, used to load the wp-admin user functions.
 	 *
 	 * @var UpgraderContext
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private UpgraderContext $context;
 
@@ -39,7 +39,7 @@ class UserManager
 	 * Pre-flight guard.
 	 *
 	 * @var Guard
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private Guard $guard;
 
@@ -47,7 +47,7 @@ class UserManager
 	 * Settings service, used for result limits.
 	 *
 	 * @var SettingsService
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private SettingsService $settings;
 
@@ -58,7 +58,7 @@ class UserManager
 	 * @param Guard           $guard    Pre-flight guard.
 	 * @param SettingsService $settings Settings service.
 	 *
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function __construct(UpgraderContext $context, Guard $guard, SettingsService $settings)
 	{
@@ -73,7 +73,7 @@ class UserManager
 	 * @param array<string, mixed> $input Optional 'search' and 'role' filters.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function listUsers(array $input)
 	{
@@ -130,7 +130,7 @@ class UserManager
 	 * @param array<string, mixed> $input Requires 'action'; other keys depend on it.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function manage(array $input)
 	{
@@ -166,7 +166,7 @@ class UserManager
 	 * @param array<string, mixed> $input Requires 'id' and 'reassign_to'.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function remove(array $input)
 	{
@@ -249,7 +249,7 @@ class UserManager
 	 * @param array<string, mixed> $input Ability input.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function create(array $input)
 	{
@@ -342,7 +342,7 @@ class UserManager
 	 * @param array<string, mixed> $input Ability input.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function update(array $input)
 	{
@@ -424,7 +424,7 @@ class UserManager
 	 * @param array<string, mixed> $input Ability input.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function setRole(array $input)
 	{
@@ -478,7 +478,7 @@ class UserManager
 	 * @param array<string, mixed> $input Ability input.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function sendPasswordReset(array $input)
 	{

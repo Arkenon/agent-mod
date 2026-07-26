@@ -13,7 +13,10 @@ const DEFAULT_STATE = {
 	conversationId: null,
 	agents: [],
 	selectedAgentId: null,
-	pendingConfirmation: null, // { token, actionName, args, pendingToolCalls }
+	pendingConfirmation: null, // { token, actionName, args, pendingToolCalls, executedCalls }
+	// Ability names the user approved for the whole session ("don't ask again").
+	// Kept in memory only, so a page reload always starts prompting again.
+	sessionApprovedAbilities: [],
 	progress: null, // live tool-call progress: { status, currentTool, executedCalls }
 	selectedProvider: null, // provider id chosen in the provider/model picker
 	selectedModel: null, // model id chosen for the selected provider
@@ -50,10 +53,22 @@ export default function reducer( state = DEFAULT_STATE, action ) {
 			return { ...state, error: null };
 
 		case 'CLEAR_MESSAGES':
-			return { ...state, messages: [], error: null };
+			// A cleared chat is a new approval session too.
+			return {
+				...state,
+				messages: [],
+				error: null,
+				sessionApprovedAbilities: [],
+			};
 
 		case 'SET_MESSAGES':
-			return { ...state, messages: action.messages, error: null };
+			// Restoring a conversation starts a fresh approval session.
+			return {
+				...state,
+				messages: action.messages,
+				error: null,
+				sessionApprovedAbilities: [],
+			};
 
 		case 'SET_SITE_CONTEXT':
 			return { ...state, isSiteContextEnabled: action.enabled };
@@ -103,6 +118,20 @@ export default function reducer( state = DEFAULT_STATE, action ) {
 
 		case 'CLEAR_CONFIRMATION':
 			return { ...state, pendingConfirmation: null };
+
+		case 'ADD_SESSION_APPROVED_ABILITIES':
+			return {
+				...state,
+				sessionApprovedAbilities: [
+					...new Set( [
+						...state.sessionApprovedAbilities,
+						...action.abilityNames,
+					] ),
+				],
+			};
+
+		case 'CLEAR_SESSION_APPROVED_ABILITIES':
+			return { ...state, sessionApprovedAbilities: [] };
 
 		default:
 			return state;

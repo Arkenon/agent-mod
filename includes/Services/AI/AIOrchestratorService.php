@@ -104,23 +104,14 @@ class AIOrchestratorService
 	 * @param array<int, array<string, mixed>>  $history     Prior turns as ['role' => ..., 'text' => ..., 'attachments' => [...]].
 	 * @param array<int, array<string, string>> $attachments Attachments for the current turn (each ['data' => dataUri, 'mimeType' => ..., 'name' => ...]).
 	 * @param string                            $requestId   Optional client-generated UUID for live progress reporting.
-	 * @param array<int, array<string, mixed>>  $approvedCalls Tool calls the user has already confirmed
-	 *                                                          (each ['name' => string, 'args' => array]); exempted
-	 *                                                          once from the write-confirmation gate.
-	 * @param array<string, mixed>              $pendingStateOverrides Values that replace the derived keys of the
-	 *                                                          confirmation state when this run pauses for
-	 *                                                          approval. A resumed run passes the *original* user
-	 *                                                          message, history and attachments here, so a chain of
-	 *                                                          confirmations keeps referring to what the user
-	 *                                                          actually asked for instead of the synthetic
-	 *                                                          "execute this now" instruction. An 'executedCalls'
-	 *                                                          entry is treated as the calls that ran *before* this
-	 *                                                          run and is merged with this run's own calls.
+	 * @param string[]                          $autoApprovedAbilities Ability names the user has approved for the
+	 *                                                          whole session; calls to them skip the
+	 *                                                          write-confirmation gate.
 	 *
 	 * @return AgentResponse
 	 * @since 1.0.0
 	 */
-	public function chat(AgentConfig $agent, string $message, array $history = [], array $attachments = [], string $requestId = '', array $approvedCalls = [], array $pendingStateOverrides = []): AgentResponse
+	public function chat(AgentConfig $agent, string $message, array $history = [], array $attachments = [], string $requestId = '', array $autoApprovedAbilities = []): AgentResponse
 	{
 		$guard = $this->guard($agent->provider);
 		if ($guard instanceof WP_Error) {
@@ -134,7 +125,7 @@ class AIOrchestratorService
 		}
 
 		$siteContext = $agent->autoIncludeSiteContext ? $this->knowledgeResolver->getSiteContext() : [];
-	
+
 		$systemInstruction = $this->promptBuilder->buildSystemInstruction($agent, $siteContext);
 		$abilities = $this->abilityResolver->resolve($agent);
 
@@ -149,39 +140,135 @@ class AIOrchestratorService
 			$agent->model,
 			$agent->maxToolCalls,
 			$requestId,
-			$approvedCalls,
+			$autoApprovedAbilities,
 			$agent->webSearchEnabled
 		);
 
-		// When a write ability requires confirmation, persist the wire-format
-		// context in a short-lived transient so the confirm endpoint can resume.
 		if ($response->isPendingConfirmation) {
-			$this->confirmationStore->save(
-				$response->confirmationToken,
-				array_merge(
-					[
-						'agent'       => $agent,
-						'history'     => $history,
-						'message'     => $message,
-						'attachments' => $attachments,
-					],
-					$pendingStateOverrides,
-					[
-						'pendingCalls' => $response->pendingToolCalls,
-						// Everything executed so far in this turn, across the whole
-						// confirmation chain — never overridable by the caller.
-						'executedCalls' => array_merge(
-							isset($pendingStateOverrides['executedCalls']) && is_array($pendingStateOverrides['executedCalls'])
-								? $pendingStateOverrides['executedCalls']
-								: [],
-							$response->toolCalls
-						),
-					]
+			$this->savePendingState($response, $agent, $message, $attachments);
+		}
+
+		return $response;
+	}
+
+	/**
+	 * Resumes a run that paused for user confirmation.
+	 *
+	 * Rebuilds the exact wire-format history the run paused with (including the
+	 * model message carrying the pending function calls) and hands it to the
+	 * adapter, which executes — or declines — those calls directly and lets the
+	 * generation loop continue. No synthetic re-prompt is involved, so a
+	 * multi-step task carries on with the model's own plan.
+	 *
+	 * @param AgentConfig                       $agent                 The agent configuration of the paused run.
+	 * @param array<int, array<string, mixed>>  $wireHistory           Serialized Message[] history from the confirmation state.
+	 * @param array<int, array<string, mixed>>  $executedCalls         Calls already executed in earlier legs of this chain.
+	 * @param string                            $originalMessage       Original user message of the paused turn.
+	 * @param array<int, array<string, string>> $attachments           Attachments of the paused turn.
+	 * @param string                            $requestId             Optional client-generated UUID for live progress reporting.
+	 * @param string[]                          $autoApprovedAbilities Session-approved ability names.
+	 * @param bool                              $approved              True to execute the pending calls, false to decline them.
+	 *
+	 * @return AgentResponse
+	 * @since x.x.x
+	 */
+	public function resume(
+		AgentConfig $agent,
+		array $wireHistory,
+		array $executedCalls,
+		string $originalMessage,
+		array $attachments,
+		string $requestId,
+		array $autoApprovedAbilities,
+		bool $approved
+	): AgentResponse {
+		$guard = $this->guard($agent->provider);
+		if ($guard instanceof WP_Error) {
+			return AgentResponse::fromError($guard);
+		}
+
+		try {
+			$messages = array_map(
+				static function (array $message): Message {
+					return Message::fromArray($message);
+				},
+				$wireHistory
+			);
+		} catch (\Throwable $e) {
+			return AgentResponse::fromError(
+				new WP_Error(
+					'corrupt_state',
+					__('The pending confirmation state is invalid.', 'agent-mod'),
+					['status' => 500]
 				)
 			);
 		}
 
+		$siteContext = $agent->autoIncludeSiteContext ? $this->knowledgeResolver->getSiteContext() : [];
+
+		$systemInstruction = $this->promptBuilder->buildSystemInstruction($agent, $siteContext);
+		$abilities         = $this->abilityResolver->resolve($agent);
+
+		$response = $this->clientAdapter->resume(
+			$systemInstruction,
+			$messages,
+			$abilities,
+			$agent->provider,
+			$agent->model,
+			$agent->maxToolCalls,
+			$requestId,
+			$autoApprovedAbilities,
+			$agent->webSearchEnabled,
+			$executedCalls,
+			$approved
+		);
+
+		if ($response->isPendingConfirmation) {
+			// The chain keeps referring to what the user originally asked for.
+			$this->savePendingState($response, $agent, $originalMessage, $attachments);
+		}
+
 		return $response;
+	}
+
+	/**
+	 * Persists the state a paused run needs to resume after user confirmation.
+	 *
+	 * The full wire-format history — including the model message whose function
+	 * calls await approval — is serialized into the transient, so the confirm
+	 * endpoint can execute exactly the calls the user saw and continue the run.
+	 * Note the payload can carry base64 attachment data; external object caches
+	 * (e.g. memcached) cap values around 1MB, matching what the plain history
+	 * already stored before.
+	 *
+	 * @param AgentResponse                     $response    The pending-confirmation response.
+	 * @param AgentConfig                       $agent       The agent configuration.
+	 * @param string                            $message     Original user message of the paused turn.
+	 * @param array<int, array<string, string>> $attachments Attachments of the paused turn.
+	 *
+	 * @return void
+	 * @since x.x.x
+	 */
+	private function savePendingState(AgentResponse $response, AgentConfig $agent, string $message, array $attachments): void
+	{
+		$this->confirmationStore->save(
+			$response->confirmationToken,
+			[
+				'agent'         => $agent,
+				'message'       => $message,
+				'attachments'   => $attachments,
+				'wireHistory'   => array_map(
+					static function (Message $message): array {
+						return $message->toArray();
+					},
+					$response->messages
+				),
+				'pendingCalls'  => $response->pendingToolCalls,
+				// Complete across the whole chain: the generation loop is seeded
+				// with the earlier legs' calls.
+				'executedCalls' => $response->toolCalls,
+			]
+		);
 	}
 
 	/**

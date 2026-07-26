@@ -14,7 +14,7 @@
  *
  * @package AgentMod
  * @subpackage Services\SiteManagement
- * @since 1.1.0
+ * @since x.x.x
  */
 
 namespace AgentMod\Services\SiteManagement;
@@ -32,7 +32,7 @@ class OptionManager
 	 * would blow the model's context window.
 	 *
 	 * @var int
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private const MAX_VALUE_LENGTH = 20000;
 
@@ -40,7 +40,7 @@ class OptionManager
 	 * Pre-flight guard.
 	 *
 	 * @var Guard
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private Guard $guard;
 
@@ -49,7 +49,7 @@ class OptionManager
 	 *
 	 * @param Guard $guard Pre-flight guard.
 	 *
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function __construct(Guard $guard)
 	{
@@ -66,7 +66,7 @@ class OptionManager
 	 * @param array<string, mixed> $input Optional 'group' and 'search' filters.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function getSettings(array $input)
 	{
@@ -125,7 +125,7 @@ class OptionManager
 	 * @param mixed  $value New value.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function updateSetting(string $name, $value)
 	{
@@ -219,7 +219,7 @@ class OptionManager
 	 * @param string $name Option name.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function getOption(string $name)
 	{
@@ -270,7 +270,7 @@ class OptionManager
 	 * @param array<string, mixed> $input Requires 'name' and 'value'; optional 'create'.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function updateOption(array $input)
 	{
@@ -358,7 +358,7 @@ class OptionManager
 	 * @param mixed  $previous  Previous structure.
 	 *
 	 * @return array<string, mixed>
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function updatePermalinkStructure(string $structure, $previous): array
 	{
@@ -387,7 +387,7 @@ class OptionManager
 	 * is the condition to test, not emptiness.
 	 *
 	 * @return array<string, array<string, mixed>>
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function registeredSettings(): array
 	{
@@ -407,7 +407,7 @@ class OptionManager
 	 * @param array<string, mixed> $args register_setting() arguments.
 	 *
 	 * @return array<string, mixed>
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function schemaFor(array $args): array
 	{
@@ -428,7 +428,7 @@ class OptionManager
 	 * @param mixed $value Option value.
 	 *
 	 * @return mixed Original value, or a truncation notice for oversized values.
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function truncate($value)
 	{

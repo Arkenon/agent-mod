@@ -995,6 +995,24 @@
 	white-space: pre;
 }
 
+.agent-mod-chat__confirm-executed {
+	margin: 0 0 8px;
+	font-size: 12px;
+	color: #757575;
+}
+
+.agent-mod-chat__confirm-remember {
+	margin-top: 16px;
+	padding-top: 12px;
+	border-top: 1px solid #dcdcde;
+
+	.components-base-control__help {
+		font-family: monospace;
+		font-size: 11px;
+		color: #757575;
+	}
+}
+
 .agent-mod-chat__confirm-buttons {
 	display: flex;
 	gap: 8px;

@@ -12,7 +12,7 @@
  *
  * @package AgentMod
  * @subpackage Services\SiteManagement
- * @since 1.1.0
+ * @since x.x.x
  */
 
 namespace AgentMod\Services\SiteManagement;
@@ -28,7 +28,7 @@ class SystemManager
 	 * Upgrader context.
 	 *
 	 * @var UpgraderContext
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private UpgraderContext $context;
 
@@ -36,7 +36,7 @@ class SystemManager
 	 * Pre-flight guard.
 	 *
 	 * @var Guard
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private Guard $guard;
 
@@ -44,7 +44,7 @@ class SystemManager
 	 * Settings service, used for result limits.
 	 *
 	 * @var SettingsService
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private SettingsService $settings;
 
@@ -55,7 +55,7 @@ class SystemManager
 	 * @param Guard           $guard    Pre-flight guard.
 	 * @param SettingsService $settings Settings service.
 	 *
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function __construct(UpgraderContext $context, Guard $guard, SettingsService $settings)
 	{
@@ -71,7 +71,7 @@ class SystemManager
 	 * environment facts that explain why an install or update might be refused.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function getCoreStatus()
 	{
@@ -135,7 +135,7 @@ class SystemManager
 	 * @param array<string, mixed> $input Optional 'search' filter.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function getCronEvents(array $input)
 	{
@@ -181,8 +181,8 @@ class SystemManager
 			'events'         => array_slice($events, 0, $limit),
 			'total'          => $total,
 			'truncated'      => $total > $limit,
-			'cron_disabled'  => defined('DISABLE_WP_CRON') && DISABLE_WP_CRON,
-			'note'           => defined('DISABLE_WP_CRON') && DISABLE_WP_CRON
+			'cron_disabled'  => defined('DISABLE_WP_CRON') ? true : false,
+			'note'           => defined('DISABLE_WP_CRON')
 				? __('DISABLE_WP_CRON is set: these events only run if a real system cron job triggers wp-cron.php.', 'agent-mod')
 				: '',
 		];
@@ -198,7 +198,7 @@ class SystemManager
 	 * @param array<string, mixed> $input Optional 'object_cache' and 'rewrite_rules' toggles.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function flushCaches(array $input)
 	{
@@ -251,7 +251,7 @@ class SystemManager
 	 * Returns the pending core update, if any.
 	 *
 	 * @return array<string, mixed>|null
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function coreUpdate(): ?array
 	{
@@ -276,7 +276,7 @@ class SystemManager
 	 * @param string $transient Transient name.
 	 *
 	 * @return array<string, mixed>
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function pending(string $transient): array
 	{

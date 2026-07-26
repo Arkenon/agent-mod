@@ -13,7 +13,7 @@
  *
  * @package AgentMod
  * @subpackage Services
- * @since 1.1.0
+ * @since x.x.x
  */
 
 namespace AgentMod\Services;
@@ -35,7 +35,7 @@ class SiteManagementAbilityService
 	 * and allow-list these higher-impact abilities as a group.
 	 *
 	 * @var string
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private const CATEGORY = 'agent-mod-site';
 
@@ -45,7 +45,7 @@ class SiteManagementAbilityService
 	 * Read-only abilities and reversible maintenance tasks are absent by design.
 	 *
 	 * @var string[]
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private const CONFIRM_REQUIRED = [
 		'agent-mod/install-plugin',
@@ -66,7 +66,7 @@ class SiteManagementAbilityService
 	 * Plugin manager.
 	 *
 	 * @var PluginManager
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private PluginManager $plugins;
 
@@ -74,7 +74,7 @@ class SiteManagementAbilityService
 	 * Theme manager.
 	 *
 	 * @var ThemeManager
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private ThemeManager $themes;
 
@@ -82,7 +82,7 @@ class SiteManagementAbilityService
 	 * Option manager.
 	 *
 	 * @var OptionManager
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private OptionManager $options;
 
@@ -90,7 +90,7 @@ class SiteManagementAbilityService
 	 * System manager.
 	 *
 	 * @var SystemManager
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private SystemManager $system;
 
@@ -98,7 +98,7 @@ class SiteManagementAbilityService
 	 * User manager.
 	 *
 	 * @var UserManager
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private UserManager $users;
 
@@ -111,7 +111,7 @@ class SiteManagementAbilityService
 	 * @param SystemManager $system  System manager.
 	 * @param UserManager   $users   User manager.
 	 *
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function __construct(
 		PluginManager $plugins,
@@ -136,7 +136,7 @@ class SiteManagementAbilityService
 	 * Registers the site management ability category.
 	 *
 	 * @return void
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function registerCategories(): void
 	{
@@ -157,7 +157,7 @@ class SiteManagementAbilityService
 	 * Registers every site management ability.
 	 *
 	 * @return void
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function registerAbilities(): void
 	{
@@ -179,7 +179,7 @@ class SiteManagementAbilityService
 	 * @param string $name     Ability name.
 	 *
 	 * @return bool
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function requiresConfirmation(bool $requires, string $name): bool
 	{
@@ -194,7 +194,7 @@ class SiteManagementAbilityService
 	 * Registers the plugin management abilities.
 	 *
 	 * @return void
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function registerPluginAbilities(): void
 	{
@@ -533,7 +533,7 @@ class SiteManagementAbilityService
 	 * Registers the theme management abilities.
 	 *
 	 * @return void
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function registerThemeAbilities(): void
 	{
@@ -868,7 +868,7 @@ class SiteManagementAbilityService
 	 * Registers the settings and option abilities.
 	 *
 	 * @return void
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function registerOptionAbilities(): void
 	{
@@ -1070,7 +1070,7 @@ class SiteManagementAbilityService
 	 * Registers the system status and maintenance abilities.
 	 *
 	 * @return void
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function registerSystemAbilities(): void
 	{
@@ -1197,7 +1197,7 @@ class SiteManagementAbilityService
 	 * Registers the user management abilities.
 	 *
 	 * @return void
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function registerUserAbilities(): void
 	{
@@ -1379,7 +1379,7 @@ class SiteManagementAbilityService
 	 * @param mixed $input Raw ability input.
 	 *
 	 * @return array<string, mixed>
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function toArray($input): array
 	{

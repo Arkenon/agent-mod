@@ -41,6 +41,10 @@ export function getPendingConfirmation( state ) {
 	return state.pendingConfirmation;
 }
 
+export function getSessionApprovedAbilities( state ) {
+	return state.sessionApprovedAbilities;
+}
+
 export function getSelectedProvider( state ) {
 	return state.selectedProvider;
 }

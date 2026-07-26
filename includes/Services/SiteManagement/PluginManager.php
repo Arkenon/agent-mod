@@ -9,7 +9,7 @@
  *
  * @package AgentMod
  * @subpackage Services\SiteManagement
- * @since 1.1.0
+ * @since x.x.x
  */
 
 namespace AgentMod\Services\SiteManagement;
@@ -26,7 +26,7 @@ class PluginManager
 	 * Upgrader context.
 	 *
 	 * @var UpgraderContext
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private UpgraderContext $context;
 
@@ -34,7 +34,7 @@ class PluginManager
 	 * Pre-flight guard.
 	 *
 	 * @var Guard
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private Guard $guard;
 
@@ -42,7 +42,7 @@ class PluginManager
 	 * Settings service, used for result limits.
 	 *
 	 * @var SettingsService
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private SettingsService $settings;
 
@@ -53,7 +53,7 @@ class PluginManager
 	 * @param Guard           $guard    Pre-flight guard.
 	 * @param SettingsService $settings Settings service.
 	 *
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function __construct(UpgraderContext $context, Guard $guard, SettingsService $settings)
 	{
@@ -72,7 +72,7 @@ class PluginManager
 	 * @param array<string, mixed> $input Optional 'search' and 'status' filters.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function listPlugins(array $input)
 	{
@@ -123,7 +123,7 @@ class PluginManager
 	 * @param string $slug Plugin slug or plugin file.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function getPlugin(string $slug)
 	{
@@ -164,7 +164,7 @@ class PluginManager
 	 * @param array<string, mixed> $input Requires 'search'.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function searchDirectory(array $input)
 	{
@@ -248,7 +248,7 @@ class PluginManager
 	 * @param bool   $activate Whether to activate after install.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function install(string $slug, bool $activate)
 	{
@@ -298,7 +298,7 @@ class PluginManager
 	 * @param array<string, mixed> $input Accepts 'url' or 'attachment_id', plus 'activate'.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function upload(array $input)
 	{
@@ -330,7 +330,7 @@ class PluginManager
 	 * @param string $action One of 'activate', 'deactivate', 'update'.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function manage(string $slug, string $action)
 	{
@@ -368,7 +368,7 @@ class PluginManager
 	 * @param string $slug Plugin slug or plugin file.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function remove(string $slug)
 	{
@@ -454,7 +454,7 @@ class PluginManager
 	 * @param bool   $activate Whether to activate after install.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function installPackage(string $package, string $slug, bool $activate)
 	{
@@ -537,7 +537,7 @@ class PluginManager
 	 * @param string $file Plugin file.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function activate(string $file)
 	{
@@ -588,7 +588,7 @@ class PluginManager
 	 * @param string $file Plugin file.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function deactivate(string $file)
 	{
@@ -641,7 +641,7 @@ class PluginManager
 	 * @param string $file Plugin file.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function update(string $file)
 	{
@@ -733,7 +733,7 @@ class PluginManager
 	 * @param array<string, mixed> $input Ability input.
 	 *
 	 * @return string|WP_Error Package URL or local path.
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function resolvePackage(array $input)
 	{
@@ -793,7 +793,7 @@ class PluginManager
 	 * @param array<string, mixed> $updates Pending updates keyed by plugin file.
 	 *
 	 * @return array<string, mixed>
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function summarise(string $file, array $data, array $updates): array
 	{
@@ -816,7 +816,7 @@ class PluginManager
 	 * @param string $file Plugin file.
 	 *
 	 * @return string One of 'network-active', 'active', 'inactive'.
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function statusOf(string $file): string
 	{
@@ -834,7 +834,7 @@ class PluginManager
 	 * @param string               $search Lowercased search term.
 	 *
 	 * @return bool
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function matches(array $entry, string $search): bool
 	{
@@ -849,7 +849,7 @@ class PluginManager
 	 * @param string               $status Requested status.
 	 *
 	 * @return bool
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function hasStatus(array $entry, string $status): bool
 	{
@@ -868,7 +868,7 @@ class PluginManager
 	 * Returns pending plugin updates keyed by plugin file.
 	 *
 	 * @return array<string, object>
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function pluginUpdates(): array
 	{
@@ -883,7 +883,7 @@ class PluginManager
 	 * @param string $slug Plugin slug.
 	 *
 	 * @return array<string, mixed>|null Null when the plugin is not in the directory.
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function directoryInfo(string $slug): ?array
 	{
@@ -920,7 +920,7 @@ class PluginManager
 	 * @param string $slug Raw identifier.
 	 *
 	 * @return string
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function normaliseSlug(string $slug): string
 	{
@@ -943,7 +943,7 @@ class PluginManager
 	 * @param string $slug Plugin slug.
 	 *
 	 * @return string|null Plugin file, or null when not installed.
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function findPluginFile(string $slug): ?string
 	{
@@ -975,7 +975,7 @@ class PluginManager
 	 * @param string[] $installed Installed plugin files.
 	 *
 	 * @return bool
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function slugIsInstalled(string $slug, array $installed): bool
 	{
@@ -998,7 +998,7 @@ class PluginManager
 	 * @param string $file Plugin file.
 	 *
 	 * @return string
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function pluginName(string $file): string
 	{
@@ -1013,7 +1013,7 @@ class PluginManager
 	 * @param string $file Plugin file.
 	 *
 	 * @return string
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function pluginVersion(string $file): string
 	{
@@ -1028,7 +1028,7 @@ class PluginManager
 	 * @param string $slug Requested slug.
 	 *
 	 * @return WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function notInstalled(string $slug): WP_Error
 	{

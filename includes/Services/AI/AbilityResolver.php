@@ -54,7 +54,7 @@ class AbilityResolver
 	 * @param WP_Ability[] $abilities Resolved abilities.
 	 *
 	 * @return WP_Ability[]
-	 * @since 1.1.0
+	 * @since 1.0.0
 	 */
 	private function filterReadonly(array $abilities): array
 	{

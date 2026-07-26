@@ -1178,11 +1178,11 @@ class AbilityRegistrarService
 		}
 
 		$title      = sanitize_text_field((string) $input['title']);
-		$postType   = (isset($input['post_type']) && in_array($input['post_type'], ['post', 'page'], true))
-			? $input['post_type']
+		$postType   = (isset($input['post_type']))
+			? sanitize_text_field($input['post_type'])
 			: 'post';
-		$postStatus = (isset($input['post_status']) && in_array($input['post_status'], ['draft', 'publish', 'pending', 'private'], true))
-			? $input['post_status']
+		$postStatus = (isset($input['post_status']))
+			? sanitize_text_field($input['post_status'])
 			: 'draft';
 
 		$serializedContent = '';
@@ -1838,7 +1838,7 @@ class AbilityRegistrarService
 			 * error surfaces to the calling agent exactly like the built-in
 			 * invalid_attributes / stray_content errors below.
 			 *
-			 * @since 1.1.0
+			 * @since x.x.x
 			 *
 			 * @param string               $html  Serialized block markup.
 			 * @param array<string, mixed> $input The write ability input.

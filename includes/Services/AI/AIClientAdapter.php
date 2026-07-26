@@ -22,9 +22,12 @@ use WP_Ability;
 use AgentMod\Services\AI\DTO\AgentResponse;
 use AgentMod\Services\AI\Http\ToolCallRepairManager;
 use WordPress\AiClient\Messages\DTO\Message;
+use WordPress\AiClient\Messages\DTO\MessagePart;
+use WordPress\AiClient\Messages\DTO\UserMessage;
 use WordPress\AiClient\Providers\Models\DTO\ModelConfig;
 use WordPress\AiClient\Results\DTO\GenerativeAiResult;
 use WordPress\AiClient\Tools\DTO\FunctionCall;
+use WordPress\AiClient\Tools\DTO\FunctionResponse;
 use WordPress\AiClient\Tools\DTO\WebSearch;
 
 defined('ABSPATH') || exit;
@@ -43,7 +46,7 @@ class AIClientAdapter
 	 * Live tool-call progress store.
 	 *
 	 * @var ProgressStore
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private ProgressStore $progressStore;
 
@@ -71,9 +74,9 @@ class AIClientAdapter
 	 * @param string|null $model             Optional model id.
 	 * @param int         $maxToolCalls      Max tool-calling iterations.
 	 * @param string      $requestId         Optional client-generated UUID for live progress reporting.
-	 * @param array<int, array<string, mixed>> $approvedCalls Tool calls the user has already confirmed
-	 *                                                          (each ['name' => string, 'args' => array]).
-	 *                                                          Bypasses the confirmation gate once per match.
+	 * @param string[]    $autoApprovedAbilities Ability names the user has approved for the whole
+	 *                                           session ('*' approves every write); these skip the
+	 *                                           confirmation gate entirely.
 	 * @param bool        $webSearchEnabled  Whether to enable the provider's native web search tool.
 	 *
 	 * @return AgentResponse
@@ -87,7 +90,7 @@ class AIClientAdapter
 		?string $model,
 		int $maxToolCalls,
 		string $requestId = '',
-		array $approvedCalls = [],
+		array $autoApprovedAbilities = [],
 		bool $webSearchEnabled = false
 	): AgentResponse {
 		if (! function_exists('wp_ai_client_prompt')) {
@@ -108,7 +111,7 @@ class AIClientAdapter
 				$model,
 				$maxToolCalls,
 				$requestId,
-				$approvedCalls,
+				$autoApprovedAbilities,
 				$webSearchEnabled
 			);
 		} finally {
@@ -121,6 +124,148 @@ class AIClientAdapter
 				$this->progressStore->clearStop($requestId);
 			}
 		}
+	}
+
+	/**
+	 * Resumes a run that paused for user confirmation.
+	 *
+	 * The history must end with the paused model message — the one whose
+	 * function calls the user saw in the confirmation dialog. On approval those
+	 * exact calls are executed (no re-prompting, so the model cannot come back
+	 * with different arguments) and their real function responses are appended
+	 * to the history; the generation loop then continues the model's own plan.
+	 * On decline, each call receives a synthetic "declined" function response so
+	 * the model can acknowledge gracefully instead of the request being dropped.
+	 *
+	 * @param string      $systemInstruction     Full system instruction.
+	 * @param Message[]   $messages              History ending with the paused model message.
+	 * @param WP_Ability[] $abilities             Abilities the model is allowed to call.
+	 * @param string      $provider              Provider id.
+	 * @param string|null $model                 Optional model id.
+	 * @param int         $maxToolCalls          Max tool-calling iterations.
+	 * @param string      $requestId             Optional client-generated UUID for live progress reporting.
+	 * @param string[]    $autoApprovedAbilities Ability names approved for the whole session.
+	 * @param bool        $webSearchEnabled      Whether to enable the provider's native web search tool.
+	 * @param array<int, array<string, mixed>>  $executedCalls Calls already executed in earlier legs of this chain.
+	 * @param bool        $approved              True to execute the pending calls, false to decline them.
+	 *
+	 * @return AgentResponse
+	 * @since x.x.x
+	 */
+	public function resume(
+		string $systemInstruction,
+		array $messages,
+		array $abilities,
+		string $provider,
+		?string $model,
+		int $maxToolCalls,
+		string $requestId,
+		array $autoApprovedAbilities,
+		bool $webSearchEnabled,
+		array $executedCalls,
+		bool $approved
+	): AgentResponse {
+		if (! function_exists('wp_ai_client_prompt')) {
+			return AgentResponse::fromError(
+				new \WP_Error('ai_client_unavailable', __('The WordPress AI Client is not available.', 'agent-mod'))
+			);
+		}
+
+		$lastMessage = end($messages);
+
+		$pendingCalls = $lastMessage instanceof Message ? $this->extractToolCalls($lastMessage) : [];
+
+		if (empty($pendingCalls)) {
+			return AgentResponse::fromError(
+				new \WP_Error(
+					'corrupt_state',
+					__('The pending confirmation state is invalid.', 'agent-mod'),
+					['status' => 500]
+				)
+			);
+		}
+
+		// Compensate for provider connectors that drop tool-call metadata across turns.
+		$this->toolCallRepairs->register();
+
+		try {
+			if ($approved) {
+				$this->reportProgress(
+					$requestId,
+					'running_tool',
+					implode(', ', array_column($pendingCalls, 'name')),
+					$executedCalls,
+					$pendingCalls
+				);
+
+				$resolver      = new WP_AI_Client_Ability_Function_Resolver(...$abilities);
+				$messages[]    = $resolver->execute_abilities($lastMessage);
+				$executedCalls = array_merge($executedCalls, $pendingCalls);
+			} else {
+				$messages[] = $this->buildDeclinedResponses($lastMessage);
+			}
+
+			return $this->runGenerationLoop(
+				$systemInstruction,
+				$messages,
+				$abilities,
+				$provider,
+				$model,
+				$maxToolCalls,
+				$requestId,
+				$autoApprovedAbilities,
+				$webSearchEnabled,
+				$executedCalls
+			);
+		} finally {
+			$this->toolCallRepairs->unregister();
+
+			if ('' !== $requestId) {
+				$this->progressStore->delete($requestId);
+				$this->progressStore->clearStop($requestId);
+			}
+		}
+	}
+
+	/**
+	 * Builds the function-response message for declined tool calls.
+	 *
+	 * Every function call of the paused model message gets a response marking it
+	 * as declined; providers require a response for each outstanding call before
+	 * the conversation can continue.
+	 *
+	 * @param Message $message The paused model message.
+	 *
+	 * @return Message
+	 * @since x.x.x
+	 */
+	private function buildDeclinedResponses(Message $message): Message
+	{
+		$parts = [];
+
+		foreach ($message->getParts() as $part) {
+			if (! $part->getType()->isFunctionCall()) {
+				continue;
+			}
+
+			$functionCall = $part->getFunctionCall();
+			if (! $functionCall instanceof FunctionCall) {
+				continue;
+			}
+
+			$parts[] = new MessagePart(
+				new FunctionResponse(
+					$functionCall->getId(),
+					$functionCall->getName(),
+					[
+						'declined' => true,
+						'error'    => __('The user declined this action. Do not retry it; acknowledge and ask how to proceed.', 'agent-mod'),
+					]
+				)
+			);
+		}
+
+		return new UserMessage($parts);
 	}
 
 	/**
@@ -156,9 +301,12 @@ class AIClientAdapter
 	 * @param string|null $model             Optional model id.
 	 * @param int         $maxToolCalls      Max tool-calling iterations.
 	 * @param string      $requestId         Optional client-generated UUID for live progress reporting.
-	 * @param array<int, array<string, mixed>> $approvedCalls Tool calls the user has already confirmed;
-	 *                                                          each is exempted from the confirmation gate once.
+	 * @param string[]    $autoApprovedAbilities Ability names approved for the whole session;
+	 *                                           calls to them skip the confirmation gate.
 	 * @param bool        $webSearchEnabled  Whether to enable the provider's native web search tool.
+	 * @param array<int, array<string, mixed>> $initialToolCalls Calls executed in earlier legs of a
+	 *                                                           confirmation chain; seeds the executed
+	 *                                                           list so responses report the whole chain.
 	 *
 	 * @return AgentResponse
 	 * @since 1.0.0
@@ -171,12 +319,13 @@ class AIClientAdapter
 		?string $model,
 		int $maxToolCalls,
 		string $requestId = '',
-		array $approvedCalls = [],
-		bool $webSearchEnabled = false
+		array $autoApprovedAbilities = [],
+		bool $webSearchEnabled = false,
+		array $initialToolCalls = []
 	): AgentResponse {
 		$resolver   = new WP_AI_Client_Ability_Function_Resolver(...$abilities);
 		$history    = $messages;
-		$toolCalls  = [];
+		$toolCalls  = $initialToolCalls;
 		$tokenUsage = [];
 
 		for ($i = 0; $i < $maxToolCalls; $i++) {
@@ -251,9 +400,9 @@ class AIClientAdapter
 			}
 
 			// Intercept write operations before execution to allow user confirmation.
-			// Calls already approved via the confirm-action endpoint are exempted once.
+			// Abilities the user session-approved are exempted by name.
 			$requestedCalls = $this->extractToolCalls($message);
-			$writeCalls     = $this->filterWriteToolCalls($requestedCalls, $approvedCalls);
+			$writeCalls     = $this->filterWriteToolCalls($requestedCalls, $autoApprovedAbilities);
 
 			if (! empty($writeCalls)) {
 				// $toolCalls carries what already ran in this iteration set; the
@@ -379,7 +528,7 @@ class AIClientAdapter
 	 * @param array<int, array<string, mixed>>  $runningCalls  Tool calls currently executing.
 	 *
 	 * @return void
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function reportProgress(
 		string $requestId,
@@ -468,33 +617,30 @@ class AIClientAdapter
 	/**
 	 * Filters tool calls that require user confirmation before execution.
 	 *
-	 * The default comes from the ability's own MCP-style annotations: anything that
-	 * declares `readonly => false` is a write and is gated. Plugins refine that
-	 * verdict through the agent_mod_ability_requires_confirmation filter — forcing
-	 * true for abilities whose annotations are missing or too permissive, or false
-	 * to let a specific write through silently. A call matching an already-approved
-	 * entry is exempted once and removed from $approvedCalls, so re-requesting the
-	 * same ability later still requires confirmation.
+	 * The default comes from the ability's own MCP-style annotations: only an
+	 * explicit `readonly => true` bypasses the gate (see isWriteAbility()).
+	 * Plugins refine that verdict through the agent_mod_ability_requires_confirmation
+	 * filter. Abilities the user has approved for the session are exempted by
+	 * name — that exemption deliberately wins over the filter, because it is an
+	 * explicit per-name consent given in the confirmation dialog.
 	 *
-	 * The match is on ability name *and* arguments. Confirmation does not execute the
-	 * stored call directly: it re-prompts the model to request it again (see
-	 * AIChatRestController::handleConfirmAction()). Matching on the name alone would let
-	 * the model come back on that turn with different arguments — approving the deletion
-	 * of one plugin and having another deleted. Comparing fingerprints keeps the approved
-	 * arguments binding; anything else falls through and prompts the user again.
+	 * Argument binding is guaranteed by the resume path, not by matching here:
+	 * confirmation executes the exact stored calls the user saw (see
+	 * AIClientAdapter::resume()), so the model never gets a chance to swap in
+	 * different arguments after approval.
 	 *
-	 * @param array<int, array<string, mixed>> $toolCalls     Extracted tool calls.
-	 * @param array<int, array<string, mixed>> $approvedCalls Tool calls already confirmed by the user.
+	 * @param array<int, array<string, mixed>> $toolCalls             Extracted tool calls.
+	 * @param string[]                         $autoApprovedAbilities Session-approved ability names.
 	 *
 	 * @return array<int, array<string, mixed>> Only the calls that still need confirmation.
 	 * @since 1.0.0
 	 */
-	private function filterWriteToolCalls(array $toolCalls, array &$approvedCalls = []): array
+	private function filterWriteToolCalls(array $toolCalls, array $autoApprovedAbilities): array
 	{
 		return array_values(
 			array_filter(
 				$toolCalls,
-				function (array $call) use (&$approvedCalls): bool {
+				function (array $call) use ($autoApprovedAbilities): bool {
 					$requires = $this->isWriteAbility((string) $call['name']);
 
 					/**
@@ -510,35 +656,42 @@ class AIClientAdapter
 						return false;
 					}
 
-					$fingerprint = $this->toolCallFingerprint($call);
-
-					foreach ($approvedCalls as $index => $approved) {
-						if ($this->toolCallFingerprint($approved) === $fingerprint) {
-							unset($approvedCalls[$index]);
-							return false;
-						}
-					}
-
-					return true;
+					return ! $this->isAutoApproved((string) $call['name'], $autoApprovedAbilities);
 				}
 			)
 		);
 	}
 
 	/**
-	 * Whether an ability declares itself as a write operation.
+	 * Whether the user has session-approved an ability by name.
 	 *
-	 * Reads the MCP-style `readonly` annotation from the ability registry, so a
-	 * newly registered write ability is gated without anyone maintaining a list of
-	 * names. Only an explicit `readonly => false` counts: many abilities — core
-	 * ones and those from other plugins — ship no annotations at all, and treating
-	 * a missing hint as a write would put a modal in front of ordinary read calls.
-	 * Those cases are covered by the agent_mod_ability_requires_confirmation
-	 * filter instead.
+	 * The literal '*' entry approves every write for the session; it is the
+	 * mechanism-level blanket variant and is not currently surfaced in the UI.
+	 *
+	 * @param string   $name      Ability name.
+	 * @param string[] $allowlist Session-approved ability names.
+	 *
+	 * @return bool
+	 * @since x.x.x
+	 */
+	private function isAutoApproved(string $name, array $allowlist): bool
+	{
+		return in_array('*', $allowlist, true) || in_array($name, $allowlist, true);
+	}
+
+	/**
+	 * Whether an ability requires confirmation before execution.
+	 *
+	 * Fail-closed: only an explicit `readonly => true` annotation bypasses the
+	 * confirmation gate. `false`, `null` (WP core injects `readonly => null`
+	 * into every ability that ships no annotations) and malformed annotation
+	 * shapes all count as writes — an unknown ability must never run silently.
+	 * Read-only abilities from other plugins opt out by annotating themselves,
+	 * or via the agent_mod_ability_requires_confirmation filter.
 	 *
 	 * @param string $name Ability name.
 	 *
-	 * @return bool True when the ability is annotated as not read-only.
+	 * @return bool True when the ability must be confirmed.
 	 * @since x.x.x
 	 */
 	private function isWriteAbility(string $name): bool
@@ -557,60 +710,7 @@ class AIClientAdapter
 
 		$annotations = $ability->get_meta_item('annotations', []);
 
-		if (! is_array($annotations) || ! array_key_exists('readonly', $annotations)) {
-			return false;
-		}
-
-		// The hint has to be present, but its falsy form is not standardised
-		// (false, 0, ''), so anything not truthy counts as a write.
-		return ! (bool) $annotations['readonly'];
-	}
-
-	/**
-	 * Builds a stable identity for a tool call from its name and arguments.
-	 *
-	 * Argument keys are sorted recursively so that a provider reordering them
-	 * between turns does not invalidate an approval. Values are compared as
-	 * encoded, so "5" and 5 are treated as different — erring towards asking
-	 * the user again rather than executing something they did not see.
-	 *
-	 * @param array<string, mixed> $call Tool call with 'name' and 'args'.
-	 *
-	 * @return string
-	 * @since 1.1.0
-	 */
-	private function toolCallFingerprint(array $call): string
-	{
-		$args = $call['args'] ?? [];
-
-		if (! is_array($args)) {
-			$args = [$args];
-		}
-
-		$this->sortKeysRecursive($args);
-
-		return (string) ($call['name'] ?? '') . '|' . (string) wp_json_encode($args);
-	}
-
-	/**
-	 * Recursively sorts an array by key, in place.
-	 *
-	 * @param array<mixed> $value Array to sort.
-	 *
-	 * @return void
-	 * @since 1.1.0
-	 */
-	private function sortKeysRecursive(array &$value): void
-	{
-		ksort($value);
-
-		foreach ($value as &$item) {
-			if (is_array($item)) {
-				$this->sortKeysRecursive($item);
-			}
-		}
-
-		unset($item);
+		return ! (is_array($annotations) && true === ($annotations['readonly'] ?? null));
 	}
 
 	/**

@@ -78,6 +78,22 @@ export function setPendingConfirmation( data ) {
 	return { type: 'SET_PENDING_CONFIRMATION', data };
 }
 
+/**
+ * Adds ability names to the session-approval list ("don't ask again").
+ *
+ * @param {string[]} abilityNames Ability names to auto-approve for the session.
+ */
+export function addSessionApprovedAbilities( abilityNames ) {
+	return { type: 'ADD_SESSION_APPROVED_ABILITIES', abilityNames };
+}
+
+/**
+ * Clears the session-approval list; every write prompts again.
+ */
+export function clearSessionApprovedAbilities() {
+	return { type: 'CLEAR_SESSION_APPROVED_ABILITIES' };
+}
+
 export function setProgress( progress ) {
 	return { type: 'SET_PROGRESS', progress };
 }
@@ -202,15 +218,18 @@ export const fetchAgents = () => async ( { dispatch, select } ) => {
 };
 
 /**
- * Executes a confirmed write action via the confirm-action REST endpoint.
+ * Resolves a pending confirmation (approve or decline) via the confirm-action
+ * REST endpoint and handles the resumed run's response.
  *
+ * @param {Object} thunkArgs      Store thunk args ({ dispatch, select }).
  * @param {string} token          Confirmation token.
  * @param {number} conversationId Current conversation ID.
+ * @param {string} decision       'approve' or 'decline'.
  */
-export const confirmAction = ( token, conversationId ) => async ( { dispatch, select } ) => {
-	// Close the modal immediately on confirm; don't wait for the request to
-	// resolve. If the resumed run hits another write action needing approval,
-	// the pendingConfirmation branch below re-opens it.
+async function resolveConfirmation( { dispatch, select }, token, conversationId, decision ) {
+	// Close the modal immediately; don't wait for the request to resolve. If
+	// the resumed run hits another write action needing approval, the
+	// pendingConfirmation branch below re-opens it.
 	dispatch.clearConfirmation();
 	dispatch.setLoading( true );
 
@@ -222,11 +241,23 @@ export const confirmAction = ( token, conversationId ) => async ( { dispatch, se
 		const data = await apiFetch( {
 			path:   select.getRestNamespace() + '/confirm-action',
 			method: 'POST',
-			data:   { token, conversationId, requestId },
+			data:   {
+				token,
+				conversationId,
+				requestId,
+				decision,
+				autoApprovedAbilities: select.getSessionApprovedAbilities(),
+			},
 			signal,
 		} );
 
 		dispatch.clearConfirmation();
+
+		// The conversation may have been created lazily at any point of the
+		// chain; keep the id in sync on every leg, not just the terminal one.
+		if ( data && data.conversationId ) {
+			dispatch.setConversationId( data.conversationId );
+		}
 
 		if ( data && data.success && ! data.pendingConfirmation ) {
 			dispatch.appendMessage( {
@@ -235,16 +266,13 @@ export const confirmAction = ( token, conversationId ) => async ( { dispatch, se
 				toolCalls: Array.isArray( data.toolCalls ) ? data.toolCalls : [],
 				tokenUsage: data.tokenUsage || null,
 			} );
-
-			if ( data.conversationId ) {
-				dispatch.setConversationId( data.conversationId );
-			}
 		} else if ( data && data.pendingConfirmation ) {
 			dispatch.setPendingConfirmation( {
 				token:            data.confirmationToken,
 				actionName:       data.pendingAction?.name || '',
 				args:             data.pendingAction?.args || {},
 				pendingToolCalls: data.pendingToolCalls || [],
+				executedCalls:    Array.isArray( data.toolCalls ) ? data.toolCalls : [],
 			} );
 		} else {
 			const message =
@@ -254,8 +282,17 @@ export const confirmAction = ( token, conversationId ) => async ( { dispatch, se
 		}
 	} catch ( err ) {
 		dispatch.clearConfirmation();
-		// A user-initiated Stop is not an error: release the UI quietly.
-		if ( ! isStopError( err ) ) {
+		if ( isStopError( err ) ) {
+			// Approved actions may have run before the stop landed; say so
+			// instead of failing silently.
+			dispatch.appendMessage( {
+				role: 'assistant',
+				text: __(
+					'Generation stopped. Actions approved before stopping may already have been executed.',
+					'agent-mod'
+				),
+			} );
+		} else {
 			dispatch.setError(
 				( err && err.message ) ||
 				__( 'Request failed. Please try again.', 'agent-mod' )
@@ -264,8 +301,33 @@ export const confirmAction = ( token, conversationId ) => async ( { dispatch, se
 	} finally {
 		untrackRequest( requestId );
 		stopPolling();
-		dispatch.setLoading( false );
+		// A chained confirmation re-opened the modal: keep the composer locked
+		// so there is no enabled-disabled flicker between modals.
+		if ( ! select.getPendingConfirmation() ) {
+			dispatch.setLoading( false );
+		}
 	}
+}
+
+/**
+ * Executes a confirmed write action via the confirm-action REST endpoint.
+ *
+ * @param {string} token          Confirmation token.
+ * @param {number} conversationId Current conversation ID.
+ */
+export const confirmAction = ( token, conversationId ) => async ( { dispatch, select } ) => {
+	await resolveConfirmation( { dispatch, select }, token, conversationId, 'approve' );
+};
+
+/**
+ * Declines a pending write action. The model receives a "declined" function
+ * response and answers gracefully instead of the request being dropped.
+ *
+ * @param {string} token          Confirmation token.
+ * @param {number} conversationId Current conversation ID.
+ */
+export const declineAction = ( token, conversationId ) => async ( { dispatch, select } ) => {
+	await resolveConfirmation( { dispatch, select }, token, conversationId, 'decline' );
 };
 
 /**
@@ -488,6 +550,7 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 			attachments: files.map( toWireAttachment ),
 			conversationId: select.getConversationId(),
 			requestId,
+			autoApprovedAbilities: select.getSessionApprovedAbilities(),
 		};
 
 		const payload = applyFilters( 'agent_mod.send_message_payload', basePayload );
@@ -511,6 +574,7 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 					actionName:       data.pendingAction?.name || '',
 					args:             data.pendingAction?.args || {},
 					pendingToolCalls: data.pendingToolCalls || [],
+					executedCalls:    Array.isArray( data.toolCalls ) ? data.toolCalls : [],
 				} );
 			} else {
 				dispatch.appendMessage( {

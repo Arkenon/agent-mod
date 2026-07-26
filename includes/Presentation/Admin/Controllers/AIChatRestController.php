@@ -57,7 +57,7 @@ final class AIChatRestController
 	 * Live tool-call progress store.
 	 *
 	 * @var ProgressStore
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private ProgressStore $progressStore;
 
@@ -260,7 +260,14 @@ final class AIChatRestController
 
 		do_action('agent_mod_before_chat', $agent, $message, $history);
 
-		$response = $this->orchestrator->chat($agent, $message, $history, $attachments, $this->sanitizeRequestId($request));
+		$response = $this->orchestrator->chat(
+			$agent,
+			$message,
+			$history,
+			$attachments,
+			$this->sanitizeRequestId($request),
+			$this->sanitizeAutoApprovedAbilities($request->get_param('autoApprovedAbilities'))
+		);
 
 		do_action('agent_mod_after_chat', $agent, $response, $conversationId);
 
@@ -354,15 +361,15 @@ final class AIChatRestController
 	}
 
 	/**
-	 * Resumes a write operation after the user has confirmed it.
+	 * Resumes a write operation after the user has confirmed or declined it.
 	 *
-	 * The resumed run is a re-prompt, not a direct execution of the stored call:
-	 * the model is asked to request the approved ability again, which it can only
-	 * do sensibly if it still knows what the user originally wanted. The original
-	 * user message (plus the calls that already ran) is therefore replayed in the
-	 * resume message — without it a multi-step request ("create five posts") would
-	 * stop after the first approved step, because the model would see nothing but
-	 * the synthetic "execute this now" instruction.
+	 * True continuation, not a re-prompt: the stored wire-format history ends
+	 * with the model message whose function calls the user saw in the dialog.
+	 * On approval the orchestrator executes exactly those calls and feeds their
+	 * real responses back, so the model carries on with its own multi-step plan
+	 * (and pauses again — new token — for any further un-approved write). On
+	 * decline the calls receive a synthetic "declined" response so the model can
+	 * acknowledge gracefully.
 	 *
 	 * @param WP_REST_Request $request The REST request.
 	 *
@@ -373,6 +380,8 @@ final class AIChatRestController
 	{
 		$token          = sanitize_text_field((string) $request->get_param('token'));
 		$conversationId = (int) $request->get_param('conversationId');
+		$decision       = sanitize_key((string) $request->get_param('decision'));
+		$decision       = in_array($decision, ['approve', 'decline'], true) ? $decision : 'approve';
 
 		if ('' === $token) {
 			return new WP_Error('missing_token', __('A confirmation token is required.', 'agent-mod'), ['status' => 400]);
@@ -385,41 +394,26 @@ final class AIChatRestController
 		}
 
 		$agent         = $state['agent'];
-		$history       = is_array($state['history'] ?? null) ? $state['history'] : [];
+		$wireHistory   = is_array($state['wireHistory'] ?? null) ? $state['wireHistory'] : [];
 		$message       = (string) ($state['message'] ?? '');
 		$attachments   = is_array($state['attachments'] ?? null) ? $state['attachments'] : [];
 		$pendingCalls  = $this->normalizeToolCalls($state['pendingCalls'] ?? []);
 		$executedCalls = $this->normalizeToolCalls($state['executedCalls'] ?? []);
 
-		if (! $agent instanceof AgentConfig || empty($pendingCalls)) {
+		if (! $agent instanceof AgentConfig || empty($wireHistory) || empty($pendingCalls)) {
 			return new WP_Error('corrupt_state', __('The pending confirmation state is invalid.', 'agent-mod'), ['status' => 500]);
 		}
 
-		// Inject a confirmation message so the AI re-requests and executes the
-		// approved tools on the next loop iteration. Every pending call is
-		// approved: a provider may batch several write calls in one turn, and
-		// dropping all but the first would silently discard work the user saw and
-		// agreed to in the modal.
-		$confirmMessage = $this->buildConfirmMessage($message, $pendingCalls, $executedCalls);
-
-		$response = $this->orchestrator->chat(
+		$response = $this->orchestrator->resume(
 			$agent,
-			$confirmMessage,
-			$history,
+			$wireHistory,
+			$executedCalls,
+			$message,
 			$attachments,
 			$this->sanitizeRequestId($request),
-			$pendingCalls,
-			[
-				'history'       => $history,
-				'message'       => $message,
-				'attachments'   => $attachments,
-				'executedCalls' => $executedCalls,
-			]
+			$this->sanitizeAutoApprovedAbilities($request->get_param('autoApprovedAbilities')),
+			'approve' === $decision
 		);
-
-		// Everything that ran across the whole confirmation chain, so the UI and
-		// the persisted turn list all steps, not just the last one.
-		$allExecutedCalls = array_merge($executedCalls, $response->toolCalls);
 
 		if ($response->isError()) {
 			$error  = $response->error;
@@ -444,7 +438,8 @@ final class AIChatRestController
 						'role'        => 'assistant',
 						'text'        => $response->text,
 						'attachments' => [],
-						'toolCalls'   => $allExecutedCalls,
+						// Seeded loop: already the complete chain-wide list.
+						'toolCalls'   => $response->toolCalls,
 						'tokenUsage'  => $response->tokenUsage,
 					],
 				];
@@ -453,80 +448,67 @@ final class AIChatRestController
 		}
 
 		$payload                   = $response->toArray();
-		$payload['toolCalls']      = $allExecutedCalls;
 		$payload['conversationId'] = $conversationId ?: null;
 
 		return rest_ensure_response($payload);
 	}
 
 	/**
-	 * Builds the user message that resumes a confirmed run.
+	 * Sanitizes the session-approved ability names sent by the client.
 	 *
-	 * Three things go into one message rather than several history turns: the
-	 * original request (so a multi-step task survives the pause), the calls that
-	 * already ran (so an approved-and-executed step is not repeated on a chained
-	 * confirmation), and the approval itself. Keeping it to a single turn avoids
-	 * emitting two consecutive user turns, which some providers reject.
+	 * Accepts registered-ability-shaped names (vendor/ability) plus the literal
+	 * '*' wildcard, capped at 50 unique entries. The result runs through the
+	 * agent_mod_auto_approved_abilities filter so site owners and extensions can
+	 * strip abilities (e.g. destructive ones) from session approval entirely.
 	 *
-	 * @param string                           $message       Original user message of the paused turn.
-	 * @param array<int, array<string, mixed>> $pendingCalls  Approved tool calls to execute now.
-	 * @param array<int, array<string, mixed>> $executedCalls Calls already executed for this request.
+	 * @param mixed $raw Raw request value.
 	 *
-	 * @return string
+	 * @return string[]
 	 * @since x.x.x
 	 */
-	private function buildConfirmMessage(string $message, array $pendingCalls, array $executedCalls): string
+	private function sanitizeAutoApprovedAbilities($raw): array
 	{
-		$blocks = [];
-
-		if ('' !== trim($message)) {
-			$blocks[] = __('My original request was:', 'agent-mod') . "\n" . $message;
+		if (! is_array($raw)) {
+			return [];
 		}
 
-		if (! empty($executedCalls)) {
-			$blocks[] = __('These steps of it are already done — do not repeat them:', 'agent-mod')
-				. "\n" . $this->describeToolCalls($executedCalls);
+		$names = [];
+
+		foreach ($raw as $name) {
+			if (! is_string($name)) {
+				continue;
+			}
+
+			$name = trim(sanitize_text_field($name));
+
+			if ('*' !== $name && ! preg_match('#^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9_-]*$#', $name)) {
+				continue;
+			}
+
+			$names[] = $name;
+
+			if (count($names) >= 50) {
+				break;
+			}
 		}
 
-		if (1 === count($pendingCalls)) {
-			$blocks[] = sprintf(
-				/* translators: 1: ability name, 2: JSON-encoded arguments. */
-				__('The user has confirmed this action. Please execute it now: %1$s with arguments: %2$s', 'agent-mod'),
-				esc_html((string) $pendingCalls[0]['name']),
-				wp_json_encode($pendingCalls[0]['args'])
-			);
-		} else {
-			$blocks[] = __('The user has confirmed the following actions. Please execute them all now, exactly as listed:', 'agent-mod')
-				. "\n" . $this->describeToolCalls($pendingCalls);
-		}
+		$names = array_values(array_unique($names));
 
-		$blocks[] = __('Afterwards continue with whatever remains of my original request; ask for confirmation again for each further action that needs it.', 'agent-mod');
-
-		return implode("\n\n", $blocks);
-	}
-
-	/**
-	 * Renders tool calls as one "name with arguments" line each.
-	 *
-	 * @param array<int, array<string, mixed>> $calls Normalized tool calls.
-	 *
-	 * @return string
-	 * @since x.x.x
-	 */
-	private function describeToolCalls(array $calls): string
-	{
-		$lines = [];
-
-		foreach ($calls as $call) {
-			$lines[] = sprintf(
-				/* translators: 1: ability name, 2: JSON-encoded arguments. */
-				__('- %1$s with arguments: %2$s', 'agent-mod'),
-				esc_html((string) $call['name']),
-				wp_json_encode($call['args'])
-			);
-		}
-
-		return implode("\n", $lines);
+		/**
+		 * Filters the ability names the user has session-approved.
+		 *
+		 * Runs after sanitization on every chat and confirm request. Returning a
+		 * reduced list revokes session approval for the removed abilities — they
+		 * will prompt again despite the user's "don't ask again" choice.
+		 *
+		 * @param string[] $names Sanitized ability names ('*' is the blanket wildcard).
+		 *
+		 * @since x.x.x
+		 */
+		return array_values(array_filter(
+			(array) apply_filters('agent_mod_auto_approved_abilities', $names),
+			'is_string'
+		));
 	}
 
 	/**
@@ -599,7 +581,7 @@ final class AIChatRestController
 	 * @param WP_REST_Request $request The REST request.
 	 *
 	 * @return WP_REST_Response|WP_Error
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	public function handleChatProgress(WP_REST_Request $request)
 	{
@@ -622,7 +604,7 @@ final class AIChatRestController
 	 * @param WP_REST_Request $request The REST request.
 	 *
 	 * @return string The UUID, or '' when missing/invalid.
-	 * @since 1.1.0
+	 * @since x.x.x
 	 */
 	private function sanitizeRequestId(WP_REST_Request $request): string
 	{

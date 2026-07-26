@@ -159,7 +159,7 @@ class Constants
 	{
 		$directives = [
 			__(
-				'Never directly execute destructive operations (delete, trash, erase, or remove content or users). Instead, list the affected items and ask the user for explicit confirmation before any such action is taken. If no relevant tool exists to list them, describe what would be affected and request confirmation.',
+				'State-changing operations are automatically intercepted by the system, which shows the user an approval dialog before they run. Do not ask for permission in chat — request the needed tool calls directly. When a task requires several write operations, request them in sequence until the whole task is complete; never stop mid-task to ask whether to continue.',
 				'agent-mod'
 			),
 			__(
