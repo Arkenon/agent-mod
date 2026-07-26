@@ -13,8 +13,10 @@ agent-mod/
 │   ├── admin-chat/                         # Admin chat widget (React app)
 │   │   ├── components/                     # UI components (ChatPanel, Composer, etc.)
 │   │   ├── store/                          # Redux data store (actions, reducers, etc.)
+│   │   ├── utils/                          # Helper functions
 │   │   └── index.js                        # Entry point
-│   └── dashboard/                          # Dashboard UI components
+│   ├── dashboard/                          # Dashboard UI components
+│   └── settings-editor/                    # Settings editor UI components
 │
 ├── build/                                  # Built assets from src/ via webpack
 │
@@ -31,6 +33,16 @@ agent-mod/
     │   ├── SettingsService.php             # Manages plugin settings via NCF (Native Custom Fields)
     │   ├── AbilityRegistrarService.php     # Registers core and block design abilities
     │   ├── LibraryService.php              # Manages library assets/scripts
+    │   ├── SiteManagementAbilityService.php# Main service for site management abilities
+    │   │
+    │   ├── SiteManagement/                 # ⚙️ Site Management Managers
+    │   │   ├── Guard.php                   # Capability and security checks
+    │   │   ├── OptionManager.php           # wp_options table management
+    │   │   ├── PluginManager.php           # Plugin installation/activation
+    │   │   ├── SystemManager.php           # Core system updates and info
+    │   │   ├── ThemeManager.php            # Theme installation/activation
+    │   │   ├── UpgraderContext.php         # WP Upgrader wrapper context
+    │   │   └── UserManager.php             # User CRUD operations
     │   │
     │   └── AI/                             # 🧠 AI Orchestration & Logic
     │       ├── AIOrchestratorService.php   # Main AI engine (handles chat loops, tool calls)
@@ -205,6 +217,7 @@ and it enforces a layered, maintainable structure.
 - Check user permissions with `current_user_can()` before sensitive operations.
 - Optimize performance by minimizing database queries, using transients for caching, and loading assets conditionally.
 - Follow WordPress coding standards and PSR-4 autoloading.
+- If a new function, method or class generated, update documentation (class PhpDoc must include @package, @subpackage, @since tags). always set @since tag to "x.x.x"
 
 🛠 Development workflow:
 1. Install composer dependencies: `composer update`
