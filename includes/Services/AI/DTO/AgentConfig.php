@@ -29,7 +29,7 @@ final class AgentConfig
 	 * relate the request to a stored agent.
 	 *
 	 * @var int|null
-	 * @since 1.2.0
+	 * @since 1.0.5
 	 */
 	public ?int $id;
 

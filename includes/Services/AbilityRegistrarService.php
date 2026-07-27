@@ -40,13 +40,22 @@ class AbilityRegistrarService
 	private SettingsService $settings_service;
 
 	/**
+	 * Shared block-markup validator (advisory linter + write-path enforcement).
+	 *
+	 * @var BlockMarkupValidator
+	 * @since x.x.x
+	 */
+	private BlockMarkupValidator $blockMarkupValidator;
+
+	/**
 	 * Constructor. Binds the abilities API hooks.
 	 *
 	 * @since 1.0.0
 	 */
-	public function __construct(SettingsService $settingsService)
+	public function __construct(SettingsService $settingsService, BlockMarkupValidator $blockMarkupValidator)
 	{
-		$this->settings_service = $settingsService;
+		$this->settings_service     = $settingsService;
+		$this->blockMarkupValidator = $blockMarkupValidator;
 
 		add_action('wp_abilities_api_categories_init', [$this, 'registerCategories']);
 		add_action('wp_abilities_api_init', [$this, 'registerAbilities']);
@@ -791,6 +800,41 @@ class AbilityRegistrarService
 				'meta'                => [
 					'annotations'  => ['readonly' => false],
 					'show_in_rest' => true,
+				],
+			]
+		);
+
+		wp_register_ability(
+			'agent-mod/validate-block-markup',
+			[
+				'label'               => __('Validate Block Markup', 'agent-mod'),
+				'description'         => __('Lints serialized Gutenberg block markup before writing: parses it and reports malformed delimiters, invalid JSON attributes, unregistered block names and content outside block delimiters. Always call this on the full markup before create-pattern, update-post, add-or-update-template or any other write ability, and fix every issue before writing.', 'agent-mod'),
+				'category'            => self::CATEGORY,
+				'execute_callback'    => [$this, 'validateBlockMarkup'],
+				'permission_callback' => function () {
+					return current_user_can('edit_posts');
+				},
+				'input_schema'        => [
+					'type' => 'object',
+					'properties' => [
+						'markup' => [
+							'type' => 'string',
+							'description' => __('The serialized block markup to validate.', 'agent-mod')
+						]
+					],
+					'required' => ['markup']
+				],
+				'output_schema'       => [
+					'type' => 'object',
+					'properties' => [
+						'valid' => ['type' => 'boolean'],
+						'block_count' => ['type' => 'integer'],
+						'issues' => ['type' => 'array', 'items' => ['type' => 'string']],
+					]
+				],
+				'meta'                => [
+					'show_in_rest' => true,
+					'annotations'  => ['readonly' => true],
 				],
 			]
 		);
@@ -1851,40 +1895,37 @@ class AbilityRegistrarService
 
 			$html = (string) $html;
 
-			// parse_blocks() silently nulls the attributes when the JSON is
-			// malformed while still recognizing the block, so the editor later
-			// fails validation — check every attribute object directly. Serialized
-			// attributes can never contain "-->" (the serializer escapes "--").
-			if (preg_match_all('#<!--\s+wp:[a-z][a-z0-9/-]*\s+({.*?})\s*/?-->#s', $html, $matches)) {
-				foreach ($matches[1] as $attributeJson) {
-					json_decode($attributeJson);
+			// Malformed attribute JSON survives parse_blocks() (attributes are
+			// silently nulled) and only fails later in the editor — reject it up
+			// front. Detection lives in the shared validator so the linter and
+			// this gate stay in lock-step; the write path returns on the first
+			// offender with its own error code.
+			$invalidAttrs = $this->blockMarkupValidator->invalidJsonAttributes($html);
 
-					if (JSON_ERROR_NONE !== json_last_error()) {
-						return new WP_Error(
-							'invalid_attributes',
-							sprintf(
-								/* translators: %s: excerpt of the invalid attribute object. */
-								__('Invalid JSON attribute object: "%s" — attributes must be strict JSON: double-quoted keys and strings, no trailing commas, no single quotes.', 'agent-mod'),
-								mb_substr($attributeJson, 0, 80)
-							)
-						);
-					}
-				}
+			if (! empty($invalidAttrs)) {
+				return new WP_Error(
+					'invalid_attributes',
+					sprintf(
+						/* translators: %s: excerpt of the invalid attribute object. */
+						__('Invalid JSON attribute object: "%s" — attributes must be strict JSON: double-quoted keys and strings, no trailing commas, no single quotes.', 'agent-mod'),
+						mb_substr($invalidAttrs[0], 0, 80)
+					)
+				);
 			}
 
 			$blocks = parse_blocks($html);
 
-			foreach ($blocks as $block) {
-				if (empty($block['blockName']) && '' !== trim((string) $block['innerHTML'])) {
-					return new WP_Error(
-						'stray_content',
-						sprintf(
-							/* translators: %s: excerpt of the stray content. */
-							__('Content exists outside block delimiters and would be dropped: "%s". Wrap it in proper block markup and retry.', 'agent-mod'),
-							mb_substr(trim((string) $block['innerHTML']), 0, 80)
-						)
-					);
-				}
+			$strayContent = $this->blockMarkupValidator->strayContentExcerpts($blocks);
+
+			if (! empty($strayContent)) {
+				return new WP_Error(
+					'stray_content',
+					sprintf(
+						/* translators: %s: excerpt of the stray content. */
+						__('Content exists outside block delimiters and would be dropped: "%s". Wrap it in proper block markup and retry.', 'agent-mod'),
+						mb_substr($strayContent[0], 0, 80)
+					)
+				);
 			}
 
 			$blocks = array_values(array_filter($blocks, static function ($block) {
@@ -1893,6 +1934,18 @@ class AbilityRegistrarService
 
 			if (empty($blocks)) {
 				return new WP_Error('parse_failed', __('No valid blocks found in the provided block markup.', 'agent-mod'));
+			}
+
+			// parse_blocks() tolerates a missing closing tag and round-trips it
+			// verbatim into the database, breaking the whole parent block chain in
+			// the editor. Hard-block unbalanced markup here — the same detection the
+			// read-only agent-mod/validate-block-markup ability exposes, now
+			// enforced. Only tag balance is blocked (the reported failure, low
+			// false-positive risk); softer diagnostics stay advisory in the ability.
+			$tagIssues = $this->blockMarkupValidator->tagBalanceIssues($html);
+
+			if (! empty($tagIssues)) {
+				return new WP_Error('unbalanced_block_markup', implode(' ', $tagIssues));
 			}
 
 			return $blocks;
@@ -1925,5 +1978,22 @@ class AbilityRegistrarService
 		}
 
 		return $base;
+	}
+
+	/**
+	 * Ability callback for agent-mod/validate-block-markup.
+	 *
+	 * Thin boundary over the shared BlockMarkupValidator: unwraps the ability
+	 * input and delegates the linting itself, so the advisory checks and the
+	 * write-path enforcement can never drift apart.
+	 *
+	 * @param array<string, mixed> $args Ability input ({ markup: string }).
+	 *
+	 * @return array<string, mixed> { valid: bool, block_count: int, issues: string[] }
+	 * @since x.x.x
+	 */
+	public function validateBlockMarkup(array $args): array
+	{
+		return $this->blockMarkupValidator->validate((string) ($args['markup'] ?? ''));
 	}
 }

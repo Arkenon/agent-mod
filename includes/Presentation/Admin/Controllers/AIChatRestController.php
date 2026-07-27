@@ -241,7 +241,7 @@ final class AIChatRestController
 		 * request-level keys: id, mode, provider, model and emphasizedAbilities.
 		 *
 		 * @param array $agentData Sanitized agent data from the request.
-		 * @since 1.2.0
+		 * @since 1.0.5
 		 */
 		$agentData = (array) apply_filters('agent_mod_agent_config_data', $agentData);
 
@@ -297,7 +297,7 @@ final class AIChatRestController
 				 * @param string $source         Origin of the conversation.
 				 * @param string $message        First user message, e.g. for deriving a title.
 				 *
-				 * @since 1.2.0
+				 * @since 1.0.5
 				 */
 				$conversationId = (int) apply_filters('agent_mod_create_conversation', 0, (int) ($agentData['id'] ?? 0), 'admin_chat', $message);
 			}
@@ -560,7 +560,7 @@ final class AIChatRestController
 	 * @param WP_REST_Request $request The REST request.
 	 *
 	 * @return WP_REST_Response|WP_Error
-	 * @since 1.2.0
+	 * @since 1.0.5
 	 */
 	public function handleChatStop(WP_REST_Request $request)
 	{

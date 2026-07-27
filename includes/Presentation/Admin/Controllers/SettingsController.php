@@ -230,7 +230,8 @@ final class SettingsController
 						'multiple'     => true,
 						'name'         => 'allowed_abilities',
 						'fieldLabel'   => __('Allowed Abilities', 'agent-mod'),
-						'fieldHelpText'         => __('Select the abilities to allow. Used only when Ability Source is set to Selected Abilities.', 'agent-mod'),
+						'className'    => 'agent-mod-wp-core-ui-select-multiple',
+						'fieldHelpText' => __('Select the abilities to allow. Used only when Ability Source is set to Selected Abilities.', 'agent-mod'),
 						'options'      => $this->getAbilityOptions(),
 						'default'      => [],
 						'dependencies' => [

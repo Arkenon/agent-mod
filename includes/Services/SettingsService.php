@@ -234,7 +234,7 @@ final class SettingsService
 	 * for every unregistered name.
 	 *
 	 * @return array<int, array{name: string, label: string, meta: array{annotations: array{readonly: bool}}}>
-	 * @since 1.2.0
+	 * @since 1.0.5
 	 */
 	public function getAllowedAbilitiesDetailed(): array
 	{

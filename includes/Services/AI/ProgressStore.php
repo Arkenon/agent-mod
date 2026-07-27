@@ -102,7 +102,7 @@ class ProgressStore
 	 * @param string $requestId The client-generated UUID.
 	 *
 	 * @return void
-	 * @since 1.2.0
+	 * @since 1.0.5
 	 */
 	public function requestStop(string $requestId): void
 	{
@@ -115,7 +115,7 @@ class ProgressStore
 	 * @param string $requestId The client-generated UUID.
 	 *
 	 * @return bool
-	 * @since 1.2.0
+	 * @since 1.0.5
 	 */
 	public function isStopRequested(string $requestId): bool
 	{
@@ -145,7 +145,7 @@ class ProgressStore
 	 * @param string $requestId The client-generated UUID.
 	 *
 	 * @return void
-	 * @since 1.2.0
+	 * @since 1.0.5
 	 */
 	public function clearStop(string $requestId): void
 	{

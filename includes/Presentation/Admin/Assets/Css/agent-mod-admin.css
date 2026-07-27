@@ -6,3 +6,7 @@
 	height: 22px !important;
 	padding: 6px 0 0 !important;
 }
+
+.agent-mod-wp-core-ui-select-multiple .components-select-control__input{
+    height: 500px!important;
+}
