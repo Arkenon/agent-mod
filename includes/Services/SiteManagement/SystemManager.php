@@ -12,7 +12,7 @@
  *
  * @package AgentMod
  * @subpackage Services\SiteManagement
- * @since x.x.x
+ * @since 1.1.0
  */
 
 namespace AgentMod\Services\SiteManagement;
@@ -28,7 +28,7 @@ class SystemManager
 	 * Upgrader context.
 	 *
 	 * @var UpgraderContext
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private UpgraderContext $context;
 
@@ -36,7 +36,7 @@ class SystemManager
 	 * Pre-flight guard.
 	 *
 	 * @var Guard
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private Guard $guard;
 
@@ -44,7 +44,7 @@ class SystemManager
 	 * Settings service, used for result limits.
 	 *
 	 * @var SettingsService
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private SettingsService $settings;
 
@@ -55,7 +55,7 @@ class SystemManager
 	 * @param Guard           $guard    Pre-flight guard.
 	 * @param SettingsService $settings Settings service.
 	 *
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function __construct(UpgraderContext $context, Guard $guard, SettingsService $settings)
 	{
@@ -71,7 +71,7 @@ class SystemManager
 	 * environment facts that explain why an install or update might be refused.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function getCoreStatus()
 	{
@@ -135,7 +135,7 @@ class SystemManager
 	 * @param array<string, mixed> $input Optional 'search' filter.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function getCronEvents(array $input)
 	{
@@ -198,7 +198,7 @@ class SystemManager
 	 * @param array<string, mixed> $input Optional 'object_cache' and 'rewrite_rules' toggles.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function flushCaches(array $input)
 	{
@@ -251,7 +251,7 @@ class SystemManager
 	 * Returns the pending core update, if any.
 	 *
 	 * @return array<string, mixed>|null
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function coreUpdate(): ?array
 	{
@@ -276,7 +276,7 @@ class SystemManager
 	 * @param string $transient Transient name.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function pending(string $transient): array
 	{

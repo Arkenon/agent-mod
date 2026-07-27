@@ -202,7 +202,7 @@ final class SettingsService
 
 	/**
 	 * @return string
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function getAbilitySource(): string
 	{
@@ -213,7 +213,7 @@ final class SettingsService
 
 	/**
 	 * @return string[]
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function getAllowedAbilities(): array
 	{
@@ -274,7 +274,7 @@ final class SettingsService
 
 	/**
 	 * @return string[]
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function getPersonalityTraits(): array
 	{

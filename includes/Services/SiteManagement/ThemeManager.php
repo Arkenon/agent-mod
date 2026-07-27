@@ -13,7 +13,7 @@
  *
  * @package AgentMod
  * @subpackage Services\SiteManagement
- * @since x.x.x
+ * @since 1.1.0
  */
 
 namespace AgentMod\Services\SiteManagement;
@@ -31,7 +31,7 @@ class ThemeManager
 	 * Upgrader context.
 	 *
 	 * @var UpgraderContext
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private UpgraderContext $context;
 
@@ -39,7 +39,7 @@ class ThemeManager
 	 * Pre-flight guard.
 	 *
 	 * @var Guard
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private Guard $guard;
 
@@ -47,7 +47,7 @@ class ThemeManager
 	 * Settings service, used for result limits.
 	 *
 	 * @var SettingsService
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private SettingsService $settings;
 
@@ -58,7 +58,7 @@ class ThemeManager
 	 * @param Guard           $guard    Pre-flight guard.
 	 * @param SettingsService $settings Settings service.
 	 *
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function __construct(UpgraderContext $context, Guard $guard, SettingsService $settings)
 	{
@@ -77,7 +77,7 @@ class ThemeManager
 	 * @param array<string, mixed> $input Optional 'search' and 'status' filters.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function listThemes(array $input)
 	{
@@ -123,7 +123,7 @@ class ThemeManager
 	 * @param string $slug Theme directory slug.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function getTheme(string $slug)
 	{
@@ -162,7 +162,7 @@ class ThemeManager
 	 * @param array<string, mixed> $input Requires 'search'.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function searchDirectory(array $input)
 	{
@@ -241,7 +241,7 @@ class ThemeManager
 	 * @param bool   $activate Whether to activate after install.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function install(string $slug, bool $activate)
 	{
@@ -291,7 +291,7 @@ class ThemeManager
 	 * @param array<string, mixed> $input Accepts 'url' or 'attachment_id', plus 'activate'.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function upload(array $input)
 	{
@@ -323,7 +323,7 @@ class ThemeManager
 	 * @param string $action One of 'activate', 'update'.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function manage(string $slug, string $action)
 	{
@@ -356,7 +356,7 @@ class ThemeManager
 	 * @param string $slug Theme directory slug.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function remove(string $slug)
 	{
@@ -430,7 +430,7 @@ class ThemeManager
 	 * @param bool   $activate Whether to activate after install.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function installPackage(string $package, string $slug, bool $activate)
 	{
@@ -517,7 +517,7 @@ class ThemeManager
 	 * @param WP_Theme $theme Theme object.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function activate(string $slug, WP_Theme $theme)
 	{
@@ -587,7 +587,7 @@ class ThemeManager
 	 * @param WP_Theme $theme Theme object.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function update(string $slug, WP_Theme $theme)
 	{
@@ -680,7 +680,7 @@ class ThemeManager
 	 * @param array<string, mixed> $input Ability input.
 	 *
 	 * @return string|WP_Error Package URL or local path.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function resolvePackage(array $input)
 	{
@@ -740,7 +740,7 @@ class ThemeManager
 	 * @param array<string, array<string, mixed>> $updates  Pending updates keyed by stylesheet.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function summarise(string $stylesheet, WP_Theme $theme, array $updates): array
 	{
@@ -766,7 +766,7 @@ class ThemeManager
 	 * @param string               $search Lowercased search term.
 	 *
 	 * @return bool
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function matches(array $entry, string $search): bool
 	{
@@ -781,7 +781,7 @@ class ThemeManager
 	 * @param string               $status Requested status.
 	 *
 	 * @return bool
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function hasStatus(array $entry, string $status): bool
 	{
@@ -798,7 +798,7 @@ class ThemeManager
 	 * Unlike the plugin transient, theme update entries are arrays, not objects.
 	 *
 	 * @return array<string, array<string, mixed>>
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function themeUpdates(): array
 	{
@@ -813,7 +813,7 @@ class ThemeManager
 	 * @param string $slug Theme slug.
 	 *
 	 * @return array<string, mixed>|null Null when the theme is not in the directory.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function directoryInfo(string $slug): ?array
 	{
@@ -853,7 +853,7 @@ class ThemeManager
 	 * @param string $slug Raw identifier.
 	 *
 	 * @return string
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function normaliseSlug(string $slug): string
 	{
@@ -869,7 +869,7 @@ class ThemeManager
 	 * @param string $slug Theme directory slug.
 	 *
 	 * @return WP_Theme|null Null when not installed.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function findTheme(string $slug): ?WP_Theme
 	{
@@ -904,7 +904,7 @@ class ThemeManager
 	 * @param string $slug Requested slug.
 	 *
 	 * @return WP_Error
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function notInstalled(string $slug): WP_Error
 	{

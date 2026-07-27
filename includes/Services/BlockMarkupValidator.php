@@ -10,7 +10,7 @@
  *
  * @package AgentMod
  * @subpackage Services
- * @since x.x.x
+ * @since 1.1.0
  */
 
 namespace AgentMod\Services;
@@ -25,7 +25,7 @@ final class BlockMarkupValidator
 	 * Common container/inline tags whose open/close counts must match.
 	 *
 	 * @var string[]
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private const BALANCED_TAGS = [
 		'div', 'section', 'header', 'footer', 'main', 'aside', 'figure',
@@ -45,7 +45,7 @@ final class BlockMarkupValidator
 	 * @param string $markup The serialized block markup to validate.
 	 *
 	 * @return array<string, mixed> { valid: bool, block_count: int, issues: string[] }
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function validate(string $markup): array
 	{
@@ -126,7 +126,7 @@ final class BlockMarkupValidator
 	 * @param string $markup Full serialized block markup.
 	 *
 	 * @return array<int, string> Human-readable issue strings; empty when balanced.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function tagBalanceIssues(string $markup): array
 	{
@@ -164,7 +164,7 @@ final class BlockMarkupValidator
 	 * @param string $markup Full serialized block markup.
 	 *
 	 * @return array<int, string> Offending attribute-object strings; empty when all decode.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function invalidJsonAttributes(string $markup): array
 	{
@@ -191,7 +191,7 @@ final class BlockMarkupValidator
 	 * @param array<int, array<string, mixed>> $blocks parse_blocks() output.
 	 *
 	 * @return array<int, string> Offending content excerpts; empty when none.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function strayContentExcerpts(array $blocks): array
 	{
@@ -218,7 +218,7 @@ final class BlockMarkupValidator
 	 * @param array<int, array<string, mixed>> $blocks parse_blocks() output.
 	 *
 	 * @return array<int, string> Hard issues.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function checkAttributeClassParity(array $blocks): array
 	{
@@ -317,7 +317,7 @@ final class BlockMarkupValidator
 	 * @param array<int, array<string, mixed>> $blocks parse_blocks() output.
 	 *
 	 * @return array<int, string> Warnings (never flip validity).
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function checkLegacyAlignmentAttributes(array $blocks): array
 	{
@@ -355,7 +355,7 @@ final class BlockMarkupValidator
 	 * @param array<int, array<string, mixed>> $blocks parse_blocks() output.
 	 *
 	 * @return int
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function countNamedBlocks(array $blocks): int
 	{
@@ -380,7 +380,7 @@ final class BlockMarkupValidator
 	 * @param array<int, array<string, mixed>> $blocks parse_blocks() output.
 	 *
 	 * @return array<int, string>
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function collectBlockNames(array $blocks): array
 	{

@@ -13,7 +13,7 @@
  *
  * @package AgentMod
  * @subpackage Services\SiteManagement
- * @since x.x.x
+ * @since 1.1.0
  */
 
 namespace AgentMod\Services\SiteManagement;
@@ -29,7 +29,7 @@ class UpgraderContext
 	 * Whether the wp-admin includes have already been loaded this request.
 	 *
 	 * @var bool
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private bool $booted = false;
 
@@ -43,7 +43,7 @@ class UpgraderContext
 	 * Note: themes_api() lives in `theme.php`, not `theme-install.php`.
 	 *
 	 * @return void
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function boot(): void
 	{
@@ -69,7 +69,7 @@ class UpgraderContext
 	 * which is not loaded during REST requests either.
 	 *
 	 * @return void
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function bootUserAdmin(): void
 	{
@@ -84,7 +84,7 @@ class UpgraderContext
 	 * call. Failing loudly here is better than silently writing nothing.
 	 *
 	 * @return true|WP_Error True when the filesystem is usable.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function prepareFilesystem()
 	{
@@ -121,7 +121,7 @@ class UpgraderContext
 	 * for ajax-context installs.
 	 *
 	 * @return WP_Ajax_Upgrader_Skin
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function skin(): WP_Ajax_Upgrader_Skin
 	{
@@ -139,7 +139,7 @@ class UpgraderContext
 	 * @param callable $callback Operation to run.
 	 *
 	 * @return mixed Whatever the callback returns.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function silently(callable $callback)
 	{
@@ -165,7 +165,7 @@ class UpgraderContext
 	 * @param string                $message Fallback message for generic failures.
 	 *
 	 * @return WP_Error|null WP_Error on failure, null on success.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function errorFrom($result, WP_Ajax_Upgrader_Skin $skin, string $code, string $message): ?WP_Error
 	{

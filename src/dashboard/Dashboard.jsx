@@ -81,6 +81,9 @@ function DashboardSidebar() {
 								__('Multi Agent System', 'agent-mod'),
 								__('Conversation History', 'agent-mod'),
 								__('AI Skills', 'agent-mod'),
+								__('Frontend Widgets', 'agent-mod'),
+								__('Code Snippets', 'agent-mod'),
+								__('Import / Export Tools', 'agent-mod'),
 								__('Full-Screen Workspace', 'agent-mod'),
 							].map((feature, i) => (
 								<HStack key={i} spacing={2} alignment="left">
@@ -170,10 +173,13 @@ export default function Dashboard() {
 												{ feature: __('Admin Chat Widget', 'agent-mod'), free: true, pro: true },
 												{ feature: __('Safety Guardrails', 'agent-mod'), free: true, pro: true },
 												{ feature: __('Hard Limits (Cost Control)', 'agent-mod'), free: true, pro: true },
+												{ feature: __('Full-Screen AI Workspace', 'agent-mod'), free: false, pro: true },
 												{ feature: __('Multi-Agent System', 'agent-mod'), free: false, pro: true },
 												{ feature: __('Conversation History', 'agent-mod'), free: false, pro: true },
 												{ feature: __('Custom AI Skills', 'agent-mod'), free: false, pro: true },
-												{ feature: __('Full-Screen AI Workspace', 'agent-mod'), free: false, pro: true }
+												{ feature: __('Code Snippets', 'agent-mod'), free: false, pro: true },
+												{ feature: __('Frontend Widgets', 'agent-mod'), free: false, pro: true },
+												{ feature: __('Import / Export Tools', 'agent-mod'), free: false, pro: true }												
 											].map((row, index) => (
 												<tr key={index} style={{ borderBottom: index === 9 ? 'none' : '1px solid #f0f0f1', backgroundColor: index % 2 === 0 ? '#fff' : '#fafafa' }}>
 													<td style={{ padding: '12px 16px', color: '#3c434a', fontWeight: row.free ? 400 : 500 }}>{row.feature}</td>

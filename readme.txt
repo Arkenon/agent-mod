@@ -60,6 +60,18 @@ A comprehensive set of PHP and JavaScript hooks for extending AgentMod:
 - Actions for ability execution lifecycle (before/after)
 - ChatPanel UI customization hooks (add/remove tools, sections)
 
+= Get Pro to Unlock More Features =
+
+Unlock advanced features and take your AI Agents to the next level.
+
+* Full-Screen Workspace : Manage all AI features in full screen panel. No distraction!
+* Multi Agent System : Create and manage multiple AI agents.
+* Conversation History : Save and manage conversation history.
+* AI Skills : Add custom AI skills to your agents.
+* Frontend Widgets : Add AI widgets to your website. For example for contact forms or FAQ floating chat panels.
+* Code Snippets : Save and manage code snippets with your AI agents.
+* Import / Export Tools : Export and import settings and custom fields and plugin settings.
+
 = Provider Agnostic =
 
 AgentMod does not lock you into any specific AI provider. It works with any provider supported by the WordPress AI Client, including OpenAI, Anthropic, and others configured via provider plugins.
@@ -108,6 +120,7 @@ If you ask the agent to create a post, it will show you a confirmation modal sum
 * Added: Site Management abilities (new "AgentMod — Site Management" category, 24 abilities) covering plugins, themes, settings/options, system status, cron and users — the native equivalent of the WP-CLI management commands, with no shell access required.
 * Added: Guards for site management operations — protected options, self-protection for AgentMod's own plugins, active/parent/default theme protection, last-administrator protection and privilege-escalation checks on user roles.
 * Fixed: An approved write action is now matched by ability name *and* arguments before it is exempted from confirmation. Previously the model could return different arguments on the confirmation turn and have them executed without a second prompt.
+* Fixed: Chat processing issues.
 
 = 1.0.9 =
 Added: Web search capability. Agent can search the web for information and use it in responses.

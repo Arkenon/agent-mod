@@ -43,7 +43,7 @@ class AbilityRegistrarService
 	 * Shared block-markup validator (advisory linter + write-path enforcement).
 	 *
 	 * @var BlockMarkupValidator
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private BlockMarkupValidator $blockMarkupValidator;
 
@@ -1882,7 +1882,7 @@ class AbilityRegistrarService
 			 * error surfaces to the calling agent exactly like the built-in
 			 * invalid_attributes / stray_content errors below.
 			 *
-			 * @since x.x.x
+			 * @since 1.1.0
 			 *
 			 * @param string               $html  Serialized block markup.
 			 * @param array<string, mixed> $input The write ability input.
@@ -1990,7 +1990,7 @@ class AbilityRegistrarService
 	 * @param array<string, mixed> $args Ability input ({ markup: string }).
 	 *
 	 * @return array<string, mixed> { valid: bool, block_count: int, issues: string[] }
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function validateBlockMarkup(array $args): array
 	{

@@ -16,7 +16,7 @@
  *
  * @package AgentMod
  * @subpackage Services\AI
- * @since x.x.x
+ * @since 1.1.0
  */
 
 namespace AgentMod\Services\AI;
@@ -29,7 +29,7 @@ class ProgressStore
 	 * Transient key prefix.
 	 *
 	 * @var string
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private const PREFIX = 'agent_mod_progress_';
 
@@ -45,7 +45,7 @@ class ProgressStore
 	 * Time-to-live in seconds (5 minutes).
 	 *
 	 * @var int
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private const TTL = 300;
 
@@ -56,7 +56,7 @@ class ProgressStore
 	 * @param array<string, mixed> $state     Serializable state array.
 	 *
 	 * @return void
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function save(string $requestId, array $state): void
 	{
@@ -70,7 +70,7 @@ class ProgressStore
 	 * @param string $requestId The client-generated UUID.
 	 *
 	 * @return array<string, mixed>|null Null when not found or expired.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function load(string $requestId): ?array
 	{
@@ -85,7 +85,7 @@ class ProgressStore
 	 * @param string $requestId The client-generated UUID.
 	 *
 	 * @return void
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function delete(string $requestId): void
 	{

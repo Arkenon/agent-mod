@@ -57,7 +57,7 @@ final class AIChatRestController
 	 * Live tool-call progress store.
 	 *
 	 * @var ProgressStore
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private ProgressStore $progressStore;
 
@@ -464,7 +464,7 @@ final class AIChatRestController
 	 * @param mixed $raw Raw request value.
 	 *
 	 * @return string[]
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function sanitizeAutoApprovedAbilities($raw): array
 	{
@@ -503,7 +503,7 @@ final class AIChatRestController
 		 *
 		 * @param string[] $names Sanitized ability names ('*' is the blanket wildcard).
 		 *
-		 * @since x.x.x
+		 * @since 1.1.0
 		 */
 		return array_values(array_filter(
 			(array) apply_filters('agent_mod_auto_approved_abilities', $names),
@@ -520,7 +520,7 @@ final class AIChatRestController
 	 * @param mixed $raw Raw tool-call list.
 	 *
 	 * @return array<int, array<string, mixed>>
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function normalizeToolCalls($raw): array
 	{
@@ -581,7 +581,7 @@ final class AIChatRestController
 	 * @param WP_REST_Request $request The REST request.
 	 *
 	 * @return WP_REST_Response|WP_Error
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function handleChatProgress(WP_REST_Request $request)
 	{
@@ -604,7 +604,7 @@ final class AIChatRestController
 	 * @param WP_REST_Request $request The REST request.
 	 *
 	 * @return string The UUID, or '' when missing/invalid.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function sanitizeRequestId(WP_REST_Request $request): string
 	{

@@ -94,7 +94,7 @@ class PromptBuilder
 	 * @param AgentConfig $agent The agent configuration.
 	 *
 	 * @return string
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function buildModeDirective(AgentConfig $agent): string
 	{
@@ -129,7 +129,7 @@ class PromptBuilder
 	 * @param AgentConfig $agent The agent configuration.
 	 *
 	 * @return string[] Valid ability names.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function resolveEmphasized(AgentConfig $agent): array
 	{

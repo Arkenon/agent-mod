@@ -170,7 +170,7 @@ class AIOrchestratorService
 	 * @param bool                              $approved              True to execute the pending calls, false to decline them.
 	 *
 	 * @return AgentResponse
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function resume(
 		AgentConfig $agent,
@@ -247,7 +247,7 @@ class AIOrchestratorService
 	 * @param array<int, array<string, string>> $attachments Attachments of the paused turn.
 	 *
 	 * @return void
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function savePendingState(AgentResponse $response, AgentConfig $agent, string $message, array $attachments): void
 	{

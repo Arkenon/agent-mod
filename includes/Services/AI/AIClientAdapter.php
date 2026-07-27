@@ -46,7 +46,7 @@ class AIClientAdapter
 	 * Live tool-call progress store.
 	 *
 	 * @var ProgressStore
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private ProgressStore $progressStore;
 
@@ -150,7 +150,7 @@ class AIClientAdapter
 	 * @param bool        $approved              True to execute the pending calls, false to decline them.
 	 *
 	 * @return AgentResponse
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function resume(
 		string $systemInstruction,
@@ -237,7 +237,7 @@ class AIClientAdapter
 	 * @param Message $message The paused model message.
 	 *
 	 * @return Message
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function buildDeclinedResponses(Message $message): Message
 	{
@@ -528,7 +528,7 @@ class AIClientAdapter
 	 * @param array<int, array<string, mixed>>  $runningCalls  Tool calls currently executing.
 	 *
 	 * @return void
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function reportProgress(
 		string $requestId,
@@ -672,7 +672,7 @@ class AIClientAdapter
 	 * @param string[] $allowlist Session-approved ability names.
 	 *
 	 * @return bool
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function isAutoApproved(string $name, array $allowlist): bool
 	{
@@ -692,7 +692,7 @@ class AIClientAdapter
 	 * @param string $name Ability name.
 	 *
 	 * @return bool True when the ability must be confirmed.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function isWriteAbility(string $name): bool
 	{

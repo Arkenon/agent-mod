@@ -128,7 +128,7 @@ final class AgentConfig
 	 * system instruction steers the agent away from making changes.
 	 *
 	 * @var string
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public string $mode;
 
@@ -139,7 +139,7 @@ final class AgentConfig
 	 * available); names are validated against the registry by the PromptBuilder.
 	 *
 	 * @var string[]
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public array $emphasizedAbilities;
 
@@ -147,7 +147,7 @@ final class AgentConfig
 	 * User-managed base system prompt, or built-in defaults.
 	 *
 	 * @var string
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public string $baseSystemPrompt;
 

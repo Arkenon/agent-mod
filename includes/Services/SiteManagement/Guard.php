@@ -12,7 +12,7 @@
  *
  * @package AgentMod
  * @subpackage Services\SiteManagement
- * @since x.x.x
+ * @since 1.1.0
  */
 
 namespace AgentMod\Services\SiteManagement;
@@ -31,7 +31,7 @@ class Guard
 	 * Knowing that lets us turn a failed check into a precise explanation.
 	 *
 	 * @var string[]
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private const FILE_MOD_CAPS = [
 		'install_plugins',
@@ -54,7 +54,7 @@ class Guard
 	 * changed conversationally.
 	 *
 	 * @var string[]
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private const WRITE_PROTECTED_OPTIONS = [
 		'siteurl',
@@ -84,7 +84,7 @@ class Guard
 	 * can answer questions about the site.
 	 *
 	 * @var string[]
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private const READ_PROTECTED_OPTIONS = [
 		// AgentMod's own configuration: without this the agent could rewrite its
@@ -98,7 +98,7 @@ class Guard
 	 * Targets credentials and transient caches.
 	 *
 	 * @var string
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private const SECRET_OPTION_PATTERN = '/^_transient_|^_site_transient_|^auth_|^wp_user_roles$|password|secret|_key$|api_key|token|salt|nonce|license/i';
 
@@ -108,7 +108,7 @@ class Guard
 	 * @param string $capability Capability to check.
 	 *
 	 * @return WP_Error|null Null when allowed.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function assertCapability(string $capability): ?WP_Error
 	{
@@ -151,7 +151,7 @@ class Guard
 	 * @param string $pluginFile Plugin file, e.g. "agent-mod/agent-mod.php".
 	 *
 	 * @return WP_Error|null Null when allowed.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function assertPluginNotProtected(string $pluginFile): ?WP_Error
 	{
@@ -181,7 +181,7 @@ class Guard
 	 * @param string $stylesheet Theme directory slug.
 	 *
 	 * @return WP_Error|null Null when allowed.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function assertThemeRemovable(string $stylesheet): ?WP_Error
 	{
@@ -225,7 +225,7 @@ class Guard
 	 * @param string $stylesheet Theme directory slug.
 	 *
 	 * @return WP_Error|null Null when allowed.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function assertThemeActivatable(string $stylesheet): ?WP_Error
 	{
@@ -255,7 +255,7 @@ class Guard
 	 * @param string $option Option name.
 	 *
 	 * @return bool
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function isReadProtectedOption(string $option): bool
 	{
@@ -270,7 +270,7 @@ class Guard
 		 *
 		 * @param string[] $protected Option names.
 		 *
-		 * @since x.x.x
+		 * @since 1.1.0
 		 */
 		$protected = (array) apply_filters('agent_mod_read_protected_options', self::READ_PROTECTED_OPTIONS);
 
@@ -289,7 +289,7 @@ class Guard
 	 * @param string $option Option name.
 	 *
 	 * @return bool
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function isWriteProtectedOption(string $option): bool
 	{
@@ -312,7 +312,7 @@ class Guard
 		 *
 		 * @param string[] $protected Option names.
 		 *
-		 * @since x.x.x
+		 * @since 1.1.0
 		 */
 		$protected = (array) apply_filters('agent_mod_write_protected_options', $protected);
 
@@ -325,7 +325,7 @@ class Guard
 	 * @param string $option Option name.
 	 *
 	 * @return WP_Error|null Null when allowed.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function assertOptionReadable(string $option): ?WP_Error
 	{
@@ -349,7 +349,7 @@ class Guard
 	 * @param string $option Option name.
 	 *
 	 * @return WP_Error|null Null when allowed.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function assertOptionWritable(string $option): ?WP_Error
 	{
@@ -382,7 +382,7 @@ class Guard
 	 * @param string $operation One of 'edit', 'promote', 'delete'.
 	 *
 	 * @return WP_Error|null Null when allowed.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function assertUserTarget(int $userId, string $operation): ?WP_Error
 	{
@@ -432,7 +432,7 @@ class Guard
 	 * @param string $role Role slug.
 	 *
 	 * @return WP_Error|null Null when allowed.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function assertRoleAssignable(string $role): ?WP_Error
 	{
@@ -489,7 +489,7 @@ class Guard
 	 * @param int $userId Target user ID.
 	 *
 	 * @return WP_Error|null Null when allowed.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function assertNotLastAdministrator(int $userId): ?WP_Error
 	{
@@ -523,7 +523,7 @@ class Guard
 	 * @param string $pluginFile Plugin file, e.g. "agent-mod/agent-mod.php".
 	 *
 	 * @return string Directory slug, or an empty string for single-file plugins.
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	public function pluginDirectory(string $pluginFile): string
 	{
@@ -540,7 +540,7 @@ class Guard
 	 * Plugin directories that may not be deactivated or deleted.
 	 *
 	 * @return string[]
-	 * @since x.x.x
+	 * @since 1.1.0
 	 */
 	private function protectedPluginDirectories(): array
 	{
@@ -559,7 +559,7 @@ class Guard
 		 *
 		 * @param string[] $directories Plugin directory slugs.
 		 *
-		 * @since x.x.x
+		 * @since 1.1.0
 		 */
 		return array_unique((array) apply_filters('agent_mod_protected_plugins', $directories));
 	}

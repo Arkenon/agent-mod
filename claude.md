@@ -217,7 +217,7 @@ and it enforces a layered, maintainable structure.
 - Check user permissions with `current_user_can()` before sensitive operations.
 - Optimize performance by minimizing database queries, using transients for caching, and loading assets conditionally.
 - Follow WordPress coding standards and PSR-4 autoloading.
-- If a new function, method or class generated, update documentation (class PhpDoc must include @package, @subpackage, @since tags). always set @since tag to "x.x.x"
+- If a new function, method or class generated, update documentation (class PhpDoc must include @package, @subpackage, @since tags). always set @since tag to "1.1.0"
 
 🛠 Development workflow:
 1. Install composer dependencies: `composer update`
