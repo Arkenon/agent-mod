@@ -18,7 +18,7 @@ export default function ChatModal() {
 
 	return (
 		<Modal
-			title={ strings.title || __( 'AgentMod Assistant', 'agent-mod' ) }
+			title={ strings.title || __( 'AgentMod Chat', 'agent-mod' ) }
 			onRequestClose={ closeChat }
 			className="agent-mod-chat__modal"
 			size="large"

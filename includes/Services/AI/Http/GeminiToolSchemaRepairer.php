@@ -3,20 +3,33 @@
 /**
  * Gemini tool-schema repairer.
  *
- * Works around a strictness difference in the Gemini generateContent endpoint:
- * a function declaration's `parameters.properties` must be a JSON object (map),
- * even when the ability takes no input. WordPress abilities that declare an empty
- * input schema (`'properties' => array()`) are serialised by PHP/`json_encode` as
- * an empty JSON array (`[]`) rather than an object (`{}`), so Gemini rejects the
- * whole request with: "Cannot bind a list to map for field 'properties'". Other
- * providers (OpenAI, Anthropic) accept the array form, so this is Gemini-specific.
+ * Works around two strictness differences in the Gemini generateContent endpoint,
+ * both stemming from Gemini using a proto-based OpenAPI subset for function
+ * declarations that other providers (OpenAI, Anthropic) do not enforce:
+ *
+ * 1. A function declaration's `parameters.properties` must be a JSON object (map),
+ *    even when the ability takes no input. WordPress abilities that declare an
+ *    empty input schema (`'properties' => array()`) are serialised by PHP/
+ *    `json_encode` as an empty JSON array (`[]`) rather than an object (`{}`), so
+ *    Gemini rejects the whole request with: "Cannot bind a list to map for field
+ *    'properties'".
+ *
+ * 2. A property's `type` must be a single scalar string. Valid JSON Schema allows
+ *    a union of types (`'type' => ['string', 'integer', 'null']`), which abilities
+ *    like update-setting and update-option use for their free-form `value` input,
+ *    but Gemini's `type` is a non-repeating proto field and rejects the whole
+ *    request with: "Proto field is not repeating, cannot start list". Because one
+ *    malformed declaration fails the entire request, this breaks every tool in the
+ *    call, not just the ones with a union type. The union is collapsed to its first
+ *    non-null member (with `nullable: true` when `null` was present); server-side
+ *    validation in the manager re-coerces the value against its real schema.
  *
  * Rather than patching the third-party abilities or the AI Client connector (both
  * forbidden by the project rules and lost on update), this repairer hooks the
  * WordPress HTTP API — the AI Client routes every Gemini call through
- * wp_safe_remote_request() — and rewrites any empty `properties` array in the
- * outgoing tool schemas to an empty object. It is strictly scoped to the Gemini
- * generateContent endpoint, so it is a no-op for every other provider.
+ * wp_safe_remote_request() — and rewrites the outgoing tool schemas. It is
+ * strictly scoped to the Gemini generateContent endpoint, so it is a no-op for
+ * every other provider.
  *
  * The body is decoded WITHOUT associative mode so genuine empty objects elsewhere
  * in the payload keep their `{}` form on re-encode; only the broken empty
@@ -159,6 +172,12 @@ class GeminiToolSchemaRepairer implements ProviderToolCallRepairerInterface
                     continue;
                 }
 
+                if ('type' === $key && is_array($value)) {
+                    $node->type = $this->collapseTypeUnion($value, $node);
+                    $changed    = true;
+                    continue;
+                }
+
                 if ($this->normalizeSchema($value)) {
                     $changed = true;
                 }
@@ -172,6 +191,50 @@ class GeminiToolSchemaRepairer implements ProviderToolCallRepairerInterface
         }
 
         return $changed;
+    }
+
+    /**
+     * Collapses a JSON Schema `type` union into a single scalar type for Gemini.
+     *
+     * Gemini's `type` is a non-repeating proto field, so a union array must be
+     * reduced to one string. The first non-"null" member is chosen (the most
+     * general the ability declared), and `nullable` is set on the node when the
+     * union allowed null. When the union somehow contains only "null", "string" is
+     * used as a permissive fallback. The value the model then supplies is still
+     * validated and coerced against the setting/option's real schema server-side,
+     * so narrowing the wire type here does not lose correctness.
+     *
+     * @param array<int, mixed> $types The declared type union.
+     * @param stdClass          $node  The schema node (mutated to set `nullable`).
+     *
+     * @return string The single type to send to Gemini.
+     * @since 1.1.0
+     */
+    private function collapseTypeUnion(array $types, stdClass $node): string
+    {
+        $hasNull = false;
+        $primary = null;
+
+        foreach ($types as $type) {
+            if (! is_string($type)) {
+                continue;
+            }
+
+            if ('null' === $type) {
+                $hasNull = true;
+                continue;
+            }
+
+            if (null === $primary) {
+                $primary = $type;
+            }
+        }
+
+        if ($hasNull) {
+            $node->nullable = true;
+        }
+
+        return $primary ?? 'string';
     }
 
     /**

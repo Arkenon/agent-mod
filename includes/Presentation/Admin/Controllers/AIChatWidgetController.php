@@ -158,7 +158,7 @@ final class AIChatWidgetController
 				'connectorsUrl' => admin_url('options-connectors.php'),
 				'defaultAgent'  => [
 					'id'          => null,
-					'name'        => __('Default Agent', 'agent-mod'),
+					'name'        => __('AgentMod Assistant', 'agent-mod'),
 					'description' => __('Uses the AgentMod settings configuration.', 'agent-mod'),
 					'avatar'      => AGENT_MOD_URL . 'includes/Presentation/Admin/Assets/img/agent_mod_colored_icon.png',
 				],
@@ -174,7 +174,7 @@ final class AIChatWidgetController
 				],
 				'presetPrompts' => $this->settingsService->getPresetPrompts(),
 				'strings'      => [
-					'title'             => __('AgentMod Assistant', 'agent-mod'),
+					'title'             => __('AgentMod Chat', 'agent-mod'),
 					'placeholder'       => __('Type your message…', 'agent-mod'),
 					'send'              => __('Send', 'agent-mod'),
 					'stop'              => __('Stop', 'agent-mod'),

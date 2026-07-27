@@ -185,15 +185,23 @@ class Constants
 	{
 		return [
 			[
-				'label' => __('Create a draft post.', 'agent-mod'),
-				'prompt' => __('Create a draft post about ..... via using @agent-mod/create-post tool. Details: .....', 'agent-mod'),
+				'label' => __('Create a pattern', 'agent-mod'),
+				'prompt' => __('Create a hero section pattern includes ...... via using @agent-mod/create-pattern  tool.', 'agent-mod'),
 			],
 			[
-				'label' => __('Get site information of my web site.', 'agent-mod'),
-				'prompt' => __('What is my WordPress site information?', 'agent-mod'),
+				'label' => __('Create a post', 'agent-mod'),
+				'prompt' => __('Create a post about ..... via using @agent-mod/create-post tool. Details: .....', 'agent-mod'),
 			],
 			[
-				'label' => __('What is the environment information of my web site?', 'agent-mod'),
+				'label' => __('Install a slider plugin', 'agent-mod'),
+				'prompt' => __('Install a slider plugin via using @agent-mod/install-plugin tool. The plugin should provide a block to create slides with core blocks.', 'agent-mod'),
+			],
+			[
+				'label' => __('Change time zone of the site', 'agent-mod'),
+				'prompt' => __('Change site time zone as "Europe/Istanbul".', 'agent-mod'),
+			],
+			[
+				'label' => __('Get environment info', 'agent-mod'),
 				'prompt' => __('What is the environment information of my web site? Use related ability tools to fetch environment info.', 'agent-mod'),
 			],
 		];
