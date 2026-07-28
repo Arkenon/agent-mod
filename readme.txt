@@ -121,6 +121,7 @@ If you ask the agent to create a post, it will show you a confirmation modal sum
 * Added: Guards for site management operations — protected options, self-protection for AgentMod's own plugins, active/parent/default theme protection, last-administrator protection and privilege-escalation checks on user roles.
 * Fixed: An approved write action is now matched by ability name *and* arguments before it is exempted from confirmation. Previously the model could return different arguments on the confirmation turn and have them executed without a second prompt.
 * Fixed: Chat processing issues.
+* Improved: Connector repair system reliability and accuracy.
 
 = 1.0.9 =
 Added: Web search capability. Agent can search the web for information and use it in responses.
