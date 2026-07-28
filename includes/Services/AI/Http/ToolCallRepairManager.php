@@ -23,12 +23,13 @@ class ToolCallRepairManager
     /**
      * Master switch for every provider tool-call repairer.
      *
-     * TEMPORARY (test toggle): set to false to run with NO connector
-     * workarounds at all — Gemini thought-signature, Gemini tool-schema
-     * (empty-properties + union-type), and Anthropic thinking-signature — so the
-     * providers' raw behaviour can be observed and it can be confirmed which
-     * quirks are still present upstream. No code is removed; flip back to true to
-     * restore every repairer. When true, behaviour is exactly as before.
+     * Set to false to run with NO connector workarounds at all — the Google
+     * connector repairer (schema normalisation, thought-signature round-trip,
+     * web search + function calling) and the Anthropic connector repairer
+     * (thinking-signature round-trip, pause_turn continuation + text merge) —
+     * so the providers' raw behaviour can be observed. Individual repairers
+     * also carry their own switch, so a single provider's repairs can be
+     * retired independently once its fixed connector ships.
      *
      * @var bool
      * @since 1.1.0
@@ -49,21 +50,18 @@ class ToolCallRepairManager
      * Each provider repairer is injected by type and added to the set. New
      * providers are wired up by adding a constructor parameter here.
      *
-     * @param GeminiThoughtSignatureRepairer      $geminiThoughtSignatureRepairer      Gemini thought-signature repairer.
-     * @param GeminiToolSchemaRepairer            $geminiToolSchemaRepairer            Gemini tool-schema repairer.
-     * @param AnthropicThinkingSignatureRepairer  $anthropicThinkingSignatureRepairer  Anthropic thinking-signature repairer.
+     * @param GoogleConnectorRepairer    $googleConnectorRepairer    Google (Gemini) connector repairer.
+     * @param AnthropicConnectorRepairer $anthropicConnectorRepairer Anthropic (Claude) connector repairer.
      *
      * @since 1.0.0
      */
     public function __construct(
-        GeminiThoughtSignatureRepairer $geminiThoughtSignatureRepairer,
-        GeminiToolSchemaRepairer $geminiToolSchemaRepairer,
-        AnthropicThinkingSignatureRepairer $anthropicThinkingSignatureRepairer
+        GoogleConnectorRepairer $googleConnectorRepairer,
+        AnthropicConnectorRepairer $anthropicConnectorRepairer
     ) {
         $this->repairers = [
-            $geminiThoughtSignatureRepairer,
-            $geminiToolSchemaRepairer,
-            $anthropicThinkingSignatureRepairer,
+            $googleConnectorRepairer,
+            $anthropicConnectorRepairer,
         ];
     }
 
@@ -75,8 +73,8 @@ class ToolCallRepairManager
      */
     public function register(): void
     {
-        // Temporarily disabled via the master switch: no repairer is registered,
-        // so every request goes to the provider unmodified.
+        // With the master switch off no repairer is registered, so every
+        // request goes to the provider unmodified.
         if (! self::REPAIRS_ENABLED) {
             return;
         }

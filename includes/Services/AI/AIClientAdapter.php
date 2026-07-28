@@ -24,7 +24,6 @@ use AgentMod\Services\AI\Http\ToolCallRepairManager;
 use WordPress\AiClient\Messages\DTO\Message;
 use WordPress\AiClient\Messages\DTO\MessagePart;
 use WordPress\AiClient\Messages\DTO\UserMessage;
-use WordPress\AiClient\Providers\Models\DTO\ModelConfig;
 use WordPress\AiClient\Results\DTO\GenerativeAiResult;
 use WordPress\AiClient\Tools\DTO\FunctionCall;
 use WordPress\AiClient\Tools\DTO\FunctionResponse;
@@ -35,19 +34,6 @@ defined('ABSPATH') || exit;
 
 class AIClientAdapter
 {
-	/**
-	 * TEMPORARY test toggle for the Gemini web-search workaround.
-	 *
-	 * When false, the Gemini-only `toolConfig.includeServerSideToolInvocations`
-	 * customOption is NOT sent, so googleSearch + function calling hits the API's
-	 * raw behaviour. Native web search (using_web_search) is unaffected. Flip back
-	 * to true to restore the workaround. No code is removed.
-	 *
-	 * @var bool
-	 * @since 1.1.0
-	 */
-	private const GEMINI_WEB_SEARCH_WORKAROUND_ENABLED = true;
-
 	/**
 	 * Provider tool-call repair manager.
 	 *
@@ -381,7 +367,7 @@ class AIClientAdapter
 
 			// Enable the provider's native web search when requested.
 			if ($webSearchEnabled) {
-				$this->applyWebSearch($builder, $provider);
+				$this->applyWebSearch($builder);
 			}
 
 			$result = $builder->generate_result();
@@ -475,7 +461,7 @@ class AIClientAdapter
 		// Keep web search available on the forced-text final pass so the answer
 		// can still ground on live results even after the tool-call limit.
 		if ($webSearchEnabled) {
-			$this->applyWebSearch($finalBuilder, $provider);
+			$this->applyWebSearch($finalBuilder);
 		}
 
 		$finalResult = $finalBuilder->generate_result();
@@ -504,35 +490,19 @@ class AIClientAdapter
 	 *
 	 * The single WebSearch config is translated by each connector into its own
 	 * server tool (OpenAI web_search, Google googleSearch, …), so no
-	 * provider-specific payload is built here.
+	 * provider-specific payload is built here. The Gemini requirement to enable
+	 * `toolConfig.includeServerSideToolInvocations` when googleSearch is combined
+	 * with function calling is handled by GoogleConnectorRepairer at the HTTP
+	 * layer, keeping this adapter provider-agnostic.
 	 *
-	 * Google/Gemini exception: when a built-in server tool (googleSearch) is
-	 * combined with function calling (our abilities), the Gemini API rejects the
-	 * request with "enable tool_config.include_server_side_tool_invocations".
-	 * The Google connector does not expose that flag, so we pass it through the
-	 * SDK's sanctioned customOptions channel, which the connector splices
-	 * verbatim into the request body (no third-party code is modified). This is
-	 * scoped to Google only — sending the flag to other providers would add an
-	 * unknown parameter and break them.
-	 *
-	 * @param WP_AI_Client_Prompt_Builder $builder  WP AI Client prompt builder.
-	 * @param string                      $provider Provider id, or '' for auto-select.
+	 * @param WP_AI_Client_Prompt_Builder $builder WP AI Client prompt builder.
 	 *
 	 * @return void
 	 * @since 1.0.6
 	 */
-	private function applyWebSearch(WP_AI_Client_Prompt_Builder $builder, string $provider): void
+	private function applyWebSearch(WP_AI_Client_Prompt_Builder $builder): void
 	{
 		$builder->using_web_search(new WebSearch());
-
-		// Temporarily disabled via the test toggle: the Gemini-only
-		// includeServerSideToolInvocations workaround is skipped so the provider's
-		// raw behaviour can be observed. Native web search above is unaffected.
-		if (self::GEMINI_WEB_SEARCH_WORKAROUND_ENABLED && in_array($provider, ['google', 'gemini'], true)) {
-			$config = new ModelConfig();
-			$config->setCustomOption('toolConfig', ['includeServerSideToolInvocations' => true]);
-			$builder->using_model_config($config);
-		}
 	}
 
 	/**
