@@ -285,8 +285,7 @@ class AbilityRegistrarService
 					'properties' => [
 						'post_type'      => [
 							'type'        => 'string',
-							'enum'        => ['post', 'page', 'any'],
-							'description' => __('"post", "page", or "any" (default).', 'agent-mod'),
+							'description' => __('Any registered post type slug (e.g. "post", "page", or a custom post type), or "any" for all public post types. Default "post".', 'agent-mod'),
 						],
 						'posts_per_page' => [
 							'type'        => 'integer',
@@ -332,7 +331,7 @@ class AbilityRegistrarService
 			'agent-mod/get-post',
 			[
 				'label'               => __('Get Post or Page', 'agent-mod'),
-				'description'         => __('Returns a post/page raw block markup as html by post_id. Use list-posts to find post_id first. The returned html can be modified and passed straight back to update-post as the html parameter.', 'agent-mod'),
+				'description'         => __('Returns a post raw block markup as html by post_id. Use list-posts to find post_id first. The returned html can be modified and passed straight back to update-post as the html parameter.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeGetPost'],
 				'permission_callback' => static function (): bool {
@@ -342,9 +341,13 @@ class AbilityRegistrarService
 					'type'       => 'object',
 					'required'   => ['post_id'],
 					'properties' => [
-						'post_id' => [
+						'post_id'   => [
 							'type'        => 'integer',
 							'description' => __('Post/page ID from list-posts.', 'agent-mod'),
+						],
+						'post_type' => [
+							'type'        => 'string',
+							'description' => __('The expected post type of post_id (e.g. "post", "page", or a custom post type). Default "post".', 'agent-mod'),
 						],
 					],
 				],
@@ -423,7 +426,7 @@ class AbilityRegistrarService
 			'agent-mod/update-post',
 			[
 				'label'               => __('Update Post or Page', 'agent-mod'),
-				'description'         => __('Saves content to a post/page. Provide post_id and html. The html parameter must be complete, valid serialized block markup; it is parsed with parse_blocks() and re-serialized as-is — attribute/innerHTML consistency is NOT validated server-side.', 'agent-mod'),
+				'description'         => __('Saves content to a post. Provide post_id and html. The html parameter must be complete, valid serialized block markup; it is parsed with parse_blocks() and re-serialized as-is — attribute/innerHTML consistency is NOT validated server-side.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeUpdatePost'],
 				'permission_callback' => static function (): bool {
@@ -433,15 +436,19 @@ class AbilityRegistrarService
 					'type'       => 'object',
 					'required'   => ['post_id', 'html'],
 					'properties' => [
-						'post_id' => [
+						'post_id'   => [
 							'type'        => 'integer',
 							'description' => __('Post/page ID from get-post.', 'agent-mod'),
 						],
-						'html'    => [
+						'post_type' => [
+							'type'        => 'string',
+							'description' => __('The expected post type of post_id (e.g. "post", "page", or a custom post type). Default "post".', 'agent-mod'),
+						],
+						'html'      => [
 							'type'        => 'string',
 							'description' => __('Serialized block markup (WordPress block comment format). Use the output of get-post for round-trip editing. Replaces existing content entirely.', 'agent-mod'),
 						],
-						'title'   => [
+						'title'     => [
 							'type'        => 'string',
 							'description' => __('Optional. Updates the post/page title if provided.', 'agent-mod'),
 						],
@@ -1087,7 +1094,7 @@ class AbilityRegistrarService
 	public function executeListPosts($input = null): array
 	{
 		$input        = is_array($input) ? $input : [];
-		$postType     = isset($input['post_type']) ? $input['post_type'] : 'any';
+		$postType     = ! empty($input['post_type']) ? sanitize_key((string) $input['post_type']) : 'post';
 		$maxResults   = $this->settings_service->getMaxSearchResults();
 		$postsPerPage = isset($input['posts_per_page']) ? min(absint($input['posts_per_page']), $maxResults) : min(10, $maxResults);
 		$paged        = isset($input['paged']) ? max(absint($input['paged']), 1) : 1;
@@ -1095,10 +1102,8 @@ class AbilityRegistrarService
 		$orderby      = isset($input['orderby']) ? $input['orderby'] : 'title';
 		$order        = isset($input['order']) ? strtoupper((string) $input['order']) : 'ASC';
 
-		$resolvedPostType = ($postType === 'any') ? ['post', 'page'] : $postType;
-
 		$queryArgs = [
-			'post_type'      => $resolvedPostType,
+			'post_type'      => $postType,
 			'post_status'    => 'publish',
 			'posts_per_page' => $postsPerPage,
 			'paged'          => $paged,
@@ -1180,16 +1185,18 @@ class AbilityRegistrarService
 			];
 		}
 
-		$postId = absint($input['post_id']);
-		$post   = get_post($postId);
+		$postId   = absint($input['post_id']);
+		$postType = ! empty($input['post_type']) ? sanitize_key((string) $input['post_type']) : 'post';
+		$post     = get_post($postId);
 
-		if (! $post || ! in_array($post->post_type, ['post', 'page'], true)) {
+		if (! $post || $post->post_type !== $postType) {
 			return [
 				'success' => false,
 				'error'   => sprintf(
-					/* translators: %d: post ID */
-					__('Post/page with ID %d not found or is not a post/page type. For templates use get-template instead.', 'agent-mod'),
-					$postId
+					/* translators: 1: post ID, 2: expected post type */
+					__('Post with ID %1$d not found or is not of type "%2$s". For templates use get-template instead.', 'agent-mod'),
+					$postId,
+					$postType
 				),
 			];
 		}
@@ -1283,16 +1290,18 @@ class AbilityRegistrarService
 			return ['success' => false, 'error' => __('post_id and html are required.', 'agent-mod')];
 		}
 
-		$postId = absint($input['post_id']);
-		$post   = get_post($postId);
+		$postId   = absint($input['post_id']);
+		$postType = ! empty($input['post_type']) ? sanitize_key((string) $input['post_type']) : 'post';
+		$post     = get_post($postId);
 
-		if (! $post || ! in_array($post->post_type, ['post', 'page'], true)) {
+		if (! $post || $post->post_type !== $postType) {
 			return [
 				'success' => false,
 				'error'   => sprintf(
-					/* translators: %d: post ID */
-					__('Post/page with ID %d not found or is not a post/page type. For templates use add-or-update-template instead.', 'agent-mod'),
-					$postId
+					/* translators: 1: post ID, 2: expected post type */
+					__('Post with ID %1$d not found or is not of type "%2$s". For templates use add-or-update-template instead.', 'agent-mod'),
+					$postId,
+					$postType
 				),
 			];
 		}

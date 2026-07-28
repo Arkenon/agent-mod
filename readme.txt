@@ -116,6 +116,10 @@ Under the AgentMod menu in your WordPress admin, there is a dedicated **Abilitie
 If you ask the agent to create a post, it will show you a confirmation modal summarizing the action before anything is written to the database. You must explicitly approve the action for it to proceed.
 
 == Changelog ==
+= 1.1.1 =
+* Added: Post type parameter into get and list post or pages abilities.
+
+
 = 1.1.0 =
 * Added: Site Management abilities (new "AgentMod — Site Management" category, 24 abilities) covering plugins, themes, settings/options, system status, cron and users — the native equivalent of the WP-CLI management commands, with no shell access required.
 * Added: Guards for site management operations — protected options, self-protection for AgentMod's own plugins, active/parent/default theme protection, last-administrator protection and privilege-escalation checks on user roles.
