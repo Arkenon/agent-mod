@@ -137,6 +137,106 @@ class ProviderInfoService
 	}
 
 	/**
+	 * Returns the already-cached text-generation models for a provider.
+	 *
+	 * Unlike getTextModels() this never talks to the provider: a cold cache
+	 * simply yields an empty list. Meant for callers that run on every request
+	 * (e.g. NCF field registration) and must not pay for a network round trip.
+	 *
+	 * @param string $providerId Provider id.
+	 *
+	 * @return array<int, array<string, string>>
+	 * @since 1.1.0
+	 */
+	public function getCachedTextModels(string $providerId): array
+	{
+		$providerId = sanitize_key($providerId);
+
+		if ('' === $providerId) {
+			return [];
+		}
+
+		$cached = get_transient(self::MODELS_CACHE_PREFIX . $providerId);
+
+		return is_array($cached) ? $cached : [];
+	}
+
+	/**
+	 * Returns every connected provider's text models as flat select options.
+	 *
+	 * A model implies its provider, so the two travel as a single opaque
+	 * "<provider>:<model>" value — split it again with splitModelValue(). This
+	 * keeps the provider/model pair impossible to desynchronise, whether it is
+	 * stored as a plugin setting or as agent post meta.
+	 *
+	 * @param bool $liveFetch Whether to fetch uncached model lists from the
+	 *                        providers. Pass false on code paths that run
+	 *                        outside a dedicated admin screen.
+	 *
+	 * @return array<int, array<string, string>>
+	 * @since 1.1.0
+	 */
+	public function getModelOptions(bool $liveFetch = true): array
+	{
+		$options = [];
+
+		foreach ($this->getConnectedProviders() as $provider) {
+			$models = $liveFetch
+				? $this->getTextModels($provider['id'])
+				: $this->getCachedTextModels($provider['id']);
+
+			foreach ($models as $model) {
+				$options[] = [
+					'value' => $provider['id'] . ':' . $model['id'],
+					'label' => $provider['name'] . ' — ' . ('' !== $model['name'] ? $model['name'] : $model['id']),
+				];
+			}
+		}
+
+		return $options;
+	}
+
+	/**
+	 * Splits a "<provider>:<model>" option value into its two parts.
+	 *
+	 * Returns an empty provider for anything unparseable (including the
+	 * "use auto" / "use default" sentinels), which every consumer treats as
+	 * "no explicit choice — fall through".
+	 *
+	 * @param string $value Stored option value.
+	 *
+	 * @return array{provider: string, model: string|null}
+	 * @since 1.1.0
+	 */
+	public static function splitModelValue(string $value): array
+	{
+		$empty = ['provider' => '', 'model' => null];
+		$value = trim($value);
+
+		if ('' === $value || false === strpos($value, ':')) {
+			return $empty;
+		}
+
+		// Limit of 2: model ids may legitimately contain further colons.
+		[$provider, $model] = explode(':', $value, 2);
+
+		$provider = sanitize_key($provider);
+
+		if ('' === $provider) {
+			return $empty;
+		}
+
+		// Not sanitize_key(): model ids carry dots and slashes (e.g. "gpt-4.1",
+		// "models/gemini-2.5-flash") that sanitize_key() would strip.
+		$model = sanitize_text_field($model);
+
+		return [
+			'provider' => $provider,
+			'model'    => '' !== $model ? $model : null,
+		];
+	}
+
+	/**
 	 * Fetches the text-generation models for a provider from the AI Client.
 	 *
 	 * @param string $providerId Provider id.

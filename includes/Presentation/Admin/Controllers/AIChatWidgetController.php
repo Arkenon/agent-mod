@@ -149,6 +149,8 @@ final class AIChatWidgetController
 			$asset['version']
 		);
 
+		$defaultModel = $this->settingsService->getDefaultModel();
+
 		wp_localize_script(
 			self::HANDLE,
 			'agentModChat',
@@ -171,6 +173,10 @@ final class AIChatWidgetController
 					'siteContextEnabled' => $this->settingsService->isSiteContextEnabled(),
 					'abilitySource'      => $this->settingsService->getAbilitySource(),
 					'selectedAbilities'  => $this->settingsService->getAllowedAbilitiesDetailed(),
+					// Split into two keys so the model picker can pre-select the
+					// pair without re-parsing the stored "<provider>:<model>".
+					'defaultProvider'    => $defaultModel['provider'],
+					'defaultModel'       => $defaultModel['model'],
 				],
 				'presetPrompts' => $this->settingsService->getPresetPrompts(),
 				'strings'      => [

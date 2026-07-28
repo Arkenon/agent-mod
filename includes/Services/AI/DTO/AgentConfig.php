@@ -158,8 +158,8 @@ final class AgentConfig
 	 * @param string|null $role                   Agent role.
 	 * @param string|null $goal                   Agent goal.
 	 * @param string[]    $personality            Personality traits.
-	 * @param string      $provider               Provider id.
-	 * @param string|null $model                  Model id, or null for provider default.
+	 * @param string|null $provider               Provider id, or null to use the settings-configured default model's provider.
+	 * @param string|null $model                  Model id belonging to $provider, or null for that provider's own default.
 	 * @param string      $abilitySource          'all' or 'selected'.
 	 * @param string[]    $allowedAbilities       Allowed ability names for 'selected'.
 	 * @param int|null    $maxToolCalls           Max tool-calling iterations.
@@ -177,7 +177,7 @@ final class AgentConfig
 		?string $role = null,
 		?string $goal = null,
 		array $personality = [],
-		string $provider = Constants::AI_PROVIDER_DEFAULT,
+		?string $provider = null,
 		?string $model = null,
 		?string $abilitySource = 'all',
 		array $allowedAbilities = [],
@@ -196,8 +196,22 @@ final class AgentConfig
 		$this->role                   = $role ?? $settingsService->getRole();
 		$this->goal                   = $goal ?? $settingsService->getGoal();
 		$this->personality            = empty($personality) ? $settingsService->getPersonalityTraits() : $personality;
-		$this->provider               = $provider;
-		$this->model                  = $model;
+
+		// Provider and model always travel together: a model only makes sense
+		// for the provider that offers it. Either the caller supplies its own
+		// pair (chat toolbar pick, or a Pro agent's configured model), or the
+		// settings-configured default pair applies wholesale. They are never
+		// mixed, which would pair a model with a provider that has never heard
+		// of it.
+		if (null !== $provider && '' !== $provider) {
+			$this->provider = $provider;
+			$this->model    = $model;
+		} else {
+			$defaultModel   = $settingsService->getDefaultModel();
+			$this->provider = $defaultModel['provider'];
+			$this->model    = $defaultModel['model'];
+		}
+
 		$resolvedAbilitySource        = $abilitySource ?? $settingsService->getAbilitySource();
 		$this->abilitySource          = in_array($resolvedAbilitySource, ['all', 'selected'], true) ? $resolvedAbilitySource : 'all';
 		$this->allowedAbilities       = empty($allowedAbilities) ? $settingsService->getAllowedAbilities() : $allowedAbilities;
@@ -241,8 +255,8 @@ final class AgentConfig
 			isset($data['role']) ? trim((string) $data['role']) : null,
 			isset($data['goal']) ? trim((string) $data['goal']) : null,
 			array_values((array) $personality),
-			isset($data['provider']) ? (string) $data['provider'] : Constants::AI_PROVIDER_DEFAULT,
-			isset($data['model']) ? (string) $data['model'] : null,
+			isset($data['provider']) && '' !== $data['provider'] ? (string) $data['provider'] : null,
+			isset($data['model']) && '' !== $data['model'] ? (string) $data['model'] : null,
 			isset($data['abilitySource']) ? (string) $data['abilitySource'] : (isset($data['ability_source']) ? (string) $data['ability_source'] : null),
 			array_values((array) $allowed),
 			isset($data['maxToolCalls']) ? (int) $data['maxToolCalls'] : (isset($data['max_tool_calls']) ? (int) $data['max_tool_calls'] : null),

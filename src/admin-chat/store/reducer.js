@@ -53,12 +53,16 @@ export default function reducer( state = DEFAULT_STATE, action ) {
 			return { ...state, error: null };
 
 		case 'CLEAR_MESSAGES':
-			// A cleared chat is a new approval session too.
+			// A cleared chat is a new approval session too. Clearing the explicit
+			// provider/model pick lets getEffectiveProvider() fall through to the
+			// agent/site default again, so a "New Topic" chat re-preselects it.
 			return {
 				...state,
 				messages: [],
 				error: null,
 				sessionApprovedAbilities: [],
+				selectedProvider: null,
+				selectedModel: null,
 			};
 
 		case 'SET_MESSAGES':

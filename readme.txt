@@ -4,7 +4,7 @@ Tags: ai, agent, chatbot, assistant, abilities
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -118,7 +118,7 @@ If you ask the agent to create a post, it will show you a confirmation modal sum
 == Changelog ==
 = 1.1.1 =
 * Added: Post type parameter into get and list post or pages abilities.
-
+* Added: Default agent model selection in AgentMod settings page.
 
 = 1.1.0 =
 * Added: Site Management abilities (new "AgentMod — Site Management" category, 24 abilities) covering plugins, themes, settings/options, system status, cron and users — the native equivalent of the WP-CLI management commands, with no shell access required.

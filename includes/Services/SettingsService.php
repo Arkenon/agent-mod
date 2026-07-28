@@ -14,6 +14,7 @@
 namespace AgentMod\Services;
 
 use AgentMod\Common\Constants;
+use AgentMod\Services\AI\ProviderInfoService;
 
 defined('ABSPATH') || exit;
 
@@ -270,6 +271,23 @@ final class SettingsService
 		}
 
 		return $details;
+	}
+
+	/**
+	 * Returns the site-wide default AI model together with its provider.
+	 *
+	 * The setting stores a single opaque "<provider>:<model>" value, so the two
+	 * can never drift apart. An empty provider means "Use Auto" — let the AI
+	 * Client pick.
+	 *
+	 * @return array{provider: string, model: string|null}
+	 * @since 1.1.0
+	 */
+	public function getDefaultModel(): array
+	{
+		return ProviderInfoService::splitModelValue(
+			(string) ($this->getSettings()['agent_mod_ai_model']['default_model'] ?? '')
+		);
 	}
 
 	/**

@@ -526,12 +526,15 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 		agent.emphasizedAbilities = mentionedAbilities;
 	}
 
-	// A provider/model picked in the picker overrides the agent defaults so the
-	// WP AI Client uses exactly that provider and model for this request.
-	const pickedProvider = select.getSelectedProvider();
-	if ( pickedProvider ) {
-		agent.provider = pickedProvider;
-		agent.model    = select.getSelectedModel() || null;
+	// The effective model and its provider (explicit pick this session > agent's
+	// own default model > site-wide default model) are sent as a pair so the WP
+	// AI Client uses exactly that model for this request; true "Auto" omits both
+	// fields entirely, letting the server resolve it the same way as a defense
+	// in depth.
+	const picked = select.getEffectiveModelPair();
+	if ( picked.provider ) {
+		agent.provider = picked.provider;
+		agent.model    = picked.model;
 	}
 
 	dispatch.clearError();

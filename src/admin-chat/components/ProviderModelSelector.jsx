@@ -20,9 +20,14 @@ export default function ProviderModelSelector() {
 
 	const { selectedProvider, selectedModel, providers, providersLoaded, connectorsUrl } = useSelect( ( select ) => {
 		const storeSelect = select( STORE_NAME );
+		// The effective pair reflects what will actually be used for the next
+		// message: an explicit pick this session, else the selected agent's own
+		// default model (PRO), else the site-wide default model — so the picker
+		// stays honest about the resolved model even before the user touches it.
+		const effective = storeSelect.getEffectiveModelPair();
 		return {
-			selectedProvider: storeSelect.getSelectedProvider(),
-			selectedModel:    storeSelect.getSelectedModel(),
+			selectedProvider: effective.provider,
+			selectedModel:    effective.model,
 			providers:        storeSelect.getProviders(),
 			providersLoaded:  storeSelect.getProvidersLoaded(),
 			connectorsUrl:    storeSelect.getConnectorsUrl(),

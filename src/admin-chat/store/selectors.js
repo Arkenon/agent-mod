@@ -57,6 +57,57 @@ export function getSelectedMode( state ) {
 	return state.selectedMode;
 }
 
+/**
+ * The provider/model pair that will actually be used for the next message.
+ *
+ * A model implies its provider, so the two are always resolved together from a
+ * single source rather than layered independently — otherwise a site default
+ * model could end up paired with an agent's provider. Precedence: an explicit
+ * pick made in the model picker this session, else the selected agent's own
+ * default model (PRO), else the site-wide default model — mirroring the same
+ * agent-overrides-settings precedence already applied by getAbilitySource().
+ *
+ * @param {Object} state Store state.
+ * @return {{provider: string|null, model: string|null}} Resolved pair; a null provider means true "Auto".
+ */
+export function getEffectiveModelPair( state ) {
+	if ( state.selectedProvider ) {
+		return { provider: state.selectedProvider, model: state.selectedModel };
+	}
+
+	const agent = getSelectedAgent( state );
+	if ( agent && agent.defaultProvider ) {
+		return { provider: agent.defaultProvider, model: agent.defaultModel || null };
+	}
+
+	const defaults = config.defaults || {};
+	if ( defaults.defaultProvider ) {
+		return { provider: defaults.defaultProvider, model: defaults.defaultModel || null };
+	}
+
+	return { provider: null, model: null };
+}
+
+/**
+ * The provider half of getEffectiveModelPair().
+ *
+ * @param {Object} state Store state.
+ * @return {string|null} Provider id, or null for true "Auto".
+ */
+export function getEffectiveProvider( state ) {
+	return getEffectiveModelPair( state ).provider;
+}
+
+/**
+ * The model half of getEffectiveModelPair().
+ *
+ * @param {Object} state Store state.
+ * @return {string|null} Model id, or null for the provider's own default.
+ */
+export function getEffectiveModel( state ) {
+	return getEffectiveModelPair( state ).model;
+}
+
 export function getProgress( state ) {
 	return state.progress;
 }

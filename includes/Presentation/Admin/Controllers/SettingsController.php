@@ -11,6 +11,7 @@
 namespace AgentMod\Presentation\Admin\Controllers;
 
 use AgentMod\Common\Constants;
+use AgentMod\Services\AI\ProviderInfoService;
 use AgentMod\Services\SettingsService;
 
 defined('ABSPATH') || exit;
@@ -20,9 +21,12 @@ final class SettingsController
 
 	private SettingsService $settingsService;
 
-	public function __construct(SettingsService $settingsService)
+	private ProviderInfoService $providerInfo;
+
+	public function __construct(SettingsService $settingsService, ProviderInfoService $providerInfo)
 	{
 		$this->settingsService = $settingsService;
+		$this->providerInfo    = $providerInfo;
 
 		// NCF page and field registration.
 		add_filter('native_custom_fields_options_pages',       [$this, 'registerSettingsPage']);
@@ -183,6 +187,21 @@ final class SettingsController
 				],
 			],
 			[
+				'section_name'  => 'agent_mod_ai_model',
+				'section_title' => __('AI Model', 'agent-mod'),
+				'section_icon'  => 'admin-generic',
+				'fields'        => [
+					[
+						'fieldType'     => 'combobox',
+						'name'          => 'default_model',
+						'fieldLabel'    => __('Default AI Model', 'agent-mod'),
+						'fieldHelpText' => __('Pre-selected automatically whenever a new chat is started. Picking a model also picks its provider. Leave "Use Auto" to let the AI Client choose.', 'agent-mod'),
+						'options'       => $this->getModelOptions(),
+						'default'       => '',
+					],
+				],
+			],
+			[
 				'section_name'  => 'agent_mod_chat_panel',
 				'section_title' => __('Chat Panel', 'agent-mod'),
 				'section_icon'  => 'admin-comments',
@@ -304,6 +323,30 @@ final class SettingsController
 				],
 			],
 		];
+	}
+
+	/**
+	 * Get the default-model select options: "Use Auto" plus every text model
+	 * offered by the currently connected AI providers.
+	 *
+	 * A live fetch is safe here — registerSettingsFields() has already bailed
+	 * out for every screen except the AgentMod settings page, and the per
+	 * provider model lists are transient-cached for six hours afterwards.
+	 *
+	 * @return array<int, array<string, string>>
+	 * @since 1.1.0
+	 */
+	private function getModelOptions(): array
+	{
+		return array_merge(
+			[
+				[
+					'label' => __('Use Auto', 'agent-mod'),
+					'value' => '',
+				],
+			],
+			$this->providerInfo->getModelOptions()
+		);
 	}
 
 	/**
