@@ -34,6 +34,21 @@ class TermMetaRepository extends BaseRepository
 	}
 
 	/**
+	 * Check whether a meta key exists for a term
+	 * Unlike getTermMeta(), this tells a stored falsy value (false, 0, '') apart from a missing one.
+	 *
+	 * @param string $field_name
+	 * @param int $term_id
+	 *
+	 * @return bool
+	 * @since 1.3.3
+	 */
+	public function termMetaExists(string $field_name, int $term_id): bool
+	{
+		return metadata_exists('term', $term_id, $field_name);
+	}
+
+	/**
 	 * Save term meta
 	 *
 	 * @param int $term_id Term ID

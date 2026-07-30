@@ -33,6 +33,21 @@ class PostMetaRepository extends BaseRepository
 	}
 
 	/**
+	 * Check whether a meta key exists for a post
+	 * Unlike getPostMeta(), this tells a stored falsy value (false, 0, '') apart from a missing one.
+	 *
+	 * @param string $field_name
+	 * @param int $post_id
+	 *
+	 * @return bool
+	 * @since 1.3.3
+	 */
+	public function postMetaExists(string $field_name, int $post_id): bool
+	{
+		return metadata_exists('post', $post_id, $field_name);
+	}
+
+	/**
 	 * Save post meta
 	 *
 	 * @param int $post_id Post ID

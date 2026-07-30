@@ -580,10 +580,14 @@ class TermMetaService implements BaseMetaServiceInterface, TermMetaServiceInterf
 				echo '<h3>' . esc_html($section_title) . '</h3>';
 			}
 
+			// Resolve the values once so the hidden inputs and the React wrapper always agree.
+			// There is no term yet on the add form, so these are the configured default values.
+			$field_values = $this->getFieldValues($fields);
+
 			// Hidden fields
 			$hidden_fields_html = '';
 			foreach ($fields as $field) {
-				if (! isset($field['name'])) {
+				if (empty($field['name'])) {
 					continue;
 				}
 
@@ -592,11 +596,13 @@ class TermMetaService implements BaseMetaServiceInterface, TermMetaServiceInterf
 					continue;
 				}
 
-				$hidden_fields_html .= '<input type="hidden" name="' . esc_attr($field['name']) . '" value="">';
+				$value = Helper::formatHiddenInputValue($field_values[$field['name']] ?? null);
+
+				$hidden_fields_html .= '<input type="hidden" name="' . esc_attr($field['name']) . '" value="' . esc_attr($value) . '">';
 			}
 
 			// React wrapper for this section
-			echo '<div class="native-custom-fields-term-meta-wrapper" data-fields="' . esc_attr(wp_json_encode($fields)) . '" data-values="' . esc_attr(wp_json_encode($this->getFieldValues($fields))) . '"></div>';
+			echo '<div class="native-custom-fields-term-meta-wrapper" data-fields="' . esc_attr(wp_json_encode($fields)) . '" data-values="' . esc_attr(wp_json_encode($field_values)) . '"></div>';
 			echo wp_kses($hidden_fields_html, $allowed_html);
 			echo '</div>';
 		}
@@ -618,17 +624,16 @@ class TermMetaService implements BaseMetaServiceInterface, TermMetaServiceInterf
 				continue;
 			}
 
-			$get_default_value = $field['default'] ?? '';
+			$field_type        = $field['fieldType'] ?? 'text';
+			$get_default_value = Helper::castFieldValue($field['default'] ?? '', $field_type);
 
-			if ($id === 0) {
+			// Fall back to the default only when the meta key is missing: a stored false/0/''
+			// is a real value and must not be overwritten by the default.
+			if ($id === 0 || ! $this->termMetaRepository->termMetaExists($field['name'], $id)) {
 				$values[$field['name']] = $get_default_value;
 			} else {
-				$get_value = $this->termMetaRepository->getTermMeta($field['name'], $id);
-				if (empty($get_value)) {
-					$values[$field['name']] = $get_default_value;
-				} else {
-					$values[$field['name']] = $get_value;
-				}
+				$get_value              = $this->termMetaRepository->getTermMeta($field['name'], $id);
+				$values[$field['name']] = Helper::castFieldValue($get_value, $field_type);
 			}
 		}
 
@@ -674,6 +679,10 @@ class TermMetaService implements BaseMetaServiceInterface, TermMetaServiceInterf
 				continue;
 			}
 
+			// Resolve the values once so the hidden inputs and the React wrapper always agree,
+			// including the fields that fall back to their configured default value.
+			$field_values = $this->getFieldValues($fields, $term->term_id);
+
 			// Hidden fields
 			$hidden_fields_html = '';
 			foreach ($fields as $field) {
@@ -681,19 +690,14 @@ class TermMetaService implements BaseMetaServiceInterface, TermMetaServiceInterf
 					continue;
 				}
 
-				$value = $this->termMetaRepository->getTermMeta($field['name'], $term->term_id);
-
-				// Convert array values to JSON string
-				if (is_array($value)) {
-					$value = wp_json_encode($value);
-				}
-
 				//Skip fields that already have input tag
 				if (in_array($field['fieldType'] ?? '', Helper::fieldsAlreadyHaveInput(), true)) {
 					continue;
 				}
 
-				$hidden_fields_html .= '<input type="hidden" name="' . esc_attr($field['name']) . '" value="' . esc_attr((string) $value) . '">';
+				$value = Helper::formatHiddenInputValue($field_values[$field['name']] ?? null);
+
+				$hidden_fields_html .= '<input type="hidden" name="' . esc_attr($field['name']) . '" value="' . esc_attr($value) . '">';
 			}
 
 			// Section title with icon
@@ -714,7 +718,7 @@ class TermMetaService implements BaseMetaServiceInterface, TermMetaServiceInterf
 				wp_kses_post($html),
 				$section_header, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $section_header is already escaped via esc_html() and esc_attr() above.
 				esc_attr(wp_json_encode($fields)),
-				esc_attr(wp_json_encode($this->getFieldValues($fields, $term->term_id))),
+				esc_attr(wp_json_encode($field_values)),
 				wp_kses($hidden_fields_html, $allowed_html)
 			);
 		}

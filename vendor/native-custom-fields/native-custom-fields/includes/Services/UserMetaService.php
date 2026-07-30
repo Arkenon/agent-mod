@@ -157,17 +157,16 @@ class UserMetaService implements BaseMetaServiceInterface, UserMetaServiceInterf
 				continue;
 			}
 
-			$get_default_value = $field['default'] ?? '';
+			$field_type        = $field['fieldType'] ?? 'text';
+			$get_default_value = Helper::castFieldValue($field['default'] ?? '', $field_type);
 
-			if ($id === 0) {
+			// Fall back to the default only when the meta key is missing: a stored false/0/''
+			// is a real value and must not be overwritten by the default.
+			if ($id === 0 || ! $this->userMetaRepository->userMetaExists($field['name'], $id)) {
 				$values[$field['name']] = $get_default_value;
 			} else {
-				$get_value = $this->userMetaRepository->getUserMeta($field['name'], $id);
-				if (empty($get_value)) {
-					$values[$field['name']] = $get_default_value;
-				} else {
-					$values[$field['name']] = $get_value;
-				}
+				$get_value              = $this->userMetaRepository->getUserMeta($field['name'], $id);
+				$values[$field['name']] = Helper::castFieldValue($get_value, $field_type);
 			}
 		}
 
@@ -217,6 +216,10 @@ class UserMetaService implements BaseMetaServiceInterface, UserMetaServiceInterf
 				continue;
 			}
 
+			// Resolve the values once so the hidden inputs and the React wrapper always agree,
+			// including the fields that fall back to their configured default value.
+			$field_values = $this->getFieldValues($fields, $user->ID);
+
 			// Hidden fields
 			$hidden_fields_html = '';
 			foreach ($fields as $field) {
@@ -224,20 +227,15 @@ class UserMetaService implements BaseMetaServiceInterface, UserMetaServiceInterf
 					continue;
 				}
 
-				// Get the value of the field
-				$value = $this->userMetaRepository->getUserMeta($field['name'], $user->ID);
-
-				// Convert array values to JSON string
-				if (is_array($value)) {
-					$value = wp_json_encode($value);
-				}
-
 				//Skip fields that already have input tag
 				if (in_array($field['fieldType'] ?? '', Helper::fieldsAlreadyHaveInput(), true)) {
 					continue;
 				}
 
-				$hidden_fields_html .= '<input type="hidden" name="' . esc_attr($field['name']) . '" value="' . esc_attr((string) $value) . '">';
+				// Get the value of the field
+				$value = Helper::formatHiddenInputValue($field_values[$field['name']] ?? null);
+
+				$hidden_fields_html .= '<input type="hidden" name="' . esc_attr($field['name']) . '" value="' . esc_attr($value) . '">';
 			}
 
 			// Section title with icon
@@ -258,7 +256,7 @@ class UserMetaService implements BaseMetaServiceInterface, UserMetaServiceInterf
 				wp_kses_post($html),
 				$section_header, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $section_header is already escaped via esc_html() and esc_attr() above.
 				esc_attr(wp_json_encode($fields)),
-				esc_attr(wp_json_encode($this->getFieldValues($fields, $user->ID))),
+				esc_attr(wp_json_encode($field_values)),
 				wp_kses($hidden_fields_html, $allowed_html)
 			);
 		}

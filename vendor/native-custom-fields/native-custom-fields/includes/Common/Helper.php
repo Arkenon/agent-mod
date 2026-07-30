@@ -26,6 +26,13 @@ class Helper
     private const MULTILINE_FIELD_TYPES = ['textarea', 'code', 'wysiwyg'];
 
     /**
+     * Field types whose value is a boolean, both in the database and in the UI.
+     *
+     * @since 1.3.3
+     */
+    private const BOOLEAN_FIELD_TYPES = ['toggle', 'checkbox'];
+
+    /**
      * Get the raw (unslashed, unsanitized) value of a GET/POST/REQUEST input
      *
      * @param string $name Input name
@@ -455,7 +462,56 @@ class Helper
      */
     public static function fieldsAlreadyHaveInput(): array
     {
-        return ['text', 'textarea', 'number', 'input', 'range', 'combobox'];
+        return ['text', 'textarea', 'number', 'input', 'range'];
+    }
+
+    /**
+     * Cast a raw value (a stored meta value or a configured default) to the type its field expects.
+     *
+     * The builder collects the "Default Value" through a text input, so a toggle default arrives as
+     * the string "false"/"true". Passed to the UI as-is, "false" would be truthy and the toggle would
+     * render as on. Stored boolean meta values come back as '' / '1' and need the same treatment.
+     *
+     * @param mixed $value Raw value
+     * @param string $field_type Field type, e.g. 'text', 'toggle', 'checkbox'
+     *
+     * @return mixed Cast value, unchanged for field types that need no casting
+     * @since 1.3.3
+     */
+    public static function castFieldValue($value, string $field_type)
+    {
+        if (in_array($field_type, self::BOOLEAN_FIELD_TYPES, true)) {
+            return rest_sanitize_boolean($value);
+        }
+
+        return $value;
+    }
+
+    /**
+     * Format a field value for the hidden input that carries it back on form submit.
+     * Mirrors updateHiddenInputValue() in src/common/helper.js so that a value rendered by PHP and
+     * a value written by React end up in the same shape.
+     *
+     * @param mixed $value Field value
+     *
+     * @return string
+     * @since 1.3.3
+     */
+    public static function formatHiddenInputValue($value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        if (is_bool($value)) {
+            return $value ? '1' : '';
+        }
+
+        if (is_array($value)) {
+            return (string) wp_json_encode($value);
+        }
+
+        return (string) $value;
     }
 
     /**

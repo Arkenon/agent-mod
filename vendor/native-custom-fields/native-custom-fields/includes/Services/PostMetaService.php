@@ -447,19 +447,22 @@ class PostMetaService implements BaseMetaServiceInterface, PostMetaServiceInterf
 		// Add nonce for security
 		wp_nonce_field('native_custom_fields_post_meta_nonce', 'native_custom_fields_post_meta_nonce');
 
+		// Resolve the values once so the hidden inputs and the React wrapper always agree,
+		// including the fields that fall back to their configured default value.
+		$field_values = $this->getFieldValues($fields, $post->ID);
+
 		$hidden_fields_html = '';
 		foreach ($fields as $field) {
-			$value = $this->postMetaRepository->getPostMeta($field['name'], $post->ID);
-
-			// Convert array values to JSON string
-			if (is_array($value)) {
-				$value = wp_json_encode($value);
+			if (empty($field['name'])) {
+				continue;
 			}
 
 			//Skip fields that already have input tag
 			if (in_array($field['fieldType'] ?? '', Helper::fieldsAlreadyHaveInput(), true)) {
 				continue;
 			}
+
+			$value = Helper::formatHiddenInputValue($field_values[$field['name']] ?? null);
 
 			//Add hidden input for fields that not have an input tag
 			$hidden_fields_html .= '<input type="hidden" name="' . esc_attr($field['name']) . '" value="' . esc_attr($value) . '">';
@@ -475,7 +478,7 @@ class PostMetaService implements BaseMetaServiceInterface, PostMetaServiceInterf
 			wp_kses_post($html),
 			esc_attr($meta_box['id']),
 			esc_attr(wp_json_encode($fields)),
-			esc_attr(wp_json_encode($this->getFieldValues($fields, $post->ID))),
+			esc_attr(wp_json_encode($field_values)),
 		);
 
 		echo wp_kses($hidden_fields_html, $allowed_html);
@@ -575,17 +578,16 @@ class PostMetaService implements BaseMetaServiceInterface, PostMetaServiceInterf
 				continue;
 			}
 
-			$get_default_value = $field['default'] ?? '';
+			$field_type        = $field['fieldType'] ?? 'text';
+			$get_default_value = Helper::castFieldValue($field['default'] ?? '', $field_type);
 
-			if ($id === 0) {
+			// Fall back to the default only when the meta key is missing: a stored false/0/''
+			// is a real value and must not be overwritten by the default.
+			if ($id === 0 || ! $this->postMetaRepository->postMetaExists($field['name'], $id)) {
 				$values[$field['name']] = $get_default_value;
 			} else {
-				$get_value = $this->postMetaRepository->getPostMeta($field['name'], $id);
-				if (empty($get_value)) {
-					$values[$field['name']] = $get_default_value;
-				} else {
-					$values[$field['name']] = $get_value;
-				}
+				$get_value              = $this->postMetaRepository->getPostMeta($field['name'], $id);
+				$values[$field['name']] = Helper::castFieldValue($get_value, $field_type);
 			}
 		}
 

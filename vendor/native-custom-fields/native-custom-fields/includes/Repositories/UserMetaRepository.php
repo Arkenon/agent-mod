@@ -33,6 +33,21 @@ class UserMetaRepository extends BaseRepository
 	}
 
 	/**
+	 * Check whether a meta key exists for a user
+	 * Unlike getUserMeta(), this tells a stored falsy value (false, 0, '') apart from a missing one.
+	 *
+	 * @param string $key
+	 * @param int $user_id
+	 *
+	 * @return bool
+	 * @since 1.3.3
+	 */
+	public function userMetaExists(string $key, int $user_id): bool
+	{
+		return metadata_exists('user', $user_id, $key);
+	}
+
+	/**
 	 * Save user meta
 	 *
 	 * @param int $user_id User ID
