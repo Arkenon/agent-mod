@@ -7,6 +7,10 @@
  * system prompt) with optional site context into a single system instruction
  * string passed to the AI provider.
  *
+ * Personality traits are printed as a comma-separated line; any trait that
+ * arrived with a description (see AgentConfig::$personalityDetails) also gets a
+ * bullet spelling out what it means.
+ *
  * @package AgentMod
  * @subpackage Services\AI
  * @since 1.0.0
@@ -20,6 +24,14 @@ defined('ABSPATH') || exit;
 
 class PromptBuilder
 {
+	/**
+	 * Most per-trait definitions spelled out in the personality section.
+	 *
+	 * @var int
+	 * @since 1.1.0
+	 */
+	private const MAX_PERSONALITY_BRIEFS = 10;
+
 	/**
 	 * Builds the full system instruction for an agent.
 	 *
@@ -53,7 +65,18 @@ class PromptBuilder
 		if (! empty($agent->personality)) {
 			$traits = implode(', ', array_map('trim', $agent->personality));
 			/* translators: %s: comma-separated personality traits. */
-			$sections[] = sprintf(__('Personality and tone: %s.', 'agent-mod'), $traits);
+			$personality = sprintf(__('Personality and tone: %s.', 'agent-mod'), $traits);
+
+			// Traits that came with a definition get spelled out underneath, so
+			// the model works from what the trait was meant to mean rather than
+			// from its own reading of the adjective. Traits without one still
+			// appear in the line above, exactly as before.
+			$briefs = $this->buildPersonalityBriefs($agent);
+			if ('' !== $briefs) {
+				$personality .= "\n" . $briefs;
+			}
+
+			$sections[] = $personality;
 		}
 
 		if (! empty($siteContext)) {
@@ -83,6 +106,49 @@ class PromptBuilder
 		$instruction = implode("\n\n", array_filter($sections));
 
 		return (string) apply_filters('agent_mod_system_prompt', $instruction, $agent);
+	}
+
+	/**
+	 * Builds the per-trait definition lines for the personality section.
+	 *
+	 * Returns an empty string when no trait carries a description, which is the
+	 * case for the settings-configured defaults — the personality section then
+	 * looks exactly as it always has.
+	 *
+	 * Order follows $agent->personality rather than the details array so the
+	 * bullets match the comma-separated line above them.
+	 *
+	 * @param AgentConfig $agent The agent configuration.
+	 *
+	 * @return string
+	 * @since 1.1.0
+	 */
+	private function buildPersonalityBriefs(AgentConfig $agent): string
+	{
+		if (empty($agent->personalityDetails)) {
+			return '';
+		}
+
+		$lines = [];
+
+		foreach ($agent->personality as $label) {
+			$label       = trim($label);
+			$description = $agent->personalityDetails[$label] ?? '';
+
+			if ('' === $description) {
+				continue;
+			}
+
+			$lines[] = sprintf('- %s: %s', $label, $description);
+
+			// A tone brief that runs past this is no longer a tone brief, and it
+			// is re-sent on every request. The labels are all still listed above.
+			if (count($lines) >= self::MAX_PERSONALITY_BRIEFS) {
+				break;
+			}
+		}
+
+		return implode("\n", $lines);
 	}
 
 	/**

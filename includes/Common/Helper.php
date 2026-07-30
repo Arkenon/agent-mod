@@ -87,13 +87,13 @@ class Helper
 	}
 
 	/**
-	 * Returns the standard personality trait checkbox options array.
+	 * Returns the stock personality traits as an NCF token field suggestion list.
 	 *
-	 * @return string
+	 * @return string Comma-separated trait names.
 	 * @since 1.0.5
 	 */
 	public static function personalityTraitOptions(): string
 	{
-		return 'helpful, friendly, professional, corporate, persuasive, curious, patient, analytical';
+		return 'Helpful, Friendly, Professional, Corporate, Persuasive, Curious, Patient, Analytical';
 	}
 }

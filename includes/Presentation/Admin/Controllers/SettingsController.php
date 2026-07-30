@@ -11,6 +11,7 @@
 namespace AgentMod\Presentation\Admin\Controllers;
 
 use AgentMod\Common\Constants;
+use AgentMod\Common\Helper;
 use AgentMod\Services\AI\ProviderInfoService;
 use AgentMod\Services\SettingsService;
 
@@ -142,7 +143,7 @@ final class SettingsController
 						'fieldLabel'              => __('Personality Traits', 'agent-mod'),
 						'fieldHelpText'           => __('Add personality traits.', 'agent-mod'),
 						'maxSuggestions'          => 10,
-						'suggestions'             => 'helpful, friendly, professional, corporate, persuasive, curious, patient, analytical',
+						'suggestions'             => Helper::personalityTraitOptions(),
 						'__experimentalExpandOnFocus' => true,
 					],
 					[

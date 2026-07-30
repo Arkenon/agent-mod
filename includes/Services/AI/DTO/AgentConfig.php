@@ -22,6 +22,14 @@ defined('ABSPATH') || exit;
 final class AgentConfig
 {
 	/**
+	 * Characters kept from a single personality trait description.
+	 *
+	 * @var int
+	 * @since 1.1.0
+	 */
+	public const MAX_PERSONALITY_DESCRIPTION_LENGTH = 500;
+
+	/**
 	 * Stored agent post ID, or null when the default (settings-based) agent runs.
 	 *
 	 * Carried on the DTO so consumers that only receive the config (e.g. the
@@ -60,10 +68,30 @@ final class AgentConfig
 	/**
 	 * Personality traits used to shape the tone.
 	 *
+	 * Always a flat list of labels, whether the caller supplied bare strings or
+	 * labelled traits — anything reading this property keeps working unchanged.
+	 * Descriptions, when supplied, land in $personalityDetails instead.
+	 *
 	 * @var string[]
 	 * @since 1.0.0
 	 */
 	public array $personality;
+
+	/**
+	 * Descriptions explaining what each personality trait means, keyed by label.
+	 *
+	 * A bare adjective leaves the model to invent its own reading of "corporate"
+	 * or "analytical". A caller that can say what it means — an extension whose
+	 * traits are terms with descriptions, for instance — passes them here and
+	 * PromptBuilder spells them out in the system prompt.
+	 *
+	 * Only traits that actually carry a description appear; the array is empty
+	 * for the settings-configured defaults, which are plain words.
+	 *
+	 * @var array<string, string>
+	 * @since 1.1.0
+	 */
+	public array $personalityDetails = [];
 
 	/**
 	 * AI provider id (e.g. "gemini", empty string means "auto").
@@ -157,7 +185,9 @@ final class AgentConfig
 	 * @param string|null $name                   Agent name.
 	 * @param string|null $role                   Agent role.
 	 * @param string|null $goal                   Agent goal.
-	 * @param string[]    $personality            Personality traits.
+	 * @param array       $personality            Personality traits. Each entry is either a
+	 *                                            plain label, or an array shaped
+	 *                                            {label: string, description?: string}.
 	 * @param string|null $provider               Provider id, or null to use the settings-configured default model's provider.
 	 * @param string|null $model                  Model id belonging to $provider, or null for that provider's own default.
 	 * @param string      $abilitySource          'all' or 'selected'.
@@ -195,7 +225,12 @@ final class AgentConfig
 		$this->name                   = $name ?? Constants::AI_AGENT_DEFAULT_NAME;
 		$this->role                   = $role ?? $settingsService->getRole();
 		$this->goal                   = $goal ?? $settingsService->getGoal();
-		$this->personality            = empty($personality) ? $settingsService->getPersonalityTraits() : $personality;
+
+		// Normalised here rather than in fromArray() so a caller that builds the
+		// DTO directly gets the same treatment.
+		[$this->personality, $this->personalityDetails] = self::splitPersonality(
+			empty($personality) ? $settingsService->getPersonalityTraits() : $personality
+		);
 
 		// Provider and model always travel together: a model only makes sense
 		// for the provider that offers it. Either the caller supplies its own
@@ -267,5 +302,50 @@ final class AgentConfig
 			isset($data['baseSystemPrompt']) ? (string) $data['baseSystemPrompt'] : null,
 			isset($data['id']) ? (int) $data['id'] : null
 		);
+	}
+
+	/**
+	 * Splits a mixed personality list into labels and their descriptions.
+	 *
+	 * Accepts both shapes so the two producers can differ without either having
+	 * to know about the other: the settings page stores plain words, while an
+	 * extension backing traits with real definitions passes
+	 * {label, description} entries. Labels always come out as a flat list, which
+	 * is what $personality has always been.
+	 *
+	 * @param array $traits Mixed list of labels and/or labelled traits.
+	 *
+	 * @return array{0: string[], 1: array<string, string>} Labels, then descriptions keyed by label.
+	 * @since 1.1.0
+	 */
+	private static function splitPersonality(array $traits): array
+	{
+		$labels  = [];
+		$details = [];
+
+		foreach ($traits as $trait) {
+			if (is_array($trait)) {
+				$label       = trim((string) ($trait['label'] ?? ''));
+				$description = trim((string) ($trait['description'] ?? ''));
+			} else {
+				$label       = trim((string) $trait);
+				$description = '';
+			}
+
+			if ('' === $label) {
+				continue;
+			}
+
+			$labels[] = $label;
+
+			if ('' !== $description) {
+				// Capped because this text is written by whoever defines the
+				// trait and is reused on every single request. Long enough for a
+				// couple of sentences, which is all a tone brief needs to be.
+				$details[$label] = mb_substr(wp_strip_all_tags($description), 0, self::MAX_PERSONALITY_DESCRIPTION_LENGTH);
+			}
+		}
+
+		return [array_values(array_unique($labels)), $details];
 	}
 }
