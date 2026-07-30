@@ -25,7 +25,7 @@ final class AgentConfig
 	 * Characters kept from a single personality trait description.
 	 *
 	 * @var int
-	 * @since 1.1.0
+	 * @since 1.1.2
 	 */
 	public const MAX_PERSONALITY_DESCRIPTION_LENGTH = 500;
 
@@ -89,7 +89,7 @@ final class AgentConfig
 	 * for the settings-configured defaults, which are plain words.
 	 *
 	 * @var array<string, string>
-	 * @since 1.1.0
+	 * @since 1.1.2
 	 */
 	public array $personalityDetails = [];
 
@@ -316,7 +316,7 @@ final class AgentConfig
 	 * @param array $traits Mixed list of labels and/or labelled traits.
 	 *
 	 * @return array{0: string[], 1: array<string, string>} Labels, then descriptions keyed by label.
-	 * @since 1.1.0
+	 * @since 1.1.2
 	 */
 	private static function splitPersonality(array $traits): array
 	{
