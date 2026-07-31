@@ -18,6 +18,7 @@ namespace AgentMod\Services;
 use WP_Error;
 use WP_Query;
 use WP_Block_Patterns_Registry;
+use WP_Theme_JSON;
 use WP_Theme_JSON_Resolver;
 
 defined('ABSPATH') || exit;
@@ -32,6 +33,36 @@ class AbilityRegistrarService
 	 */
 	private const CATEGORY = 'agent-mod';
 
+	/**
+	 * Global Styles preset paths mapped to the key carrying each preset's value.
+	 *
+	 * Mirrors WP_Theme_JSON::PRESETS_METADATA. In the user's wp_global_styles post
+	 * every one of these paths must hold a *flat list* of preset objects. Anything
+	 * else — a scalar, or a map keyed by origin (default/theme/custom) — makes
+	 * WP_Theme_JSON iterate a non-array while building the stylesheet and emit
+	 * "foreach() argument must be of type array|object" warnings on every page.
+	 *
+	 * @var array<string, string>
+	 * @since x.x.x
+	 */
+	private const PRESET_PATHS = [
+		'color.palette'           => 'color',
+		'color.gradients'         => 'gradient',
+		'color.duotone'           => 'colors',
+		'typography.fontSizes'    => 'size',
+		'typography.fontFamilies' => 'fontFamily',
+		'spacing.spacingSizes'    => 'size',
+		'shadow.presets'          => 'shadow',
+		'dimensions.aspectRatios' => 'ratio',
+	];
+
+	/**
+	 * Origins WP_Theme_JSON keys presets by internally, in precedence order.
+	 *
+	 * @var string[]
+	 * @since x.x.x
+	 */
+	private const PRESET_ORIGINS = ['default', 'theme', 'custom'];
 
 	/**
 	 * Inject Setting Service
@@ -730,7 +761,7 @@ class AbilityRegistrarService
 			'agent-mod/get-global-styles',
 			[
 				'label'               => __('Get Global Styles', 'agent-mod'),
-				'description'         => __('Returns the active theme\'s design tokens from theme.json (colors, typography, spacing). Use this before editing templates or patterns to know available preset slugs for block attributes.', 'agent-mod'),
+				'description'         => __('Returns the active theme\'s design tokens from theme.json (colors, typography, spacing). Use this before editing templates or patterns to know available preset slugs for block attributes. Presets are returned as flat lists — exactly the shape agent-mod/update-global-styles expects back.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeGetGlobalStyles'],
 				'permission_callback' => static function (): bool {
@@ -776,7 +807,7 @@ class AbilityRegistrarService
 			'agent-mod/update-global-styles',
 			[
 				'label'               => __('Update Global Styles', 'agent-mod'),
-				'description'         => __('Merges the provided settings and/or styles into the active theme\'s user overrides (wp_global_styles post). Only supplied keys are changed; everything else is preserved. Creates the post if it does not yet exist.', 'agent-mod'),
+				'description'         => __('Merges the provided settings and/or styles into the active theme\'s user overrides (wp_global_styles post). Only supplied keys are changed; everything else is preserved. Creates the post if it does not yet exist. Presets (palette, gradients, fontSizes, fontFamilies, spacingSizes, shadow presets) must be FLAT lists of objects, never numbers and never keyed by origin (default/theme/custom); passing a preset list replaces that list in full, so send every preset you want to keep.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeUpdateGlobalStyles'],
 				'permission_callback' => static function (): bool {
@@ -787,7 +818,47 @@ class AbilityRegistrarService
 					'properties' => [
 						'settings' => [
 							'type'        => 'object',
-							'description' => __('Partial settings object to deep-merge into global settings (e.g. {"color":{"palette":[...]}}).', 'agent-mod'),
+							'description' => __('Partial settings object to deep-merge into global settings, e.g. {"color":{"palette":[{"slug":"primary","name":"Primary","color":"#3d35e8"}]}}.', 'agent-mod'),
+							'properties'  => [
+								'color'      => [
+									'type'       => 'object',
+									'properties' => [
+										'palette'   => self::presetListSchema('color', __('CSS color value, e.g. #3d35e8.', 'agent-mod')),
+										'gradients' => self::presetListSchema('gradient', __('CSS gradient value, e.g. linear-gradient(135deg,#3d35e8 0%,#5b4de8 100%).', 'agent-mod')),
+										'duotone'   => [
+											'type'  => 'array',
+											'items' => [
+												'type'       => 'object',
+												'required'   => ['slug', 'colors'],
+												'properties' => [
+													'slug'   => ['type' => 'string'],
+													'name'   => ['type' => 'string'],
+													'colors' => ['type' => 'array', 'items' => ['type' => 'string']],
+												],
+											],
+										],
+									],
+								],
+								'typography' => [
+									'type'       => 'object',
+									'properties' => [
+										'fontSizes'    => self::presetListSchema('size', __('CSS length, e.g. 1.25rem.', 'agent-mod'), ['string', 'number']),
+										'fontFamilies' => self::presetListSchema('fontFamily', __('CSS font stack, e.g. "DM Sans", sans-serif. Add a fontFace array only for fonts already installed on the site.', 'agent-mod')),
+									],
+								],
+								'spacing'    => [
+									'type'       => 'object',
+									'properties' => [
+										'spacingSizes' => self::presetListSchema('size', __('CSS length, e.g. 1.5rem.', 'agent-mod'), ['string', 'number']),
+									],
+								],
+								'shadow'     => [
+									'type'       => 'object',
+									'properties' => [
+										'presets' => self::presetListSchema('shadow', __('CSS box-shadow value.', 'agent-mod')),
+									],
+								],
+							],
 						],
 						'styles'   => [
 							'type'        => 'object',
@@ -802,6 +873,7 @@ class AbilityRegistrarService
 						'post_id' => ['type' => 'integer'],
 						'created' => ['type' => 'boolean'],
 						'error'   => ['type' => 'string'],
+						'issues'  => ['type' => 'array', 'items' => ['type' => 'string']],
 					],
 				],
 				'meta'                => [
@@ -1772,8 +1844,13 @@ class AbilityRegistrarService
 		}
 
 		if (in_array('settings', $sections, true)) {
-			$context            = $origin === 'base' ? ['origin' => 'base'] : [];
-			$result['settings'] = wp_get_global_settings([], $context);
+			$context = $origin === 'base' ? ['origin' => 'base'] : [];
+
+			// wp_get_global_settings() hands back WP_Theme_JSON's *internal*
+			// representation, where presets sit under an origin key. Writing that
+			// shape back is what corrupts the user CPT, so the read side flattens
+			// it: what the model sees is what update-global-styles accepts.
+			$result['settings'] = $this->flattenSettingsPresets(wp_get_global_settings([], $context));
 		}
 
 		if (in_array('styles', $sections, true)) {
@@ -1818,38 +1895,91 @@ class AbilityRegistrarService
 			return ['success' => false, 'error' => __('At least one of "settings" or "styles" must be provided.', 'agent-mod')];
 		}
 
+		if (isset($input['settings']) && ! is_array($input['settings'])) {
+			return ['success' => false, 'error' => __('"settings" must be an object.', 'agent-mod')];
+		}
+
+		if (isset($input['styles']) && ! is_array($input['styles'])) {
+			return ['success' => false, 'error' => __('"styles" must be an object.', 'agent-mod')];
+		}
+
+		// Presets that are not flat lists of preset objects break WP_Theme_JSON on
+		// every front-end request, so they never reach the database: the payload is
+		// rejected and the offending paths are named back to the caller.
+		$issues           = [];
+		$incomingSettings = isset($input['settings'])
+			? $this->normalizeGlobalStylesSettings($input['settings'], $issues)
+			: [];
+
+		if (! empty($issues)) {
+			return [
+				'success' => false,
+				'error'   => __('Nothing was saved — the payload contains invalid preset data.', 'agent-mod') . ' ' . implode(' ', $issues),
+				'issues'  => $issues,
+			];
+		}
+
 		$theme   = wp_get_theme();
 		$userCpt = WP_Theme_JSON_Resolver::get_user_data_from_wp_global_styles($theme);
 
 		$current = [];
 		if (! empty($userCpt) && ! empty($userCpt['post_content'])) {
-			$current = json_decode($userCpt['post_content'], true) ?: [];
+			$decoded = json_decode($userCpt['post_content'], true);
+			$current = is_array($decoded) ? $decoded : [];
+		}
+
+		// Repair whatever an earlier write left behind before merging on top of it,
+		// so one good call is enough to heal an already-corrupted post.
+		if (isset($current['settings']) && is_array($current['settings'])) {
+			$discarded           = [];
+			$current['settings'] = $this->normalizeGlobalStylesSettings($current['settings'], $discarded);
 		}
 
 		if (isset($input['settings'])) {
-			$current['settings'] = $this->deepMerge($current['settings'] ?? [], $input['settings']);
+			$base                = isset($current['settings']) && is_array($current['settings']) ? $current['settings'] : [];
+			$current['settings'] = $this->deepMerge($base, $incomingSettings);
 		}
 
 		if (isset($input['styles'])) {
-			$current['styles'] = $this->deepMerge($current['styles'] ?? [], $input['styles']);
+			$base              = isset($current['styles']) && is_array($current['styles']) ? $current['styles'] : [];
+			$current['styles'] = $this->deepMerge($base, $input['styles']);
 		}
 
+		// Without a version WP_Theme_JSON_Schema::migrate() throws the whole payload
+		// away, and without the flag WP_Theme_JSON_Resolver ignores the post as
+		// unescaped content — either way the changes would silently do nothing.
+		if (! isset($current['version']) || ! is_int($current['version'])) {
+			$current['version'] = class_exists('WP_Theme_JSON') ? WP_Theme_JSON::LATEST_SCHEMA : 3;
+		}
+
+		$current['isGlobalStylesUserThemeJSON'] = true;
+
+		$json = wp_json_encode($current, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+		if (false === $json) {
+			return ['success' => false, 'error' => __('The merged global styles could not be encoded as JSON.', 'agent-mod')];
+		}
+
+		// wp_insert_post()/wp_update_post() expect slashed data and unslash before
+		// writing: an unslashed font stack such as "\"DM Sans\", sans-serif" would
+		// lose its backslashes and leave invalid JSON in post_content.
+		$json    = wp_slash($json);
 		$created = false;
 
 		if (! empty($userCpt['ID'])) {
 			$postId = wp_update_post([
 				'ID'           => (int) $userCpt['ID'],
-				'post_content' => wp_json_encode($current),
-			]);
+				'post_content' => $json,
+			], true);
 		} else {
 			$created = true;
 			$postId  = wp_insert_post([
-				'post_name'    => 'wp-global-styles-' . $theme->get_stylesheet(),
-				'post_title'   => 'Custom Styles',
+				'post_name'    => sprintf('wp-global-styles-%s', urlencode($theme->get_stylesheet())),
+				'post_title'   => 'Custom Styles', // Not translatable, matches core.
 				'post_type'    => 'wp_global_styles',
 				'post_status'  => 'publish',
-				'post_content' => wp_json_encode($current),
-			]);
+				'post_content' => $json,
+			], true);
 		}
 
 		if (is_wp_error($postId) || ! $postId) {
@@ -1857,7 +1987,18 @@ class AbilityRegistrarService
 			return ['success' => false, 'error' => $message];
 		}
 
-		WP_Theme_JSON_Resolver::clean_cached_data();
+		// The resolver finds the post through the wp_theme taxonomy; a new post
+		// without that term is invisible to it and a fresh one is created on every
+		// call until the lookup breaks on multiple matches.
+		if ($created) {
+			wp_set_object_terms((int) $postId, $theme->get_stylesheet(), 'wp_theme');
+		}
+
+		if (function_exists('wp_clean_theme_json_cache')) {
+			wp_clean_theme_json_cache();
+		} else {
+			WP_Theme_JSON_Resolver::clean_cached_data();
+		}
 
 		return [
 			'success' => true,
@@ -1979,14 +2120,385 @@ class AbilityRegistrarService
 	private function deepMerge(array $base, array $override): array
 	{
 		foreach ($override as $key => $value) {
-			if (is_array($value) && isset($base[$key]) && is_array($base[$key])) {
+			// Sequential arrays are leaf values here (preset lists, spacing.units):
+			// merging them by index would keep stale trailing entries, so a palette
+			// could never shrink. They replace the base value wholesale, which is
+			// also how WP_Theme_JSON::merge() treats them.
+			if (is_array($value) && ! $this->isList($value) && isset($base[$key]) && is_array($base[$key])) {
 				$base[$key] = $this->deepMerge($base[$key], $value);
-			} else {
-				$base[$key] = $value;
+				continue;
 			}
+
+			$base[$key] = $value;
 		}
 
 		return $base;
+	}
+
+	/**
+	 * Tells a sequential (list) array from an associative one.
+	 *
+	 * @param array<mixed> $value Array to test.
+	 *
+	 * @return bool True when the keys are 0..n-1, including for an empty array.
+	 * @since x.x.x
+	 */
+	private function isList(array $value): bool
+	{
+		if ([] === $value) {
+			return true;
+		}
+
+		return array_keys($value) === range(0, count($value) - 1);
+	}
+
+	/**
+	 * Builds the input schema for one preset list.
+	 *
+	 * @param string          $valueKey         Key carrying the preset value ('color', 'gradient', ...).
+	 * @param string          $valueDescription Human description of that value.
+	 * @param string|string[] $valueType        JSON schema type(s) accepted for the value.
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	private static function presetListSchema(string $valueKey, string $valueDescription, $valueType = 'string'): array
+	{
+		return [
+			'type'        => 'array',
+			'description' => __('Flat list of presets. Replaces the existing list in full — include every preset you want to keep.', 'agent-mod'),
+			'items'       => [
+				'type'       => 'object',
+				'required'   => ['slug', $valueKey],
+				'properties' => [
+					'slug'    => [
+						'type'        => 'string',
+						'description' => __('Stable identifier. It becomes has-{slug}-* class names and var:preset|...|{slug} references in block markup, so renaming one breaks every block using it.', 'agent-mod'),
+					],
+					'name'    => ['type' => 'string', 'description' => __('Label shown in the editor.', 'agent-mod')],
+					$valueKey => ['type' => $valueType, 'description' => $valueDescription],
+				],
+			],
+		];
+	}
+
+	/**
+	 * Flattens origin-keyed presets so a settings tree can be handed to the model.
+	 *
+	 * Purely structural: values that are not arrays are left untouched, so a
+	 * corrupted node stays visible in the output instead of being hidden.
+	 *
+	 * @param array<string, mixed> $settings Settings tree from wp_get_global_settings().
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	private function flattenSettingsPresets(array $settings): array
+	{
+		$settings = $this->flattenPresetNode($settings);
+
+		if (isset($settings['blocks']) && is_array($settings['blocks'])) {
+			foreach ($settings['blocks'] as $blockName => $blockNode) {
+				if (is_array($blockNode)) {
+					$settings['blocks'][$blockName] = $this->flattenPresetNode($blockNode);
+				}
+			}
+		}
+
+		return $settings;
+	}
+
+	/**
+	 * Flattens the origin-keyed presets of a single settings node.
+	 *
+	 * @param array<string, mixed> $node Root settings node or one settings.blocks.* node.
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	private function flattenPresetNode(array $node): array
+	{
+		foreach (self::PRESET_PATHS as $dotted => $valueKey) {
+			list($group, $leaf) = explode('.', $dotted);
+
+			if (! isset($node[$group][$leaf]) || ! is_array($node[$group][$leaf])) {
+				continue;
+			}
+
+			$node[$group][$leaf] = $this->flattenPresetOrigins($node[$group][$leaf]);
+		}
+
+		// spacingScale generates spacing presets and is keyed by origin too.
+		if (isset($node['spacing']['spacingScale']) && is_array($node['spacing']['spacingScale'])) {
+			$scale = $node['spacing']['spacingScale'];
+
+			if (! empty(array_intersect(array_keys($scale), self::PRESET_ORIGINS))) {
+				$flat = [];
+
+				foreach (self::PRESET_ORIGINS as $origin) {
+					if (isset($scale[$origin]) && is_array($scale[$origin])) {
+						$flat = array_replace($flat, $scale[$origin]);
+					}
+				}
+
+				$node['spacing']['spacingScale'] = $flat;
+			}
+		}
+
+		return $node;
+	}
+
+	/**
+	 * Collapses a preset value keyed by origin into a single flat list.
+	 *
+	 * Later origins win over earlier ones for the same slug, matching how
+	 * WP_Theme_JSON resolves the layers. Values that are already flat lists, and
+	 * associative arrays that are not keyed by origin, are returned untouched so
+	 * the caller can decide what to do with them.
+	 *
+	 * @param array<mixed> $presets Preset value taken from a settings node.
+	 *
+	 * @return array<mixed>
+	 * @since x.x.x
+	 */
+	private function flattenPresetOrigins(array $presets): array
+	{
+		if ($this->isList($presets)) {
+			return $presets;
+		}
+
+		if (empty(array_intersect(array_keys($presets), self::PRESET_ORIGINS))) {
+			return $presets;
+		}
+
+		$bySlug = [];
+
+		foreach (self::PRESET_ORIGINS as $origin) {
+			if (! isset($presets[$origin]) || ! is_array($presets[$origin])) {
+				continue;
+			}
+
+			foreach ($presets[$origin] as $preset) {
+				if (! is_array($preset) || ! isset($preset['slug']) || ! is_scalar($preset['slug'])) {
+					continue;
+				}
+
+				$bySlug[(string) $preset['slug']] = $preset;
+			}
+		}
+
+		return array_values($bySlug);
+	}
+
+	/**
+	 * Validates and normalizes a settings tree destined for the user's global styles.
+	 *
+	 * Every preset path is forced into the flat list of preset objects that
+	 * WP_Theme_JSON expects from the 'custom' origin. Invalid entries are dropped
+	 * and described in $issues; origin-keyed presets are flattened silently, since
+	 * writing a 'theme' or 'default' origin from the user layer would overwrite the
+	 * active theme's own presets.
+	 *
+	 * @param array<string, mixed> $settings Settings tree to normalize.
+	 * @param array<int, string>   $issues   Collects human-readable problem descriptions.
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	private function normalizeGlobalStylesSettings(array $settings, array &$issues): array
+	{
+		$settings = $this->normalizePresetNode($settings, 'settings', $issues);
+
+		if (isset($settings['blocks']) && is_array($settings['blocks'])) {
+			foreach ($settings['blocks'] as $blockName => $blockNode) {
+				if (is_array($blockNode)) {
+					$settings['blocks'][$blockName] = $this->normalizePresetNode(
+						$blockNode,
+						'settings.blocks.' . $blockName,
+						$issues
+					);
+				}
+			}
+		}
+
+		return $settings;
+	}
+
+	/**
+	 * Normalizes the presets of a single settings node.
+	 *
+	 * @param array<string, mixed> $node   Root settings node or one settings.blocks.* node.
+	 * @param string               $prefix Path prefix used in issue messages.
+	 * @param array<int, string>   $issues Collects human-readable problem descriptions.
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	private function normalizePresetNode(array $node, string $prefix, array &$issues): array
+	{
+		$emptied = [];
+
+		foreach (self::PRESET_PATHS as $dotted => $valueKey) {
+			list($group, $leaf) = explode('.', $dotted);
+
+			if (! isset($node[$group]) || ! is_array($node[$group]) || ! array_key_exists($leaf, $node[$group])) {
+				continue;
+			}
+
+			$label = $prefix . '.' . $dotted;
+			$value = $node[$group][$leaf];
+
+			if (! is_array($value)) {
+				$issues[] = sprintf(
+					/* translators: 1: settings path, 2: PHP type of the supplied value, 3: the supplied value. */
+					__('%1$s must be a list of preset objects but %2$s was given (%3$s).', 'agent-mod'),
+					$label,
+					gettype($value),
+					wp_json_encode($value)
+				);
+				unset($node[$group][$leaf]);
+				$emptied[$group] = true;
+				continue;
+			}
+
+			$value = $this->flattenPresetOrigins($value);
+
+			if (! $this->isList($value)) {
+				$issues[] = sprintf(
+					/* translators: 1: settings path, 2: comma separated list of the keys found. */
+					__('%1$s must be a list of preset objects, not an object keyed by %2$s.', 'agent-mod'),
+					$label,
+					implode(', ', array_slice(array_keys($value), 0, 5))
+				);
+				unset($node[$group][$leaf]);
+				$emptied[$group] = true;
+				continue;
+			}
+
+			$node[$group][$leaf] = $this->normalizePresetList($value, $valueKey, $label, $issues);
+		}
+
+		if (isset($node['spacing']) && is_array($node['spacing']) && array_key_exists('spacingScale', $node['spacing'])) {
+			$scale = $node['spacing']['spacingScale'];
+
+			if (! is_array($scale)) {
+				$issues[] = sprintf(
+					/* translators: 1: settings path, 2: PHP type of the supplied value. */
+					__('%1$s must be an object such as {"steps":7,"mediumStep":1.5,"unit":"rem","operator":"*","increment":1.5} but %2$s was given.', 'agent-mod'),
+					$prefix . '.spacing.spacingScale',
+					gettype($scale)
+				);
+				unset($node['spacing']['spacingScale']);
+				$emptied['spacing'] = true;
+			} elseif (! empty(array_intersect(array_keys($scale), self::PRESET_ORIGINS))) {
+				$flat = [];
+
+				foreach (self::PRESET_ORIGINS as $origin) {
+					if (isset($scale[$origin]) && is_array($scale[$origin])) {
+						$flat = array_replace($flat, $scale[$origin]);
+					}
+				}
+
+				$node['spacing']['spacingScale'] = $flat;
+			}
+		}
+
+		// A group left empty by the checks above would serialize as a JSON list
+		// where theme.json expects an object — the very confusion being removed.
+		foreach (array_keys($emptied) as $group) {
+			if (isset($node[$group]) && [] === $node[$group]) {
+				unset($node[$group]);
+			}
+		}
+
+		return $node;
+	}
+
+	/**
+	 * Validates the individual presets of one already-flattened preset list.
+	 *
+	 * @param array<int, mixed>  $presets  Flat list of candidate presets.
+	 * @param string             $valueKey Key carrying the preset value.
+	 * @param string             $label    Full settings path, used in issue messages.
+	 * @param array<int, string> $issues   Collects human-readable problem descriptions.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 * @since x.x.x
+	 */
+	private function normalizePresetList(array $presets, string $valueKey, string $label, array &$issues): array
+	{
+		$clean = [];
+
+		foreach ($presets as $index => $preset) {
+			$itemLabel = $label . '[' . $index . ']';
+
+			if (! is_array($preset)) {
+				$issues[] = sprintf(
+					/* translators: 1: settings path of the preset, 2: PHP type of the supplied value. */
+					__('%1$s must be an object with a slug but %2$s was given.', 'agent-mod'),
+					$itemLabel,
+					gettype($preset)
+				);
+				continue;
+			}
+
+			$slug = isset($preset['slug']) && is_scalar($preset['slug']) ? trim((string) $preset['slug']) : '';
+
+			if ('' === $slug) {
+				$issues[] = sprintf(
+					/* translators: %s: settings path of the preset. */
+					__('%s is missing a non-empty "slug".', 'agent-mod'),
+					$itemLabel
+				);
+				continue;
+			}
+
+			$preset['slug'] = $slug;
+
+			// Duotone is the one preset whose value is a list of colors rather than
+			// a single CSS value.
+			if ('colors' === $valueKey) {
+				$colors = [];
+
+				if (isset($preset['colors']) && is_array($preset['colors'])) {
+					foreach ($preset['colors'] as $color) {
+						if (is_scalar($color) && '' !== trim((string) $color)) {
+							$colors[] = (string) $color;
+						}
+					}
+				}
+
+				if (empty($colors)) {
+					$issues[] = sprintf(
+						/* translators: %s: settings path of the preset. */
+						__('%s needs a "colors" array holding at least one CSS color.', 'agent-mod'),
+						$itemLabel
+					);
+					continue;
+				}
+
+				$preset['colors'] = $colors;
+				$clean[]          = $preset;
+				continue;
+			}
+
+			$value = isset($preset[$valueKey]) && is_scalar($preset[$valueKey]) ? trim((string) $preset[$valueKey]) : '';
+
+			if ('' === $value) {
+				$issues[] = sprintf(
+					/* translators: 1: settings path of the preset, 2: expected key name. */
+					__('%1$s is missing a non-empty "%2$s" value; a preset without it is silently dropped by WordPress.', 'agent-mod'),
+					$itemLabel,
+					$valueKey
+				);
+				continue;
+			}
+
+			$preset[$valueKey] = $value;
+			$clean[]           = $preset;
+		}
+
+		return $clean;
 	}
 
 	/**

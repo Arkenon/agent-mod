@@ -75,7 +75,7 @@ class Constants
 	 *
 	 * @since 1.0.0
 	 */
-	public const AI_ATTACHMENT_MAX_COUNT = 5;
+	public const AI_ATTACHMENT_MAX_COUNT = 15;
 
 	/**
 	 * MIME types accepted as chat attachments.
@@ -95,6 +95,7 @@ class Constants
 		'application/pdf',
 		'text/plain',
 		'text/markdown',
+		'text/html',
 		'text/csv',
 	];
 
