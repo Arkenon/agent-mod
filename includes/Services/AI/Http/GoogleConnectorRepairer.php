@@ -68,9 +68,9 @@
 
 namespace AgentMod\Services\AI\Http;
 
-use stdClass;
-
 defined('ABSPATH') || exit;
+
+use stdClass;
 
 class GoogleConnectorRepairer implements ProviderToolCallRepairerInterface
 {

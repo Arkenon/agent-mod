@@ -102,7 +102,7 @@ class SystemManager
 			'environment' => [
 				'php_version'      => PHP_VERSION,
 				'mysql_version'    => $wpdb->db_version(),
-				'server_software'  => sanitize_text_field((string) ($_SERVER['SERVER_SOFTWARE'] ?? '')),
+				'server_software'  => sanitize_text_field(wp_unslash((string) ($_SERVER['SERVER_SOFTWARE'] ?? ''))),
 				'memory_limit'     => (string) ini_get('memory_limit'),
 				'max_execution_time' => (string) ini_get('max_execution_time'),
 				'debug_mode'       => defined('WP_DEBUG') && WP_DEBUG,
