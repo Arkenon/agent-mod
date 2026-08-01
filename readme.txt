@@ -4,7 +4,7 @@ Tags: ai, agent, chatbot, assistant, abilities
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.1.3
+Stable tag: 1.1.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -116,6 +116,11 @@ Under the AgentMod menu in your WordPress admin, there is a dedicated **Abilitie
 If you ask the agent to create a post, it will show you a confirmation modal summarizing the action before anything is written to the database. You must explicitly approve the action for it to proceed.
 
 == Changelog ==
+= 1.1.4 =
+* Fixed: Global Styles Ability-> Schema validation error for color presets.
+* Updated: Increased max attachment count from 5 to 15.
+* Added: 'text/html' mime type to supported image formats.
+
 = 1.1.3 =
 * Fixed: Errors and warnings Plugin Check found (2 errors, 1 warning).
 
