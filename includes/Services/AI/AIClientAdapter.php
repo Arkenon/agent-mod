@@ -17,9 +17,11 @@
 namespace AgentMod\Services\AI;
 
 use Throwable;
+use AgentMod\Common\Constants;
 use WP_AI_Client_Ability_Function_Resolver;
 use WP_Ability;
 use AgentMod\Services\AI\DTO\AgentResponse;
+use AgentMod\Services\AI\Http\HttpTimeoutManager;
 use AgentMod\Services\AI\Http\ToolCallRepairManager;
 use WordPress\AiClient\Messages\DTO\Message;
 use WordPress\AiClient\Messages\DTO\MessagePart;
@@ -51,17 +53,41 @@ class AIClientAdapter
 	private ProgressStore $progressStore;
 
 	/**
+	 * AI provider HTTP timeout manager.
+	 *
+	 * @var HttpTimeoutManager
+	 * @since 1.1.5
+	 */
+	private HttpTimeoutManager $httpTimeouts;
+
+	/**
+	 * In-loop history compactor.
+	 *
+	 * @var HistoryCompactor
+	 * @since 1.1.5
+	 */
+	private HistoryCompactor $historyCompactor;
+
+	/**
 	 * Constructor (PHP-DI autowired).
 	 *
-	 * @param ToolCallRepairManager $toolCallRepairs Provider tool-call repair manager.
-	 * @param ProgressStore         $progressStore   Live tool-call progress store.
+	 * @param ToolCallRepairManager $toolCallRepairs  Provider tool-call repair manager.
+	 * @param ProgressStore         $progressStore    Live tool-call progress store.
+	 * @param HttpTimeoutManager    $httpTimeouts     AI provider HTTP timeout manager.
+	 * @param HistoryCompactor      $historyCompactor In-loop history compactor.
 	 *
 	 * @since 1.0.0
 	 */
-	public function __construct(ToolCallRepairManager $toolCallRepairs, ProgressStore $progressStore)
-	{
-		$this->toolCallRepairs = $toolCallRepairs;
-		$this->progressStore   = $progressStore;
+	public function __construct(
+		ToolCallRepairManager $toolCallRepairs,
+		ProgressStore $progressStore,
+		HttpTimeoutManager $httpTimeouts,
+		HistoryCompactor $historyCompactor
+	) {
+		$this->toolCallRepairs  = $toolCallRepairs;
+		$this->progressStore    = $progressStore;
+		$this->httpTimeouts     = $httpTimeouts;
+		$this->historyCompactor = $historyCompactor;
 	}
 
 	/**
@@ -101,6 +127,7 @@ class AIClientAdapter
 
 		// Compensate for provider connectors that drop tool-call metadata across turns.
 		$this->toolCallRepairs->register();
+		$this->httpTimeouts->register();
 
 		try {
 			return $this->runGenerationLoop(
@@ -116,6 +143,7 @@ class AIClientAdapter
 			);
 		} finally {
 			$this->toolCallRepairs->unregister();
+			$this->httpTimeouts->unregister();
 
 			// Progress and stop flags are only meaningful while the request is
 			// in flight.
@@ -187,6 +215,7 @@ class AIClientAdapter
 
 		// Compensate for provider connectors that drop tool-call metadata across turns.
 		$this->toolCallRepairs->register();
+		$this->httpTimeouts->register();
 
 		try {
 			if ($approved) {
@@ -199,8 +228,9 @@ class AIClientAdapter
 				);
 
 				$resolver      = new WP_AI_Client_Ability_Function_Resolver(...$abilities);
-				$messages[]    = $resolver->execute_abilities($lastMessage);
-				$executedCalls = array_merge($executedCalls, $pendingCalls);
+				$resultMessage = $resolver->execute_abilities($lastMessage);
+				$messages[]    = $resultMessage;
+				$executedCalls = array_merge($executedCalls, $this->attachResultDigests($pendingCalls, $resultMessage));
 			} else {
 				$messages[] = $this->buildDeclinedResponses($lastMessage);
 			}
@@ -219,6 +249,7 @@ class AIClientAdapter
 			);
 		} finally {
 			$this->toolCallRepairs->unregister();
+			$this->httpTimeouts->unregister();
 
 			if ('' !== $requestId) {
 				$this->progressStore->delete($requestId);
@@ -349,8 +380,10 @@ class AIClientAdapter
 				$this->reportProgress($requestId, 'thinking', '', $toolCalls);
 			}
 
+			// The provider gets a compacted copy; $history itself stays intact
+			// for the AgentResponse / confirmation-resume flow.
 			$builder = wp_ai_client_prompt()
-				->with_history(...$history)
+				->with_history(...$this->historyCompactor->compact($history))
 				->using_system_instruction($systemInstruction);
 
 			if ('' !== $provider) {
@@ -431,8 +464,13 @@ class AIClientAdapter
 				$requestedCalls
 			);
 
-			$toolCalls = array_merge($toolCalls, $requestedCalls);
-			$history[] = $resolver->execute_abilities($message);
+			$resultMessage = $resolver->execute_abilities($message);
+			$history[]     = $resultMessage;
+
+			// Carry a truncated result digest on each executed call so the
+			// conversation store can persist it and later turns can reuse the
+			// data instead of re-calling the same tools.
+			$toolCalls = array_merge($toolCalls, $this->attachResultDigests($requestedCalls, $resultMessage));
 
 			// Deliberately keep the "running_tool" status set here (no reset to
 			// "thinking"): it stays visible while the next generate_result()
@@ -447,7 +485,7 @@ class AIClientAdapter
 		}
 
 		$finalBuilder = wp_ai_client_prompt()
-			->with_history(...$history)
+			->with_history(...$this->historyCompactor->compact($history))
 			->using_system_instruction($systemInstruction);
 
 		if ('' !== $provider) {
@@ -596,6 +634,59 @@ class AIClientAdapter
 				'name' => WP_AI_Client_Ability_Function_Resolver::function_name_to_ability_name($functionName),
 				'args' => $functionCall->getArgs() ?? [],
 			];
+		}
+
+		return $calls;
+	}
+
+	/**
+	 * Attaches a truncated result digest to each executed tool call.
+	 *
+	 * The function responses of $resultMessage are paired with $calls in order
+	 * (the resolver executes and answers calls in request order). The digest is
+	 * persisted with the conversation history so later turns can be told what
+	 * each tool already returned, preventing the model from re-calling the same
+	 * read tools on every user message.
+	 *
+	 * @param array<int, array<string, mixed>> $calls         Extracted tool calls (name/args).
+	 * @param Message                          $resultMessage The function-response message.
+	 *
+	 * @return array<int, array<string, mixed>> Calls with a 'result' digest added where available.
+	 * @since 1.1.5
+	 */
+	private function attachResultDigests(array $calls, Message $resultMessage): array
+	{
+		/**
+		 * Filters the maximum length (characters) of the persisted tool-result digest.
+		 *
+		 * @param int $length Digest length.
+		 *
+		 * @since 1.1.5
+		 */
+		$digestLength = max(0, (int) apply_filters('agent_mod_tool_result_digest_length', Constants::AI_TOOL_RESULT_DIGEST_LENGTH));
+
+		if (0 === $digestLength) {
+			return $calls;
+		}
+
+		$responses = [];
+
+		foreach ($resultMessage->getParts() as $part) {
+			$response = $part->getFunctionResponse();
+
+			if ($response instanceof FunctionResponse) {
+				$responses[] = $response;
+			}
+		}
+
+		foreach ($calls as $index => $call) {
+			if (! isset($responses[$index])) {
+				continue;
+			}
+
+			$digest = (string) wp_json_encode($responses[$index]->getResponse());
+
+			$calls[$index]['result'] = mb_substr($digest, 0, $digestLength);
 		}
 
 		return $calls;

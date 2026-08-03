@@ -43,6 +43,16 @@ class AbilityResolver
 			$abilities = $this->filterReadonly($abilities);
 		}
 
+		// Stable, name-sorted tool ordering keeps the serialized tool block
+		// byte-identical across requests, which lets providers with automatic
+		// prefix caching (e.g. OpenAI) reuse the cached prompt prefix.
+		usort($abilities, static function ($a, $b): int {
+			$aName = $a instanceof WP_Ability ? $a->get_name() : '';
+			$bName = $b instanceof WP_Ability ? $b->get_name() : '';
+
+			return strcmp($aName, $bName);
+		});
+
 		return (array) apply_filters('agent_mod_resolved_abilities', $abilities, $agent);
 	}
 

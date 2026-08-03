@@ -345,6 +345,19 @@ class AIOrchestratorService
 	/**
 	 * Maps a plain history array to AI Client Message objects.
 	 *
+	 * Two compaction rules keep prior turns cheap without losing the
+	 * information the model actually needs:
+	 *
+	 *  - Assistant turns that ran tools get a plain-text `[Tools used this
+	 *    turn]` digest of each call and its (truncated) result appended, so on
+	 *    the next user message the model remembers what it already fetched and
+	 *    does not re-call the same read tools. Only the most recent turns are
+	 *    replayed this way (agent_mod_history_tool_digest_turns) so the digests
+	 *    themselves cannot re-grow the prompt.
+	 *  - Binary attachment payloads are only needed on the CURRENT user message
+	 *    (appended by the caller); prior turns get a text placeholder naming the
+	 *    files instead of re-uploading base64 data every request.
+	 *
 	 * @param array<int, array<string, mixed>> $history Prior turns.
 	 *
 	 * @return Message[]
@@ -352,13 +365,50 @@ class AIOrchestratorService
 	 */
 	private function mapHistoryToMessages(array $history): array
 	{
+		/**
+		 * Filters how many of the most recent tool-running assistant turns get
+		 * their tool-result digests replayed into the provider history.
+		 *
+		 * @param int $turns Number of assistant turns.
+		 *
+		 * @since 1.1.5
+		 */
+		$digestTurns = max(0, (int) apply_filters('agent_mod_history_tool_digest_turns', 6));
+
+		$digestIndexes = [];
+
+		foreach ($history as $index => $turn) {
+			$role = (string) ($turn['role'] ?? 'user');
+
+			if (in_array($role, ['model', 'assistant'], true) && ! empty($turn['toolCalls']) && is_array($turn['toolCalls'])) {
+				$digestIndexes[] = $index;
+			}
+		}
+
+		// array_slice with -0 would return the whole array, so 0 disables replay explicitly.
+		$digestIndexes = $digestTurns > 0 ? array_flip(array_slice($digestIndexes, -$digestTurns)) : [];
+
 		$messages = [];
 
-		foreach ($history as $turn) {
+		foreach ($history as $index => $turn) {
 			$text        = isset($turn['text']) ? (string) $turn['text'] : '';
 			$attachments = isset($turn['attachments']) && is_array($turn['attachments']) ? $turn['attachments'] : [];
 
-			if ('' === trim($text) && empty($attachments)) {
+			if (isset($digestIndexes[$index])) {
+				$digest = $this->buildToolDigestBlock((array) $turn['toolCalls']);
+
+				if ('' !== $digest) {
+					$text = trim($text . "\n\n" . $digest);
+				}
+			}
+
+			$placeholder = $this->attachmentPlaceholder($attachments);
+
+			if ('' !== $placeholder) {
+				$text = trim($text . "\n\n" . $placeholder);
+			}
+
+			if ('' === trim($text)) {
 				continue;
 			}
 
@@ -367,11 +417,91 @@ class AIOrchestratorService
 
 			$messages[] = new Message(
 				$isUser ? MessageRoleEnum::user() : MessageRoleEnum::model(),
-				$this->buildMessageParts($text, $attachments)
+				[new MessagePart(trim($text))]
 			);
 		}
 
 		return $messages;
+	}
+
+	/**
+	 * Builds the plain-text digest block for an assistant turn's tool calls.
+	 *
+	 * @param array<int, array<string, mixed>> $toolCalls Persisted tool calls (name/args and, when
+	 *                                                    available, a truncated result digest).
+	 *
+	 * @return string Empty string when there is nothing to report.
+	 * @since 1.1.5
+	 */
+	private function buildToolDigestBlock(array $toolCalls): string
+	{
+		$lines = [];
+
+		foreach ($toolCalls as $call) {
+			if (! is_array($call)) {
+				continue;
+			}
+
+			$name = (string) ($call['name'] ?? '');
+
+			if ('' === $name) {
+				continue;
+			}
+
+			$line = '- ' . $name . '(' . wp_json_encode(is_array($call['args'] ?? null) ? $call['args'] : []) . ')';
+
+			$result = (string) ($call['result'] ?? '');
+
+			if ('' !== $result) {
+				$line .= ' → ' . $result;
+			}
+
+			$lines[] = $line;
+		}
+
+		if (empty($lines)) {
+			return '';
+		}
+
+		return "[Tools used this turn]\n" . implode("\n", $lines);
+	}
+
+	/**
+	 * Builds a text placeholder naming a prior turn's attachments.
+	 *
+	 * @param array<int, array<string, string>> $attachments Attachment records.
+	 *
+	 * @return string Empty string when the turn has no attachments.
+	 * @since 1.1.5
+	 */
+	private function attachmentPlaceholder(array $attachments): string
+	{
+		$names = [];
+
+		foreach ($attachments as $attachment) {
+			if (! is_array($attachment)) {
+				continue;
+			}
+
+			$name = (string) ($attachment['name'] ?? '');
+			$mime = (string) ($attachment['mimeType'] ?? '');
+
+			if ('' === $name && '' === $mime) {
+				continue;
+			}
+
+			$names[] = trim($name . ('' !== $mime ? ' (' . $mime . ')' : ''));
+		}
+
+		if (empty($names)) {
+			return '';
+		}
+
+		return sprintf(
+			/* translators: %s: comma-separated list of file names. */
+			__('[Attachments sent with this earlier message (binary data omitted): %s]', 'agent-mod'),
+			implode(', ', $names)
+		);
 	}
 
 	/**

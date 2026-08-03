@@ -166,7 +166,7 @@ This service is responsible for assembling the final system instruction string s
 
 ### 🔧 **Services**
 - **AI Engine (`Services/AI`)**: Contains the core logic for chatting, tool execution (`AIOrchestratorService`), and prompt generation.
-- **Abilities (`AbilityRegistrarService`)**: Registers the tools that the AI can use (e.g., creating posts, querying templates).
+- **Abilities (`AbilityRegistrarService`)**: Registers the tools that the AI can use (e.g., creating posts, querying templates). If an ability does not require an input schema do not pass empty object. No input_schema on purpose: WP_Ability rejects a null input when a schema is present, and providers routinely call zero-argument tools with no arguments at all.
 - **Settings (`SettingsService`)**: Provides a clean API for reading plugin settings.
 
 ### 🛠️ **Common/Shared**

@@ -43,7 +43,7 @@ class AbilityRegistrarService
 	 * "foreach() argument must be of type array|object" warnings on every page.
 	 *
 	 * @var array<string, string>
-	 * @since x.x.x
+	 * @since 1.1.5
 	 */
 	private const PRESET_PATHS = [
 		'color.palette'           => 'color',
@@ -60,7 +60,7 @@ class AbilityRegistrarService
 	 * Origins WP_Theme_JSON keys presets by internally, in precedence order.
 	 *
 	 * @var string[]
-	 * @since x.x.x
+	 * @since 1.1.5
 	 */
 	private const PRESET_ORIGINS = ['default', 'theme', 'custom'];
 
@@ -222,7 +222,7 @@ class AbilityRegistrarService
 			'agent-mod/get-template',
 			[
 				'label'               => __('Get Template', 'agent-mod'),
-				'description'         => __('Returns a template\'s raw block markup as html by slug. Use list-templates first to get slugs. The returned html can be modified and passed straight back to add-or-update-template as the html parameter.', 'agent-mod'),
+				'description'         => __('Returns a template\'s raw block markup as html by slug. Use list-templates first to get slugs. The returned html can be modified and passed straight back to add-or-update-template as the html parameter. For header/footer/sidebar template parts use get-template-part instead.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeGetTemplate'],
 				'permission_callback' => static function (): bool {
@@ -241,10 +241,13 @@ class AbilityRegistrarService
 				'output_schema'       => [
 					'type'       => 'object',
 					'properties' => [
+						'success' => ['type' => 'boolean'],
 						'slug'    => ['type' => 'string'],
 						'title'   => ['type' => 'string'],
 						'post_id' => ['type' => 'integer'],
 						'html'    => ['type' => 'string'],
+						'source'  => ['type' => 'string'],
+						'error'   => ['type' => 'string'],
 					],
 				],
 				'meta'                => [
@@ -258,7 +261,7 @@ class AbilityRegistrarService
 			'agent-mod/add-or-update-template',
 			[
 				'label'               => __('Add or Update Template', 'agent-mod'),
-				'description'         => __('Saves content to a template. Provide html and either post_id or slug (not both).', 'agent-mod'),
+				'description'         => __('Saves content to a template. Provide html and either post_id or slug (not both). Theme-file templates are read-only on disk: saving with the SAME slug creates a database override that WordPress uses instead — this is the correct way to customize them. A slug the theme ships no file for (e.g. front-page) is also allowed and creates a new template. For header/footer parts use add-or-update-template-part.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeAddOrUpdateTemplate'],
 				'permission_callback' => static function (): bool {
@@ -274,7 +277,11 @@ class AbilityRegistrarService
 						],
 						'slug'    => [
 							'type'        => 'string',
-							'description' => __('Template slug. Use this to create (duplicate) a new template from a theme file.', 'agent-mod'),
+							'description' => __('Template slug (e.g. front-page, single, page). Updates the existing DB override for this slug when one exists, otherwise creates one — including slugs the theme ships no file for.', 'agent-mod'),
+						],
+						'title'   => [
+							'type'        => 'string',
+							'description' => __('Optional human-readable title. Defaults to the theme template\'s title or one derived from the slug.', 'agent-mod'),
 						],
 						'html'    => [
 							'type'        => 'string',
@@ -287,6 +294,143 @@ class AbilityRegistrarService
 					'properties' => [
 						'success' => ['type' => 'boolean'],
 						'post_id' => ['type' => 'integer'],
+						'action'  => ['type' => 'string'],
+						'slug'    => ['type' => 'string'],
+						'error'   => ['type' => 'string'],
+					],
+				],
+				'meta'                => [
+					'annotations'  => ['readonly' => false],
+					'show_in_rest' => true,
+				],
+			]
+		);
+
+		// -------------------------------------------------------------------------
+		// Block Design: Template Part abilities
+		// -------------------------------------------------------------------------
+
+		wp_register_ability(
+			'agent-mod/list-template-parts',
+			[
+				'label'               => __('List Template Parts', 'agent-mod'),
+				'description'         => __('Returns all template parts (header, footer, sidebar, …) available for the active theme, with their area and, when a database override exists, its post_id.', 'agent-mod'),
+				'category'            => self::CATEGORY,
+				'execute_callback'    => [$this, 'executeListTemplateParts'],
+				'permission_callback' => static function (): bool {
+					return current_user_can('edit_theme_options');
+				},
+				// No input_schema on purpose: WP_Ability rejects a null input when
+				// a schema is present, and providers routinely call zero-argument
+				// tools with no arguments at all.
+				'output_schema'       => [
+					'type'       => 'object',
+					'properties' => [
+						'theme'          => ['type' => 'string'],
+						'template_parts' => [
+							'type'  => 'array',
+							'items' => [
+								'type'       => 'object',
+								'properties' => [
+									'slug'    => ['type' => 'string'],
+									'title'   => ['type' => 'string'],
+									'area'    => ['type' => 'string'],
+									'post_id' => ['type' => 'integer'],
+								],
+							],
+						],
+					],
+				],
+				'meta'                => [
+					'annotations'  => ['readonly' => true],
+					'show_in_rest' => true,
+				],
+			]
+		);
+
+		wp_register_ability(
+			'agent-mod/get-template-part',
+			[
+				'label'               => __('Get Template Part', 'agent-mod'),
+				'description'         => __('Returns a template part\'s raw block markup as html by slug (e.g. header, footer). Use list-template-parts first to get slugs. The returned html can be modified and passed straight back to add-or-update-template-part.', 'agent-mod'),
+				'category'            => self::CATEGORY,
+				'execute_callback'    => [$this, 'executeGetTemplatePart'],
+				'permission_callback' => static function (): bool {
+					return current_user_can('edit_theme_options');
+				},
+				'input_schema'        => [
+					'type'       => 'object',
+					'required'   => ['slug'],
+					'properties' => [
+						'slug' => [
+							'type'        => 'string',
+							'description' => __('Template part slug from list-template-parts.', 'agent-mod'),
+						],
+					],
+				],
+				'output_schema'       => [
+					'type'       => 'object',
+					'properties' => [
+						'success' => ['type' => 'boolean'],
+						'slug'    => ['type' => 'string'],
+						'title'   => ['type' => 'string'],
+						'area'    => ['type' => 'string'],
+						'post_id' => ['type' => 'integer'],
+						'html'    => ['type' => 'string'],
+						'source'  => ['type' => 'string'],
+						'error'   => ['type' => 'string'],
+					],
+				],
+				'meta'                => [
+					'annotations'  => ['readonly' => true],
+					'show_in_rest' => true,
+				],
+			]
+		);
+
+		wp_register_ability(
+			'agent-mod/add-or-update-template-part',
+			[
+				'label'               => __('Add or Update Template Part', 'agent-mod'),
+				'description'         => __('Saves content to a template part (header, footer, sidebar, …). Provide html and either post_id or slug (not both). Theme-file parts are read-only on disk: saving with the SAME slug creates a database override that WordPress uses instead — the correct way to customize the site header or footer.', 'agent-mod'),
+				'category'            => self::CATEGORY,
+				'execute_callback'    => [$this, 'executeAddOrUpdateTemplatePart'],
+				'permission_callback' => static function (): bool {
+					return current_user_can('edit_theme_options');
+				},
+				'input_schema'        => [
+					'type'       => 'object',
+					'required'   => ['html'],
+					'properties' => [
+						'post_id' => [
+							'type'        => 'integer',
+							'description' => __('DB post ID of the template part. Use this to update an existing database record.', 'agent-mod'),
+						],
+						'slug'    => [
+							'type'        => 'string',
+							'description' => __('Template part slug (e.g. header, footer). Updates the existing DB override for this slug when one exists, otherwise creates one.', 'agent-mod'),
+						],
+						'title'   => [
+							'type'        => 'string',
+							'description' => __('Optional human-readable title. Defaults to the theme part\'s title or one derived from the slug.', 'agent-mod'),
+						],
+						'area'    => [
+							'type'        => 'string',
+							'description' => __('Template part area: header, footer, sidebar or uncategorized. Defaults by slug convention on create.', 'agent-mod'),
+						],
+						'html'    => [
+							'type'        => 'string',
+							'description' => __('Serialized block markup (WordPress block comment format). Use the output of get-template-part for round-trip editing. Replaces part content entirely.', 'agent-mod'),
+						],
+					],
+				],
+				'output_schema'       => [
+					'type'       => 'object',
+					'properties' => [
+						'success' => ['type' => 'boolean'],
+						'post_id' => ['type' => 'integer'],
+						'action'  => ['type' => 'string'],
+						'slug'    => ['type' => 'string'],
 						'error'   => ['type' => 'string'],
 					],
 				],
@@ -1031,29 +1175,7 @@ class AbilityRegistrarService
 	 */
 	public function executeGetTemplate($input = null): array
 	{
-		if (! is_array($input) || empty($input['slug'])) {
-			return ['html' => ''];
-		}
-
-		$slug       = sanitize_title((string) $input['slug']);
-		$templateId = get_stylesheet() . '//' . $slug;
-		$template   = get_block_template($templateId, 'wp_template');
-
-		if (! $template) {
-			return ['html' => ''];
-		}
-
-		$result = [
-			'slug'  => $template->slug,
-			'title' => $template->title,
-			'html'  => $template->content,
-		];
-
-		if (! empty($template->wp_id)) {
-			$result['post_id'] = (int) $template->wp_id;
-		}
-
-		return $result;
+		return $this->readTemplateObject($input, 'wp_template');
 	}
 
 	/**
@@ -1066,6 +1188,168 @@ class AbilityRegistrarService
 	 */
 	public function executeAddOrUpdateTemplate($input = null): array
 	{
+		return $this->writeTemplateObject($input, 'wp_template');
+	}
+
+	/**
+	 * Execute callback for agent-mod/list-template-parts.
+	 *
+	 * @param mixed $input Input data (no parameters required).
+	 *
+	 * @return array<string, mixed>
+	 * @since 1.1.5
+	 */
+	public function executeListTemplateParts($input = null): array
+	{
+		if (! function_exists('get_block_templates')) {
+			return ['theme' => get_stylesheet(), 'template_parts' => []];
+		}
+
+		$blockTemplates = get_block_templates([], 'wp_template_part');
+
+		$parts = array_map(static function ($tpl) {
+			$item = [
+				'slug'  => $tpl->slug,
+				'title' => $tpl->title,
+				'area'  => (string) ($tpl->area ?? ''),
+			];
+
+			if (! empty($tpl->wp_id)) {
+				$item['post_id'] = (int) $tpl->wp_id;
+			}
+
+			return $item;
+		}, $blockTemplates);
+
+		usort($parts, static fn ($a, $b) => strcmp($a['slug'], $b['slug']));
+
+		return [
+			'theme'          => get_stylesheet(),
+			'template_parts' => $parts,
+		];
+	}
+
+	/**
+	 * Execute callback for agent-mod/get-template-part.
+	 *
+	 * @param mixed $input Input data (expects 'slug').
+	 *
+	 * @return array<string, mixed>
+	 * @since 1.1.5
+	 */
+	public function executeGetTemplatePart($input = null): array
+	{
+		return $this->readTemplateObject($input, 'wp_template_part');
+	}
+
+	/**
+	 * Execute callback for agent-mod/add-or-update-template-part.
+	 *
+	 * @param mixed $input Input data (expects 'html' and either 'post_id' or 'slug').
+	 *
+	 * @return array<string, mixed>
+	 * @since 1.1.5
+	 */
+	public function executeAddOrUpdateTemplatePart($input = null): array
+	{
+		return $this->writeTemplateObject($input, 'wp_template_part');
+	}
+
+	/**
+	 * Reads a template or template part by slug for the active theme.
+	 *
+	 * Not-found is an explicit error (never an empty-html success shape): the
+	 * model must be able to distinguish "wrong slug / wrong object type" from
+	 * "template exists but is empty", and be told how to recover.
+	 *
+	 * @param mixed  $input    Input data (expects 'slug').
+	 * @param string $postType 'wp_template' or 'wp_template_part'.
+	 *
+	 * @return array<string, mixed>
+	 * @since 1.1.5
+	 */
+	private function readTemplateObject($input, string $postType): array
+	{
+		$isPart = 'wp_template_part' === $postType;
+		$label  = $isPart ? __('Template part', 'agent-mod') : __('Template', 'agent-mod');
+
+		if (! is_array($input) || empty($input['slug'])) {
+			return [
+				'success' => false,
+				/* translators: %s: object label (Template / Template part). */
+				'error'   => sprintf(__('%s slug is required.', 'agent-mod'), $label),
+			];
+		}
+
+		$slug       = sanitize_title((string) $input['slug']);
+		$templateId = get_stylesheet() . '//' . $slug;
+		$template   = get_block_template($templateId, $postType);
+
+		if (! $template) {
+			return [
+				'success' => false,
+				'error'   => $isPart
+					? sprintf(
+						/* translators: %1$s: template part slug, %2$s: theme slug. */
+						__('Template part "%1$s" not found for theme "%2$s". Call agent-mod/list-template-parts for valid slugs, or create it with agent-mod/add-or-update-template-part. If you meant a full template (front-page, single, …), use the template abilities instead.', 'agent-mod'),
+						$slug,
+						get_stylesheet()
+					)
+					: sprintf(
+						/* translators: %1$s: template slug, %2$s: theme slug. */
+						__('Template "%1$s" not found for theme "%2$s". Call agent-mod/list-templates for valid slugs, or create it with agent-mod/add-or-update-template. If you meant a header/footer/sidebar template part, use the template-part abilities instead.', 'agent-mod'),
+						$slug,
+						get_stylesheet()
+					),
+			];
+		}
+
+		$result = [
+			'success' => true,
+			'slug'    => $template->slug,
+			'title'   => $template->title,
+			'html'    => $template->content,
+			// 'theme' = shipped by the theme files (read-only on disk, editable
+			// via a DB override with the same slug); 'custom' = DB record.
+			'source'  => (string) ($template->source ?? ''),
+		];
+
+		if ($isPart) {
+			$result['area'] = (string) ($template->area ?? '');
+		}
+
+		if (! empty($template->wp_id)) {
+			$result['post_id'] = (int) $template->wp_id;
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Creates or updates a template / template part database record.
+	 *
+	 * Override-by-slug model: themes ship read-only template files; saving a
+	 * wp_template / wp_template_part post with the same slug (and the active
+	 * theme's wp_theme term) makes WordPress use the database version instead.
+	 * The slug branch therefore:
+	 *  1. updates the existing DB override when one exists (never inserts a
+	 *     duplicate that would get renamed to "header-2" and silently stop
+	 *     overriding), and
+	 *  2. inserts a new record otherwise — including slugs the theme does not
+	 *     ship a file for (e.g. creating a front-page template from scratch).
+	 *
+	 * @param mixed  $input    Input data (expects 'html' and either 'post_id' or 'slug';
+	 *                         optional 'title'; optional 'area' for template parts).
+	 * @param string $postType 'wp_template' or 'wp_template_part'.
+	 *
+	 * @return array<string, mixed>
+	 * @since 1.1.5
+	 */
+	private function writeTemplateObject($input, string $postType): array
+	{
+		$isPart = 'wp_template_part' === $postType;
+		$label  = $isPart ? __('Template part', 'agent-mod') : __('Template', 'agent-mod');
+
 		if (! is_array($input)) {
 			return ['success' => false, 'error' => __('Invalid input.', 'agent-mod')];
 		}
@@ -1073,40 +1357,54 @@ class AbilityRegistrarService
 		if (! empty($input['post_id']) && ! empty($input['slug'])) {
 			return [
 				'success' => false,
-				'error'   => __('Provide either post_id or slug, not both. Post_id for update, slug for create.', 'agent-mod'),
+				'error'   => __('Provide either post_id or slug, not both. Post_id for update, slug for create-or-override.', 'agent-mod'),
 			];
 		}
 
-		$postId   = null;
-		$template = null;
+		$postId = null;
+		$slug   = '';
+		$title  = sanitize_text_field((string) ($input['title'] ?? ''));
+		$action = 'updated';
 
 		if (! empty($input['post_id'])) {
 			$postId = absint($input['post_id']);
 			$post   = get_post($postId);
 
-			if (! $post || $post->post_type !== 'wp_template') {
+			if (! $post || $post->post_type !== $postType) {
 				return [
 					'success' => false,
 					'error'   => sprintf(
-						/* translators: %d: template post ID */
-						__('Template with post_id %d not found.', 'agent-mod'),
+						/* translators: %1$s: object label (Template / Template part), %2$d: post ID. */
+						__('%1$s with post_id %2$d not found.', 'agent-mod'),
+						$label,
 						$postId
 					),
 				];
 			}
-		} elseif (! empty($input['slug'])) {
-			$templateId = get_stylesheet() . '//' . sanitize_title((string) $input['slug']);
-			$template   = get_block_template($templateId, 'wp_template');
 
-			if (! $template) {
-				return [
-					'success' => false,
-					'error'   => sprintf(
-						/* translators: %s: template slug */
-						__('Template "%s" not found.', 'agent-mod'),
-						sanitize_text_field((string) $input['slug'])
-					),
-				];
+			$slug = (string) $post->post_name;
+		} elseif (! empty($input['slug'])) {
+			$slug = sanitize_title((string) $input['slug']);
+
+			if ('' === $slug) {
+				return ['success' => false, 'error' => __('Invalid slug.', 'agent-mod')];
+			}
+
+			// An existing DB override for this slug+theme must be updated in
+			// place — a blind insert would get a "-2" suffixed slug and never
+			// take effect.
+			$existingId = $this->findTemplateObjectPost($slug, $postType);
+
+			if ($existingId > 0) {
+				$postId = $existingId;
+			} elseif ('' === $title) {
+				// Derive the title from the theme-provided file when there is
+				// one; otherwise from the slug (creating a template the theme
+				// ships no file for is a supported case).
+				$themeTemplate = get_block_template(get_stylesheet() . '//' . $slug, $postType);
+				$title         = $themeTemplate
+					? (string) $themeTemplate->title
+					: ucwords(str_replace(['-', '_'], ' ', $slug));
 			}
 		} else {
 			return ['success' => false, 'error' => __('Either post_id or slug must be provided.', 'agent-mod')];
@@ -1127,28 +1425,127 @@ class AbilityRegistrarService
 		}
 
 		if ($postId) {
-			$result = wp_update_post(['ID' => $postId, 'post_content' => $serializedContent]);
+			$update = ['ID' => $postId, 'post_content' => $serializedContent];
+
+			if ('' !== $title) {
+				$update['post_title'] = $title;
+			}
+
+			$result = wp_update_post($update, true);
 
 			if (is_wp_error($result)) {
 				return ['success' => false, 'error' => $result->get_error_message()];
 			}
 		} else {
-			$slug   = sanitize_title((string) $input['slug']);
-			$postId = wp_insert_post([
-				'post_type'    => 'wp_template',
-				'post_status'  => 'publish',
-				'post_name'    => $slug,
-				'post_title'   => $template->title,
-				'post_content' => $serializedContent,
-				'tax_input'    => ['wp_theme' => [get_stylesheet()]],
-			]);
+			$action = 'created';
+			$postId = wp_insert_post(
+				[
+					'post_type'    => $postType,
+					'post_status'  => 'publish',
+					'post_name'    => $slug,
+					'post_title'   => '' !== $title ? $title : $slug,
+					'post_content' => $serializedContent,
+				],
+				true
+			);
 
 			if (is_wp_error($postId)) {
 				return ['success' => false, 'error' => $postId->get_error_message()];
 			}
+
+			// Explicit term assignment: tax_input silently skips terms when the
+			// current user lacks the taxonomy caps in some contexts.
+			wp_set_object_terms($postId, get_stylesheet(), 'wp_theme');
 		}
 
-		return ['success' => true, 'post_id' => (int) $postId];
+		if ($isPart) {
+			$area = $this->resolveTemplatePartArea((string) ($input['area'] ?? ''), (int) $postId, 'created' === $action);
+
+			if ('' !== $area) {
+				wp_set_object_terms((int) $postId, $area, 'wp_template_part_area');
+			}
+		}
+
+		return [
+			'success' => true,
+			'post_id' => (int) $postId,
+			'action'  => $action,
+			'slug'    => $slug,
+		];
+	}
+
+	/**
+	 * Finds the existing database record for a template/template-part slug in
+	 * the active theme.
+	 *
+	 * @param string $slug     Object slug.
+	 * @param string $postType 'wp_template' or 'wp_template_part'.
+	 *
+	 * @return int Post ID, or 0 when no DB record exists.
+	 * @since 1.1.5
+	 */
+	private function findTemplateObjectPost(string $slug, string $postType): int
+	{
+		$query = new WP_Query([
+			'post_type'      => $postType,
+			'post_status'    => 'publish',
+			'name'           => $slug,
+			'posts_per_page' => 1,
+			'no_found_rows'  => true,
+			'tax_query'      => [ // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
+				[
+					'taxonomy' => 'wp_theme',
+					'field'    => 'name',
+					'terms'    => get_stylesheet(),
+				],
+			],
+		]);
+
+		return empty($query->posts) ? 0 : (int) $query->posts[0]->ID;
+	}
+
+	/**
+	 * Resolves the wp_template_part_area term to assign.
+	 *
+	 * An explicitly provided area is validated against the allowed areas. On
+	 * create without an explicit area the slug-matching default (header/footer)
+	 * or the uncategorized fallback applies; on update the stored area is kept.
+	 *
+	 * @param string $requested Requested area slug ('' for none).
+	 * @param int    $postId    Template part post ID.
+	 * @param bool   $isCreate  Whether the record was just created.
+	 *
+	 * @return string Area slug to assign, or '' to leave the terms untouched.
+	 * @since 1.1.5
+	 */
+	private function resolveTemplatePartArea(string $requested, int $postId, bool $isCreate): string
+	{
+		$allowed = [];
+
+		if (function_exists('get_allowed_block_template_part_areas')) {
+			$allowed = array_column((array) get_allowed_block_template_part_areas(), 'area');
+		}
+
+		$requested = sanitize_title($requested);
+
+		if ('' !== $requested && (empty($allowed) || in_array($requested, $allowed, true))) {
+			return $requested;
+		}
+
+		if (! $isCreate) {
+			return '';
+		}
+
+		// Default for new parts: match by slug convention, else uncategorized.
+		$slug = (string) get_post_field('post_name', $postId);
+
+		foreach (['header', 'footer'] as $wellKnown) {
+			if ($slug === $wellKnown || 0 === strpos($slug, $wellKnown . '-')) {
+				return $wellKnown;
+			}
+		}
+
+		return defined('WP_TEMPLATE_PART_AREA_UNCATEGORIZED') ? WP_TEMPLATE_PART_AREA_UNCATEGORIZED : 'uncategorized';
 	}
 
 	// =========================================================================
@@ -2141,7 +2538,7 @@ class AbilityRegistrarService
 	 * @param array<mixed> $value Array to test.
 	 *
 	 * @return bool True when the keys are 0..n-1, including for an empty array.
-	 * @since x.x.x
+	 * @since 1.1.5
 	 */
 	private function isList(array $value): bool
 	{
@@ -2160,7 +2557,7 @@ class AbilityRegistrarService
 	 * @param string|string[] $valueType        JSON schema type(s) accepted for the value.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.1.5
 	 */
 	private static function presetListSchema(string $valueKey, string $valueDescription, $valueType = 'string'): array
 	{
@@ -2191,7 +2588,7 @@ class AbilityRegistrarService
 	 * @param array<string, mixed> $settings Settings tree from wp_get_global_settings().
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.1.5
 	 */
 	private function flattenSettingsPresets(array $settings): array
 	{
@@ -2214,7 +2611,7 @@ class AbilityRegistrarService
 	 * @param array<string, mixed> $node Root settings node or one settings.blocks.* node.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.1.5
 	 */
 	private function flattenPresetNode(array $node): array
 	{
@@ -2259,7 +2656,7 @@ class AbilityRegistrarService
 	 * @param array<mixed> $presets Preset value taken from a settings node.
 	 *
 	 * @return array<mixed>
-	 * @since x.x.x
+	 * @since 1.1.5
 	 */
 	private function flattenPresetOrigins(array $presets): array
 	{
@@ -2303,7 +2700,7 @@ class AbilityRegistrarService
 	 * @param array<int, string>   $issues   Collects human-readable problem descriptions.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.1.5
 	 */
 	private function normalizeGlobalStylesSettings(array $settings, array &$issues): array
 	{
@@ -2332,7 +2729,7 @@ class AbilityRegistrarService
 	 * @param array<int, string>   $issues Collects human-readable problem descriptions.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.1.5
 	 */
 	private function normalizePresetNode(array $node, string $prefix, array &$issues): array
 	{
@@ -2423,7 +2820,7 @@ class AbilityRegistrarService
 	 * @param array<int, string> $issues   Collects human-readable problem descriptions.
 	 *
 	 * @return array<int, array<string, mixed>>
-	 * @since x.x.x
+	 * @since 1.1.5
 	 */
 	private function normalizePresetList(array $presets, string $valueKey, string $label, array &$issues): array
 	{

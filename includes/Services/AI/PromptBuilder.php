@@ -94,6 +94,11 @@ class PromptBuilder
 			$sections[] = $modeDirective;
 		}
 
+		// Earlier turns replay their tool activity as compact text digests (see
+		// AIOrchestratorService::mapHistoryToMessages()); without this directive
+		// the model tends to re-fetch data it already has.
+		$sections[] = __('Earlier tool results are summarized in the conversation history as "[Tools used this turn]" blocks. Trust those summaries: do not re-call the same read tool with the same arguments to retrieve data you already have.', 'agent-mod');
+
 		$emphasized = $this->resolveEmphasized($agent);
 		if (! empty($emphasized)) {
 			$sections[] = sprintf(

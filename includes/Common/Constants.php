@@ -57,6 +57,45 @@ class Constants
 	public const AI_MAX_SEARCH_RESULTS = 20;
 
 	/**
+	 * HTTP timeout (seconds) for requests to AI provider APIs.
+	 *
+	 * WordPress defaults to a 30s cURL timeout, which long generations
+	 * (large prompts, vision inputs) regularly exceed. Applied only to
+	 * provider hosts while a generation is in flight; filterable via
+	 * `agent_mod_ai_http_timeout`.
+	 *
+	 * @since 1.1.5
+	 */
+	public const AI_HTTP_TIMEOUT = 120;
+
+	/**
+	 * How many of the most recent tool-result messages are re-sent verbatim on
+	 * each iteration of the tool-calling loop; older ones are elided to stubs.
+	 * Filterable via `agent_mod_history_keep_tool_results`.
+	 *
+	 * @since 1.1.5
+	 */
+	public const AI_HISTORY_KEEP_TOOL_RESULTS = 4;
+
+	/**
+	 * Length (characters) of the stub kept when an old tool result is elided
+	 * from the in-loop history.
+	 *
+	 * @since 1.1.5
+	 */
+	public const AI_TOOL_RESULT_STUB_LENGTH = 200;
+
+	/**
+	 * Length (characters) of the tool-result digest persisted with the
+	 * conversation history so later turns can reuse earlier results instead of
+	 * re-calling the same tools. Filterable via
+	 * `agent_mod_tool_result_digest_length`.
+	 *
+	 * @since 1.1.5
+	 */
+	public const AI_TOOL_RESULT_DIGEST_LENGTH = 500;
+
+	/**
 	 * Maximum posts whose full body content an agent may read in a single turn.
 	 *
 	 * @since 1.0.0
