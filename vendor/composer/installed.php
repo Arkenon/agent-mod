@@ -3,7 +3,7 @@
         'name' => 'agent-mod/agent-mod',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => 'e9f90f1e8ef4c4a1fa565cf6389f58327735ead5',
+        'reference' => '6f6fcd15bc75281cda2ff43479bc67b4c2f5e50a',
         'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -13,7 +13,7 @@
         'agent-mod/agent-mod' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => 'e9f90f1e8ef4c4a1fa565cf6389f58327735ead5',
+            'reference' => '6f6fcd15bc75281cda2ff43479bc67b4c2f5e50a',
             'type' => 'wordpress-plugin',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
