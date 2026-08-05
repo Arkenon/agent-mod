@@ -183,17 +183,10 @@ class AbilityRegistrarService
 				'permission_callback' => static function (): bool {
 					return current_user_can('edit_theme_options');
 				},
-				'input_schema'        => [
-					'type' => 'object',
-					'properties' => [
-						'count' => [
-							'type'        => 'integer',
-							'description' => __('How many templates to return (1-20).', 'agent-mod'),
-							'minimum'     => 1,
-							'maximum'     => $this->settings_service->getMaxSearchResults(),
-						],
-					],
-				],
+				// No input_schema: executeListTemplates() never read the "count"
+				// property, and WP_Ability::validate_input() rejects the null
+				// input a provider sends for an argument-less tool call whenever
+				// a schema is present.
 				'output_schema'       => [
 					'type'       => 'object',
 					'properties' => [

@@ -68,17 +68,29 @@ class PostMetaService implements BaseMetaServiceInterface, PostMetaServiceInterf
 						continue;
 					}
 
+					// Configurations saved before the empty-slug fix stored has_archive as an empty
+					// string when the archive was enabled without a custom slug. Restore it to true
+					// so the value is not dropped by the array_filter below.
+					if (isset($config['args']['has_archive']) && $config['args']['has_archive'] === '') {
+						$config['args']['has_archive'] = true;
+					}
+
 					//Remove null values from args
 					$arguments = array_filter($config['args'], function ($value) {
 						return $value !== null && $value !== '';
 					});
 
-					$allowed_masks = Helper::getAllowedEpMaskList();
+					// Only normalize the endpoint mask when rewrites are enabled: $arguments['rewrite']
+					// is false when the post type opted out of rewrites.
+					if (isset($arguments['rewrite']) && is_array($arguments['rewrite'])) {
+						$allowed_masks = Helper::getAllowedEpMaskList();
+						$ep_mask       = $arguments['rewrite']['ep_mask'] ?? '';
 
-					if (in_array($arguments['rewrite']['ep_mask'], $allowed_masks, true) && defined($arguments['rewrite']['ep_mask'])) {
-						$arguments['rewrite']['ep_mask'] = constant($arguments['rewrite']['ep_mask']);
-					} else {
-						$arguments['rewrite']['ep_mask'] = defined('EP_PERMALINK') ? EP_PERMALINK : 0;
+						if (is_string($ep_mask) && in_array($ep_mask, $allowed_masks, true) && defined($ep_mask)) {
+							$arguments['rewrite']['ep_mask'] = constant($ep_mask);
+						} else {
+							$arguments['rewrite']['ep_mask'] = defined('EP_PERMALINK') ? EP_PERMALINK : 0;
+						}
 					}
 
 					$registered = register_post_type($post_type, $arguments);
@@ -107,7 +119,7 @@ class PostMetaService implements BaseMetaServiceInterface, PostMetaServiceInterf
 	public function getPostTypes(): PostTypeListResponseModel
 	{
 		// Get registered post types
-		$registered_post_types = get_post_types(['public' => true, '_builtin' => false], 'objects');
+		$registered_post_types = get_post_types(['_builtin' => false], 'objects');
 
 		// Post types from configurations
 		$configured_post_types = $this->getPostTypesConfigurationsFiltered();
@@ -206,19 +218,22 @@ class PostMetaService implements BaseMetaServiceInterface, PostMetaServiceInterf
 		$template     = Helper::sanitizeArray($values['native_custom_fields_create_post_type_template']);
 
 		//Prepare has archive settings
-		$has_archive = rest_sanitize_boolean($general['has_archive']) ?? false;
+		$has_archive = rest_sanitize_boolean($general['has_archive'] ?? false);
 		if ($has_archive) {
-			//Set custom slug if it has archive is true and custom slug is set
-			if ($general['has_archive_custom_slug'] !== null) {
-				$has_archive = $general['has_archive_custom_slug'];
+			// Only replace the boolean with a slug when a non-empty custom slug is provided.
+			// An empty custom slug must keep has_archive as true so WordPress falls back to the post type slug.
+			$archive_custom_slug = isset($general['has_archive_custom_slug']) ? sanitize_title($general['has_archive_custom_slug']) : '';
+			if ($archive_custom_slug !== '') {
+				$has_archive = $archive_custom_slug;
 			}
 		}
 
 		//Prepare query var settings
-		$query_var = rest_sanitize_boolean($general['query_var']);
+		$query_var = rest_sanitize_boolean($general['query_var'] ?? false);
 		if ($query_var) {
-			//Set custom slug if it has archive is true
-			$query_var = (isset($general['query_var_custom_slug'])) ? $general['query_var_custom_slug'] : $general['post_type'];
+			// Same as has_archive: an empty custom slug falls back to the post type slug.
+			$query_var_custom_slug = isset($general['query_var_custom_slug']) ? sanitize_title($general['query_var_custom_slug']) : '';
+			$query_var             = $query_var_custom_slug !== '' ? $query_var_custom_slug : $general['post_type'];
 		}
 
 		// Prepare rewrite settings
@@ -740,7 +755,7 @@ class PostMetaService implements BaseMetaServiceInterface, PostMetaServiceInterf
 			$args = [
 				'type'         => $get_type,
 				'single'       => true,
-				'show_in_rest' => true,
+				'show_in_rest' => true, // Required for syncing.
 			];
 
 			// Modify post meta args

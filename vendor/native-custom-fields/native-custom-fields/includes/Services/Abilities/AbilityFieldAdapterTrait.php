@@ -11,6 +11,8 @@
 
 namespace NativeCustomFields\Services\Abilities;
 
+use NativeCustomFields\Common\Helper;
+
 defined('ABSPATH') || exit;
 
 trait AbilityFieldAdapterTrait
@@ -34,7 +36,10 @@ trait AbilityFieldAdapterTrait
                 ],
                 'name'       => ['type' => 'string', 'description' => __('Unique meta key slug', 'native-custom-fields')],
                 'fieldLabel' => ['type' => 'string'],
-                'default'    => ['type' => 'string'],
+                'default'    => [
+                    'type'        => ['string', 'array'],
+                    'description' => __('Default value. Repeater and group fields take an array: a repeater default is a list of row objects keyed by sub-field name.', 'native-custom-fields'),
+                ],
                 'required'   => ['type' => 'boolean', 'default' => false],
                 'disabled'   => ['type' => 'boolean', 'default' => false],
                 'field_custom_info' => [
@@ -71,7 +76,8 @@ trait AbilityFieldAdapterTrait
                 'fieldType'                  => $type,
                 'name'                       => sanitize_key($field['name'] ?? ''),
                 'fieldLabel'                 => sanitize_text_field($field['fieldLabel'] ?? ''),
-                'default'                    => sanitize_text_field($field['default'] ?? ''),
+                // Repeater/group defaults are arrays; sanitize_text_field() would flatten them to ''.
+                'default'                    => Helper::sanitizeFieldValue($field['default'] ?? '', $type, $field['fields'] ?? [], $field['name'] ?? ''),
                 'field_base_info'            => $field_base_info,
                 'field_custom_info_' . $type => $field['field_custom_info'] ?? [],
                 'field_dependency_info'      => [],

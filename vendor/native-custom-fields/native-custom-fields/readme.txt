@@ -4,7 +4,7 @@ Tags: custom fields, custom post type, meta box, gutenberg, block editor
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.3.3
+Stable tag: 1.3.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -136,6 +136,18 @@ Yes. The free version has Repeater and Group fields. These are custom components
 
 
 == Changelog ==
+= 1.3.5 =
+Fixed: Repeater default values were not rendered on options pages until the section was reset.
+Fixed: "Reset All" on an options page cleared repeater defaults instead of restoring them.
+Fixed: Array defaults were flattened to an empty string for fields registered through the Abilities API.
+Updated: Repeater control documentation now covers the `default` parameter.
+
+= 1.3.4 =
+Fixed: Post type archive did not work when "Has Archive" was enabled without a custom archive slug.
+Fixed: Query var fell back incorrectly when no custom query var slug was provided.
+Fixed: Endpoint mask normalization broke post types registered with rewrite disabled.
+Updated: Post type template field now documents the correct block array format.
+
 = 1.3.3 =
 Fixed: Missing required field controls in Post Meta, Term Meta, User Meta and TreView forms.
 

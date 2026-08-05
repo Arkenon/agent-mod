@@ -116,6 +116,10 @@ Under the AgentMod menu in your WordPress admin, there is a dedicated **Abilitie
 If you ask the agent to create a post, it will show you a confirmation modal summarizing the action before anything is written to the database. You must explicitly approve the action for it to proceed.
 
 == Changelog ==
+= 1.1.6 =
+* Removed: Unused input_schemas in AbilityRegistrarService
+* Update NCF library (native-custom-fields) to 1.3.5
+
 = 1.1.5 =
 * New: In-loop history compaction to reduce token usage by eliding old tool results and removing old binary attachments.
 * New: AI provider HTTP timeout manager to prevent "cURL error 28" on long generations.

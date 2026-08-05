@@ -484,6 +484,12 @@ class Helper
             return rest_sanitize_boolean($value);
         }
 
+        // Repeater and group values are always structured. A missing default reaches this method as
+        // an empty string, which is the wrong shape for the client, so normalise it to an array.
+        if (in_array($field_type, ['repeater', 'group'], true) && ! is_array($value)) {
+            return [];
+        }
+
         return $value;
     }
 
