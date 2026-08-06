@@ -33,6 +33,28 @@ class Helper
     private const BOOLEAN_FIELD_TYPES = ['toggle', 'checkbox'];
 
     /**
+     * Field types whose value is stored as a numeric value.
+     *
+     * @since 1.3.6
+     */
+    private const NUMBER_FIELD_TYPES = ['number', 'range'];
+
+    /**
+     * Field types whose value is stored as a list of file objects
+     * (see normaliseAttachment() in src/components/MediaLibrary/MediaLibraryField.js).
+     *
+     * @since 1.3.6
+     */
+    private const FILE_FIELD_TYPES = ['file_upload', 'media_library'];
+
+    /**
+     * Properties of a single file entry stored by the file/media fields.
+     *
+     * @since 1.3.6
+     */
+    private const FILE_ITEM_PROPERTIES = ['file_name', 'file_to_upload', 'file_size'];
+
+    /**
      * Get the raw (unslashed, unsanitized) value of a GET/POST/REQUEST input
      *
      * @param string $name Input name
@@ -410,6 +432,159 @@ class Helper
         $allowed_types = ['string', 'boolean', 'integer', 'number', 'array', 'object'];
 
         return in_array($type, $allowed_types, true) ? $type : 'string';
+    }
+
+    /**
+     * Resolve the meta type (as used by register_post_meta/register_term_meta) a field stores.
+     *
+     * Repeater rows and file lists are arrays, a group is an associative array (object) and a
+     * select can be either depending on its "multiple" setting. Everything else is stored as a
+     * scalar.
+     *
+     * @param array $field Field configuration, with at least 'fieldType'
+     *
+     * @return string One of: string, boolean, number, array, object
+     * @since 1.3.6
+     */
+    public static function getMetaTypeFromField(array $field): string
+    {
+        $field_type = $field['fieldType'] ?? 'text';
+
+        if ($field_type === 'group') {
+            return 'object';
+        }
+
+        if ($field_type === 'repeater' || $field_type === 'token_field') {
+            return 'array';
+        }
+
+        if (in_array($field_type, self::FILE_FIELD_TYPES, true)) {
+            return 'array';
+        }
+
+        if ($field_type === 'select' && ! empty($field['multiple'])) {
+            return 'array';
+        }
+
+        if (in_array($field_type, self::BOOLEAN_FIELD_TYPES, true)) {
+            return 'boolean';
+        }
+
+        if (in_array($field_type, self::NUMBER_FIELD_TYPES, true)) {
+            return 'number';
+        }
+
+        return 'string';
+    }
+
+    /**
+     * Build the 'show_in_rest' argument for a meta registration.
+     *
+     * register_meta() only accepts `true` for scalar types: an "array" or "object" meta must
+     * describe its structure through show_in_rest.schema, otherwise WordPress throws
+     * "you must specify the schema for each array item in show_in_rest.schema.items"
+     * (_doing_it_wrong, since WP 5.3) and skips the meta in REST.
+     *
+     * @param string $meta_type Normalized meta type (string, boolean, integer, number, array, object)
+     * @param array $field Field configuration, used to describe sub-fields of group/repeater fields
+     *
+     * @return array|bool `true` for scalar types, ['schema' => ...] for array/object types
+     * @since 1.3.6
+     */
+    public static function getMetaShowInRest(string $meta_type, array $field = [])
+    {
+        if ($meta_type !== 'array' && $meta_type !== 'object') {
+            return true;
+        }
+
+        return ['schema' => self::getMetaSchema($meta_type, $field)];
+    }
+
+    /**
+     * Build the REST schema describing the value of a field.
+     *
+     * @param string $meta_type Normalized meta type
+     * @param array $field Field configuration
+     *
+     * @return array
+     * @since 1.3.6
+     */
+    private static function getMetaSchema(string $meta_type, array $field = []): array
+    {
+        $field_type = $field['fieldType'] ?? '';
+        $sub_fields = $field['fields'] ?? [];
+
+        if ($meta_type === 'object') {
+            return [
+                'type'       => 'object',
+                'properties' => self::getMetaSchemaProperties($sub_fields),
+                // Sub-fields the configuration does not know about (e.g. values stored before a
+                // field was removed from the builder) must not fail REST validation.
+                'additionalProperties' => true,
+            ];
+        }
+
+        if ($field_type === 'repeater') {
+            return [
+                'type'  => 'array',
+                'items' => [
+                    'type'                 => 'object',
+                    'properties'           => self::getMetaSchemaProperties($sub_fields),
+                    'additionalProperties' => true,
+                ],
+            ];
+        }
+
+        if (in_array($field_type, self::FILE_FIELD_TYPES, true)) {
+            $properties = [];
+            foreach (self::FILE_ITEM_PROPERTIES as $property) {
+                $properties[$property] = ['type' => 'string'];
+            }
+
+            return [
+                'type'  => 'array',
+                'items' => [
+                    'type'                 => 'object',
+                    'properties'           => $properties,
+                    'additionalProperties' => true,
+                ],
+            ];
+        }
+
+        // token_field, multiple select and any array type coming from a filter: a list of scalars.
+        return [
+            'type'  => 'array',
+            'items' => ['type' => 'string'],
+        ];
+    }
+
+    /**
+     * Build the 'properties' part of an object schema from a sub-field configuration list.
+     *
+     * @param array $fields Sub-field configuration list, each with 'name' and 'fieldType'
+     *
+     * @return array
+     * @since 1.3.6
+     */
+    private static function getMetaSchemaProperties(array $fields): array
+    {
+        $properties = [];
+
+        foreach ($fields as $field) {
+            $name = $field['name'] ?? '';
+
+            if (! is_string($name) || $name === '') {
+                continue;
+            }
+
+            $type = self::getMetaTypeFromField($field);
+
+            $properties[$name] = ($type === 'array' || $type === 'object')
+                ? self::getMetaSchema($type, $field)
+                : ['type' => $type];
+        }
+
+        return $properties;
     }
 
     /**

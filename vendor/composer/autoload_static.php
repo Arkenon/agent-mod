@@ -11,54 +11,54 @@ class ComposerStaticInitAgentMod
     );
 
     public static $prefixLengthsPsr4 = array (
-        'P' => 
+        'P' =>
         array (
             'Psr\\Container\\' => 14,
         ),
-        'N' => 
+        'N' =>
         array (
             'NativeCustomFields\\' => 19,
         ),
-        'L' => 
+        'L' =>
         array (
             'Laravel\\SerializableClosure\\' => 28,
         ),
-        'I' => 
+        'I' =>
         array (
             'Invoker\\' => 8,
         ),
-        'D' => 
+        'D' =>
         array (
             'DI\\' => 3,
         ),
-        'A' => 
+        'A' =>
         array (
             'AgentMod\\' => 9,
         ),
     );
 
     public static $prefixDirsPsr4 = array (
-        'Psr\\Container\\' => 
+        'Psr\\Container\\' =>
         array (
             0 => __DIR__ . '/..' . '/psr/container/src',
         ),
-        'NativeCustomFields\\' => 
+        'NativeCustomFields\\' =>
         array (
             0 => __DIR__ . '/..' . '/native-custom-fields/native-custom-fields/includes',
         ),
-        'Laravel\\SerializableClosure\\' => 
+        'Laravel\\SerializableClosure\\' =>
         array (
             0 => __DIR__ . '/..' . '/laravel/serializable-closure/src',
         ),
-        'Invoker\\' => 
+        'Invoker\\' =>
         array (
             0 => __DIR__ . '/..' . '/php-di/invoker/src',
         ),
-        'DI\\' => 
+        'DI\\' =>
         array (
             0 => __DIR__ . '/..' . '/php-di/php-di/src',
         ),
-        'AgentMod\\' => 
+        'AgentMod\\' =>
         array (
             0 => __DIR__ . '/../..' . '/includes',
         ),

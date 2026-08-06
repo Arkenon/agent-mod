@@ -747,15 +747,21 @@ class PostMetaService implements BaseMetaServiceInterface, PostMetaServiceInterf
 				continue;
 			}
 
+			// Resolve the type the field actually stores (repeater/file fields are arrays,
+			// a group is an object) so REST gets a matching schema.
+			$default_type = Helper::getMetaTypeFromField($field);
+
 			// Modify post meta type (for example, convert string to number)
-			$get_type = apply_filters('native_custom_fields_register_post_meta_type', $meta_key, $post_type);
+			$get_type = apply_filters('native_custom_fields_register_post_meta_type', $default_type, $meta_key, $post_type);
 
 			$get_type = Helper::normalizeMetaType($get_type);
 
 			$args = [
 				'type'         => $get_type,
 				'single'       => true,
-				'show_in_rest' => true, // Required for syncing.
+				// Required for syncing. Array/object meta must carry a schema, otherwise
+				// register_meta() runs into _doing_it_wrong and drops the meta from REST.
+				'show_in_rest' => Helper::getMetaShowInRest($get_type, $field),
 			];
 
 			// Modify post meta args

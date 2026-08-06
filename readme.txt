@@ -4,7 +4,7 @@ Tags: ai, agent, chatbot, assistant, abilities
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.1.6
+Stable tag: 1.1.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,9 +12,9 @@ AgentMod is an AI Agent Platform for WordPress that orchestrates native Abilitie
 
 == Description ==
 
-AgentMod is an **AI Agent Platform** built natively for WordPress. Unlike standard AI chatbot plugins, AgentMod acts as an orchestration layer on top of the *Connectors*, *WP AI Client*, and *Abilities API* infrastructure introduced in WordPress 7.0.
+AgentMod is an **AI Agent Platform** built natively for WordPress. Unlike standard AI chatbot plugins, AgentMod acts as an orchestration layer on top of the *Connectors*, *WP AI Client* infrastructure introduced in WordPress 7.0.
 
-Instead of writing custom integration code (glue-code) for external services, AgentMod creates an **Ability Economy**: it reads abilities exposed by plugins like WooCommerce (`create_order`), FluentCRM (`create_contact`), or Amelia (`book_appointment`) directly from the WordPress Core Registry and makes them available to AI agents — turning your site into an autonomous operating platform.
+Instead of writing custom integration code (glue-code) for external services, AgentMod creates an **Ability Economy**: it reads abilities exposed by plugins like WooCommerce (`create_order`), Core (`get_site_infor`), or Native Custom Fields (`create_post_type`) directly from the WordPress Core Registry and makes them available to AI agents — turning your site into an autonomous operating platform.
 
 = Key Features (Free Version) =
 
@@ -116,6 +116,9 @@ Under the AgentMod menu in your WordPress admin, there is a dedicated **Abilitie
 If you ask the agent to create a post, it will show you a confirmation modal summarizing the action before anything is written to the database. You must explicitly approve the action for it to proceed.
 
 == Changelog ==
+= 1.1.7 =
+* Update NCF library (native-custom-fields) to 1.3.6
+
 = 1.1.6 =
 * Removed: Unused input_schemas in AbilityRegistrarService
 * Update NCF library (native-custom-fields) to 1.3.5

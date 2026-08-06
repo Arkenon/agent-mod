@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "56b5a4976a0fa1aca7059ee600f55cfb",
+    "content-hash": "2be0f5e5e26829544e2d8be541eaa72b",
     "packages": [
         {
             "name": "laravel/serializable-closure",
@@ -69,16 +69,16 @@
         },
         {
             "name": "native-custom-fields/native-custom-fields",
-            "version": "v1.3.5",
+            "version": "v1.3.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Arkenon/native-custom-fields.git",
-                "reference": "d3e9ea55bf9c1ae3d9becdb84bfa42dee105a191"
+                "reference": "b624f9fba58cdfed65e09e688ca749515b8e2699"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Arkenon/native-custom-fields/zipball/d3e9ea55bf9c1ae3d9becdb84bfa42dee105a191",
-                "reference": "d3e9ea55bf9c1ae3d9becdb84bfa42dee105a191",
+                "url": "https://api.github.com/repos/Arkenon/native-custom-fields/zipball/b624f9fba58cdfed65e09e688ca749515b8e2699",
+                "reference": "b624f9fba58cdfed65e09e688ca749515b8e2699",
                 "shasum": ""
             },
             "require": {
@@ -116,7 +116,7 @@
                 "issues": "https://github.com/arkenon/native-custom-fields/issues",
                 "source": "https://github.com/arkenon/native-custom-fields"
             },
-            "time": "2026-08-05T11:45:47+00:00"
+            "time": "2026-08-06T10:33:13+00:00"
         },
         {
             "name": "php-di/invoker",

@@ -4,7 +4,7 @@ Tags: custom fields, custom post type, meta box, gutenberg, block editor
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.3.5
+Stable tag: 1.3.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -136,6 +136,12 @@ Yes. The free version has Repeater and Group fields. These are custom components
 
 
 == Changelog ==
+= 1.3.6 =
+Fixed: Repeater, group, file and multiple select fields were registered with the wrong meta type, so `register_meta` raised a "you must specify the schema for each array item" notice and dropped the meta from the REST API.
+Fixed: The `native_custom_fields_register_post_meta_type` and `native_custom_fields_register_term_meta_type` filters received the meta key instead of the meta type as their filtered value.
+Added: Array and object meta are now registered with a REST schema generated from the field configuration.
+Updated: Hooks documentation now describes how the meta type is derived and when a custom schema is required.
+
 = 1.3.5 =
 Fixed: Repeater default values were not rendered on options pages until the section was reset.
 Fixed: "Reset All" on an options page cleared repeater defaults instead of restoring them.

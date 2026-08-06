@@ -5,7 +5,7 @@ declare(strict_types=1);
  * Plugin Name: Native Custom Fields
  * Plugin URI: https://nativecustomfields.com
  * Description: A WordPress plugin for creating custom fields using Gutenberg components
- * Version: 1.3.5
+ * Version: 1.3.6
  * Author: Kadim Gültekin
  * Author URI: https://profiles.wordpress.org/arkenon/
  * Text Domain: native-custom-fields
