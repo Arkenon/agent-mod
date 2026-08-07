@@ -228,7 +228,7 @@ class AIClientAdapter
 				);
 
 				$resolver      = new WP_AI_Client_Ability_Function_Resolver(...$abilities);
-				$resultMessage = $resolver->execute_abilities($lastMessage);
+				$resultMessage = $this->executeAbilities($resolver, $lastMessage);
 				$messages[]    = $resultMessage;
 				$executedCalls = array_merge($executedCalls, $this->attachResultDigests($pendingCalls, $resultMessage));
 			} else {
@@ -464,8 +464,10 @@ class AIClientAdapter
 				$requestedCalls
 			);
 
-			$resultMessage = $resolver->execute_abilities($message);
+			$resultMessage = $this->executeAbilities($resolver, $message);
 			$history[]     = $resultMessage;
+
+			$this->logToolFailures($resultMessage);
 
 			// Carry a truncated result digest on each executed call so the
 			// conversation store can persist it and later turns can reuse the
@@ -590,7 +592,15 @@ class AIClientAdapter
 	}
 
 	/**
-	 * Safely extracts text from a result (toText() throws when there is none).
+	 * Safely extracts the answer text from a result.
+	 *
+	 * GenerativeAiResult::toText() returns only the FIRST content-channel text
+	 * part and throws when there is none, so a candidate whose answer is split
+	 * across several text parts silently loses everything after the first one.
+	 * Every content-channel part is merged here instead — provider-agnostic, and
+	 * the counterpart of the connector-level block merging done in Http/.
+	 *
+	 * Thought/reasoning channels are skipped: they are not the answer.
 	 *
 	 * @param GenerativeAiResult $result The result.
 	 *
@@ -600,7 +610,25 @@ class AIClientAdapter
 	private function extractText(GenerativeAiResult $result): string
 	{
 		try {
-			return $result->toText();
+			$candidates = $result->getCandidates();
+
+			if (empty($candidates)) {
+				return '';
+			}
+
+			$blocks = [];
+
+			foreach ($candidates[0]->getMessage()->getParts() as $part) {
+				$text = $part->getText();
+
+				if (null === $text || '' === trim($text) || ! $part->getChannel()->isContent()) {
+					continue;
+				}
+
+				$blocks[] = $text;
+			}
+
+			return implode("\n\n", $blocks);
 		} catch (Throwable $e) {
 			return '';
 		}
@@ -690,6 +718,101 @@ class AIClientAdapter
 		}
 
 		return $calls;
+	}
+
+	/**
+	 * Executes the abilities a model message requested.
+	 *
+	 * Wrapped in a hook pair so a caller can open an authorisation window around
+	 * ability execution ALONE. Every ability is gated on current_user_can(), and
+	 * a caller that has no logged-in user of its own — an unattended run, a
+	 * public front-end widget — needs one for exactly this call and nothing else.
+	 * Keeping the window this narrow is the point: prompt building, knowledge
+	 * lookups and persistence stay on the caller's real identity.
+	 *
+	 * A listener MUST restore whatever it changed on the `after` action; it fires
+	 * in a finally block, so an exception inside an ability cannot leave the
+	 * request authenticated as somebody else.
+	 *
+	 * @param WP_AI_Client_Ability_Function_Resolver $resolver The ability resolver.
+	 * @param Message                                $message  The model message holding the calls.
+	 *
+	 * @return Message The function-response message.
+	 * @since 1.1.8
+	 */
+	private function executeAbilities(WP_AI_Client_Ability_Function_Resolver $resolver, Message $message): Message
+	{
+		/**
+		 * Fires immediately before requested abilities are executed.
+		 *
+		 * @since 1.1.8
+		 */
+		do_action('agent_mod_before_ability_execution');
+
+		try {
+			return $resolver->execute_abilities($message);
+		} finally {
+			/**
+			 * Fires after ability execution, including when one threw.
+			 *
+			 * @since 1.1.8
+			 */
+			do_action('agent_mod_after_ability_execution');
+		}
+	}
+
+	/**
+	 * Logs ability executions that came back as an error.
+	 *
+	 * A failing ability is not an exception: the resolver wraps the WP_Error into
+	 * a FunctionResponse and hands it to the model, which then either apologises
+	 * or — worse — retries until the tool-call budget is gone and the answer ends
+	 * up empty. Without this the whole class of failures (`ability_invalid_permissions`,
+	 * `ability_not_allowed`, `ability_not_found`) is completely invisible.
+	 *
+	 * @param Message $resultMessage The function-response message.
+	 *
+	 * @return void
+	 * @since 1.1.8
+	 */
+	private function logToolFailures(Message $resultMessage): void
+	{
+		foreach ($resultMessage->getParts() as $part) {
+			$response = $part->getFunctionResponse();
+
+			if (! $response instanceof FunctionResponse) {
+				continue;
+			}
+
+			$payload = $response->getResponse();
+
+			if (! is_array($payload) || ! isset($payload['error'])) {
+				continue;
+			}
+
+			$name = WP_AI_Client_Ability_Function_Resolver::function_name_to_ability_name((string) $response->getName());
+
+			/**
+			 * Fires when an ability execution returned an error to the model.
+			 *
+			 * @since 1.1.8
+			 *
+			 * @param string               $name    Ability name.
+			 * @param array<string, mixed> $payload The error payload fed back to the model.
+			 */
+			do_action('agent_mod_tool_call_failed', $name, $payload);
+
+			if (defined('WP_DEBUG') && WP_DEBUG) {
+				error_log( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- diagnostics behind WP_DEBUG.
+					sprintf(
+						'AgentMod: ability "%s" failed [%s] %s',
+						$name,
+						(string) ($payload['code'] ?? 'unknown'),
+						(string) ($payload['error'] ?? '')
+					)
+				);
+			}
+		}
 	}
 
 	/**
