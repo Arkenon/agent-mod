@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "2be0f5e5e26829544e2d8be541eaa72b",
+    "content-hash": "38587604b1d64f7670db30da9c7dae37",
     "packages": [
         {
             "name": "laravel/serializable-closure",
-            "version": "v2.0.15",
+            "version": "v2.0.16",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/serializable-closure.git",
-                "reference": "dccd8bcb851bb03fcc005df650b708b57cc52661"
+                "reference": "7cfc24e4fa2cca045fb8dd2a797a2b2b13b655ed"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/serializable-closure/zipball/dccd8bcb851bb03fcc005df650b708b57cc52661",
-                "reference": "dccd8bcb851bb03fcc005df650b708b57cc52661",
+                "url": "https://api.github.com/repos/laravel/serializable-closure/zipball/7cfc24e4fa2cca045fb8dd2a797a2b2b13b655ed",
+                "reference": "7cfc24e4fa2cca045fb8dd2a797a2b2b13b655ed",
                 "shasum": ""
             },
             "require": {
@@ -65,20 +65,20 @@
                 "issues": "https://github.com/laravel/serializable-closure/issues",
                 "source": "https://github.com/laravel/serializable-closure"
             },
-            "time": "2026-07-21T16:49:22+00:00"
+            "time": "2026-08-18T20:28:54+00:00"
         },
         {
             "name": "native-custom-fields/native-custom-fields",
-            "version": "v1.3.6",
+            "version": "v1.3.7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Arkenon/native-custom-fields.git",
-                "reference": "b624f9fba58cdfed65e09e688ca749515b8e2699"
+                "reference": "85436fbf83b7b9ade8529bb1a6bad1e92b1e8afa"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Arkenon/native-custom-fields/zipball/b624f9fba58cdfed65e09e688ca749515b8e2699",
-                "reference": "b624f9fba58cdfed65e09e688ca749515b8e2699",
+                "url": "https://api.github.com/repos/Arkenon/native-custom-fields/zipball/85436fbf83b7b9ade8529bb1a6bad1e92b1e8afa",
+                "reference": "85436fbf83b7b9ade8529bb1a6bad1e92b1e8afa",
                 "shasum": ""
             },
             "require": {
@@ -116,7 +116,7 @@
                 "issues": "https://github.com/arkenon/native-custom-fields/issues",
                 "source": "https://github.com/arkenon/native-custom-fields"
             },
-            "time": "2026-08-06T10:33:13+00:00"
+            "time": "2026-08-31T08:09:40+00:00"
         },
         {
             "name": "php-di/invoker",

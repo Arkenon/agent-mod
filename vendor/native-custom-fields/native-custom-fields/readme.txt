@@ -1,10 +1,9 @@
 === Native Custom Fields - Custom Content Types and Meta Fields ===
 Contributors: arkenon
-Tags: custom fields, custom post type, meta box, gutenberg, block editor
-Requires at least: 7.0
+Tags: custom fields, fields, meta, repeater, ncf
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.3.6
+Stable tag: 1.3.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -136,6 +135,10 @@ Yes. The free version has Repeater and Group fields. These are custom components
 
 
 == Changelog ==
+
+= 1.3.7 =
+* Bumped WordPress tested-up-to version 7.1
+
 = 1.3.6 =
 Fixed: Repeater, group, file and multiple select fields were registered with the wrong meta type, so `register_meta` raised a "you must specify the schema for each array item" notice and dropped the meta from the REST API.
 Fixed: The `native_custom_fields_register_post_meta_type` and `native_custom_fields_register_term_meta_type` filters received the meta key instead of the meta type as their filtered value.

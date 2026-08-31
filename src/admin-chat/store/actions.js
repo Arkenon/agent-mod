@@ -294,8 +294,7 @@ async function resolveConfirmation( { dispatch, select }, token, conversationId,
 			} );
 		} else {
 			dispatch.setError(
-				( err && err.message ) ||
-				__( 'Request failed. Please try again.', 'agent-mod' )
+				getErrorMessage( err, __( 'Request failed. Please try again.', 'agent-mod' ) )
 			);
 		}
 	} finally {
@@ -392,6 +391,22 @@ function isStopError( err ) {
 		'agent_mod_request_stopped' === err?.code ||
 		'agent_mod_request_stopped' === err?.error?.code
 	);
+}
+
+/**
+ * Extracts a human-readable message from a caught apiFetch error.
+ *
+ * apiFetch rejects with the parsed REST error body as-is, which nests the
+ * message under `error.message` (see AgentResponse::toArray()), not at the
+ * top level — so `err.message` alone misses provider errors (e.g. a 429
+ * quota response from the AI provider).
+ *
+ * @param {Object} err      The caught error.
+ * @param {string} fallback Message to use when none can be found.
+ * @return {string} The resolved error message.
+ */
+function getErrorMessage( err, fallback ) {
+	return err?.error?.message || err?.message || fallback;
 }
 
 /**
@@ -600,10 +615,9 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 	} catch ( err ) {
 		// A user-initiated Stop is not an error: release the UI quietly.
 		if ( ! isStopError( err ) ) {
-			const message =
-				( err && err.message ) ||
-				__( 'Request failed. Please try again.', 'agent-mod' );
-			dispatch.setError( message );
+			dispatch.setError(
+				getErrorMessage( err, __( 'Request failed. Please try again.', 'agent-mod' ) )
+			);
 		}
 	} finally {
 		untrackRequest( requestId );
