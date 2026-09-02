@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Plugin URI:        https://agentmodwp.com 
  * Requires at least: 7.0
  * Requires PHP:      7.4
- * Version:           1.1.9
+ * Version:           1.2.0
  * Author:            Kadim Gültekin
  * Author URI:        https://profiles.wordpress.org/arkenon/
  * License:           GPL-2.0-or-later
