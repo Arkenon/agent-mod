@@ -4,7 +4,7 @@ Tags: ai, agent, chatbot, assistant, abilities
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.2.1
+Stable tag: 1.2.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -118,6 +118,11 @@ Under the AgentMod menu in your WordPress admin, there is a dedicated **Abilitie
 If you ask the agent to create a post, it will show you a confirmation modal summarizing the action before anything is written to the database. You must explicitly approve the action for it to proceed.
 
 == Changelog ==
+
+= 1.2.2 =
+* Fixed: Tool calling failed with a "400 Bad Request" on Anthropic and Google when any registered ability declared an input schema those providers do not accept — for example WooCommerce 11.x `product-create` / `product-update`. Because the full tool list travels with every request, one unsupported schema broke every message, including plain chat with no ability call involved.
+* Added: Anthropic connector repair — a tool's top-level `oneOf` / `anyOf` / `allOf` is flattened into a single object schema. Branch properties are merged and their enums are unioned, so no option the schema offered is lost.
+* Improved: Google connector repair — tool schemas are now normalized against the Gemini schema subset: keywords the API does not define (`additionalProperties` and friends) and unsupported `format` values are dropped, `allOf` is merged into its parent node, and union types collapse to a scalar type plus `nullable`.
 
 = 1.2.1 =
 * Added: Overview video embed in readme.txt

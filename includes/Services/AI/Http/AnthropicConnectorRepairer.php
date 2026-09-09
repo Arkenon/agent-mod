@@ -4,9 +4,9 @@
  * Anthropic (Claude) connector repairer.
  *
  * Single, self-contained workaround layer for every known quirk of the bundled
- * "AI Provider for Anthropic" connector. It is the HTTP-layer mirror of the two
- * upstream fix branches submitted as PRs; each numbered repair below maps 1:1 to
- * one of them and becomes a harmless no-op once the fixed connector ships:
+ * "AI Provider for Anthropic" connector. Each numbered repair below becomes a
+ * harmless no-op once the fixed connector ships; repairs 1 and 2 are the
+ * HTTP-layer mirror of upstream fix branches submitted as PRs.
  *
  * 1. Thinking-signature round-trip (fix/anthropic-thinking-signature,
  *    anthropic #30): with extended thinking active, Claude returns each
@@ -42,6 +42,27 @@
  *    text slices are therefore merged unconditionally into a single text block
  *    (mirror of mergeTextBlocks()).
  *
+ * 3. Tool schemas with a top-level JSON Schema combiner: the API rejects any
+ *    tool whose `input_schema` starts with `oneOf` / `anyOf` / `allOf` —
+ *    "tools.N.custom.input_schema: input_schema does not support oneOf, allOf,
+ *    or anyOf at the top level". The connector forwards every ability schema
+ *    verbatim (AnthropicTextGenerationModel::prepareToolsParam()), so a single
+ *    ability written that way 400s the WHOLE request: the tool list travels
+ *    with every call, so nothing works at all — not even plain chat, and not
+ *    just that one ability. WooCommerce 11.x is the known offender
+ *    (`woocommerce/product-create` and `woocommerce/product-update` discriminate
+ *    on `product_type_alias` through a top-level `oneOf`), but any third-party
+ *    ability may do the same, so the repair is generic. The combiner is
+ *    flattened into one permissive object schema: branch properties are unioned
+ *    (enums of a shared property are unioned too, so a per-branch discriminator
+ *    keeps every value it had), `required` collapses to the fields required by
+ *    EVERY branch, and the combiner key is dropped. This relaxes what the model
+ *    is told, not what the site accepts — WP_Ability re-validates the input
+ *    against the real schema, and abilities like WooCommerce's additionally
+ *    enforce the branch matrix at run time
+ *    (ProductAbilityTrait::validate_product_fields_for_config()). Only the top
+ *    level is touched; nested combiners are legal and are left alone.
+ *
  * Rather than patching the third-party connector (forbidden by project rules and
  * lost on update), all repairs hook the WordPress HTTP API — the AI Client routes
  * every Anthropic call through wp_safe_remote_request() — and are strictly scoped
@@ -53,8 +74,9 @@
  * ToolCallRepairManager) to run against the connector's native behaviour, e.g.
  * once the upstream PRs are merged and the fixed connector is installed. All
  * repairs are also idempotent against an already-fixed connector: a thinking
- * block that already carries its signature is left alone, and a turn the
- * connector already continued arrives here as a single finished response.
+ * block that already carries its signature is left alone, a turn the connector
+ * already continued arrives here as a single finished response, and a tool
+ * schema without a top-level combiner is passed through untouched.
  *
  * @package AgentMod
  * @subpackage Services\AI\Http
@@ -191,7 +213,8 @@ class AnthropicConnectorRepairer implements ProviderToolCallRepairerInterface
      * Applies every request-side repair to an outgoing Anthropic call.
      *
      * Re-injects captured thinking signatures into outgoing thinking blocks and
-     * drops the blocks that would still be unsigned (repair 1).
+     * drops the blocks that would still be unsigned (repair 1), then flattens
+     * top-level combiners out of the tool schemas (repair 3).
      *
      * @param mixed  $args The WordPress HTTP request arguments.
      * @param string $url  The request URL.
@@ -212,13 +235,16 @@ class AnthropicConnectorRepairer implements ProviderToolCallRepairerInterface
         // Decode preserving the object/array distinction so untouched empty
         // objects ({}) are not flattened to arrays ([]) on re-encode.
         $payload = json_decode($args['body']);
-        if (! $payload instanceof stdClass || empty($payload->messages) || ! is_array($payload->messages)) {
+        if (! $payload instanceof stdClass) {
             return $args;
         }
 
-        $changed = false;
+        // Repair 3 runs on the tool list, which is present on every call —
+        // including the very first one, before any message carries a thinking
+        // block — so it is deliberately not gated on $payload->messages.
+        $changed = $this->flattenToolSchemas($payload);
 
-        foreach ($payload->messages as $message) {
+        foreach ((array) ($payload->messages ?? []) as $message) {
             if (! $message instanceof stdClass || empty($message->content) || ! is_array($message->content)) {
                 continue;
             }
@@ -255,6 +281,225 @@ class AnthropicConnectorRepairer implements ProviderToolCallRepairerInterface
         }
 
         return $args;
+    }
+
+    /**
+     * Flattens top-level JSON Schema combiners out of every tool schema (repair 3).
+     *
+     * @param stdClass $payload The decoded request payload (modified in place).
+     *
+     * @return bool True if any schema was rewritten.
+     * @since 1.2.2
+     */
+    private function flattenToolSchemas(stdClass $payload): bool
+    {
+        if (empty($payload->tools) || ! is_array($payload->tools)) {
+            return false;
+        }
+
+        $changed = false;
+
+        foreach ($payload->tools as $tool) {
+            // Server-side tools (web_search) carry no input_schema at all.
+            if (
+                ! $tool instanceof stdClass
+                || ! isset($tool->input_schema)
+                || ! $tool->input_schema instanceof stdClass
+            ) {
+                continue;
+            }
+
+            if ($this->flattenTopLevelCombiners($tool->input_schema)) {
+                $changed = true;
+            }
+        }
+
+        return $changed;
+    }
+
+    /**
+     * Merges a schema's top-level `oneOf` / `anyOf` / `allOf` branches into itself.
+     *
+     * Only the top level is rewritten, because that is the only place the API
+     * refuses a combiner. A schema that has none is left byte-identical, which
+     * keeps this a no-op for well-formed abilities and for a future connector
+     * that normalises the schemas itself.
+     *
+     * @param stdClass $schema The tool input schema (modified in place).
+     *
+     * @return bool True if a combiner was flattened.
+     * @since 1.2.2
+     */
+    private function flattenTopLevelCombiners(stdClass $schema): bool
+    {
+        $changed = false;
+
+        foreach (['oneOf', 'anyOf', 'allOf'] as $combiner) {
+            if (empty($schema->{$combiner}) || ! is_array($schema->{$combiner})) {
+                continue;
+            }
+
+            $branches = $schema->{$combiner};
+            unset($schema->{$combiner});
+
+            // `allOf` is a conjunction: every branch applies, so their required
+            // fields add up. `oneOf` / `anyOf` are disjunctions, where only the
+            // fields required by every branch are certainly required.
+            $this->mergeBranchesInto($schema, $branches, 'allOf' === $combiner);
+            $changed = true;
+        }
+
+        if ($changed) {
+            // The API also insists the top level is an object schema.
+            $schema->type = 'object';
+        }
+
+        return $changed;
+    }
+
+    /**
+     * Merges combiner branches into the parent schema.
+     *
+     * Keys already present on the parent win, so an explicit top-level
+     * declaration is never overwritten by a branch.
+     *
+     * @param stdClass           $schema      The parent schema (modified in place).
+     * @param array<int, mixed>  $branches    The combiner branches.
+     * @param bool               $conjunction True for `allOf` (union of required),
+     *                                        false for `oneOf` / `anyOf`
+     *                                        (intersection of required).
+     *
+     * @return void
+     * @since 1.2.2
+     */
+    private function mergeBranchesInto(stdClass $schema, array $branches, bool $conjunction): void
+    {
+        $requiredSets = [];
+
+        foreach ($branches as $branch) {
+            if (! $branch instanceof stdClass) {
+                continue;
+            }
+
+            $branchRequired = [];
+
+            foreach (get_object_vars($branch) as $key => $value) {
+                if ('properties' === $key) {
+                    $this->mergeProperties($schema, $value);
+                    continue;
+                }
+
+                if ('required' === $key) {
+                    if (is_array($value)) {
+                        $branchRequired = array_values(array_filter($value, 'is_string'));
+                    }
+                    continue;
+                }
+
+                // The merged schema is an object by definition; a branch `type`
+                // must not override that.
+                if ('type' === $key) {
+                    continue;
+                }
+
+                if (! property_exists($schema, $key)) {
+                    $schema->{$key} = $value;
+                }
+            }
+
+            $requiredSets[] = $branchRequired;
+        }
+
+        if (empty($requiredSets)) {
+            return;
+        }
+
+        $merged = array_shift($requiredSets);
+
+        foreach ($requiredSets as $set) {
+            $merged = $conjunction ? array_merge($merged, $set) : array_intersect($merged, $set);
+        }
+
+        // A field the parent already required stays required regardless of the
+        // branch it came from.
+        $existing = (isset($schema->required) && is_array($schema->required)) ? $schema->required : [];
+        $required = array_values(array_unique(array_merge($existing, $merged)));
+
+        if (empty($required)) {
+            unset($schema->required);
+
+            return;
+        }
+
+        $schema->required = $required;
+    }
+
+    /**
+     * Unions one branch's `properties` map into the parent schema.
+     *
+     * A property that several branches declare keeps the first branch's schema,
+     * except for `enum`, which is unioned. That matters for discriminator
+     * properties: WooCommerce gives `product_type_alias` a single-value enum per
+     * branch, and taking only the first would silently leave the model able to
+     * create nothing but a "physical" product.
+     *
+     * @param stdClass $schema     The parent schema (modified in place).
+     * @param mixed    $properties The branch's `properties` map.
+     *
+     * @return void
+     * @since 1.2.2
+     */
+    private function mergeProperties(stdClass $schema, $properties): void
+    {
+        if (! $properties instanceof stdClass) {
+            return;
+        }
+
+        if (! isset($schema->properties) || ! $schema->properties instanceof stdClass) {
+            $schema->properties = new stdClass();
+        }
+
+        foreach (get_object_vars($properties) as $name => $child) {
+            if (! property_exists($schema->properties, $name)) {
+                $schema->properties->{$name} = $child;
+                continue;
+            }
+
+            $this->mergeEnums($schema->properties->{$name}, $child);
+        }
+    }
+
+    /**
+     * Widens an already-merged property's `enum` with another branch's values.
+     *
+     * A branch that constrains the property to no enum at all is the widest
+     * case, so the merged property drops its enum entirely.
+     *
+     * @param mixed $existing The property schema kept so far (modified in place).
+     * @param mixed $incoming The same property from a later branch.
+     *
+     * @return void
+     * @since 1.2.2
+     */
+    private function mergeEnums($existing, $incoming): void
+    {
+        if (! $existing instanceof stdClass || ! $incoming instanceof stdClass) {
+            return;
+        }
+
+        if (! isset($existing->enum) || ! is_array($existing->enum)) {
+            return;
+        }
+
+        if (! isset($incoming->enum) || ! is_array($incoming->enum)) {
+            unset($existing->enum);
+
+            return;
+        }
+
+        $existing->enum = array_values(
+            array_unique(array_merge($existing->enum, $incoming->enum), SORT_REGULAR)
+        );
     }
 
     /**

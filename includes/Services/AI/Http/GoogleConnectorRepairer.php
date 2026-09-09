@@ -4,19 +4,44 @@
  * Google (Gemini) connector repairer.
  *
  * Single, self-contained workaround layer for every known quirk of the bundled
- * "AI Provider for Google" connector. It is the HTTP-layer mirror of the three
- * upstream fix branches submitted as PRs; each numbered repair below maps 1:1 to
- * one of them and becomes a harmless no-op once the fixed connector ships:
+ * "AI Provider for Google" connector. Each numbered repair below becomes a
+ * harmless no-op once the fixed connector ships. Repairs 2 and 3 are the
+ * HTTP-layer mirror of upstream fix branches submitted as PRs; repair 1 started
+ * as one and has since grown past it, because the connector's own sanitiser
+ * covers only part of what the proto refuses.
  *
- * 1. Schema type-union / empty-properties (fix/schema-type-union, google #33):
- *    Gemini's function-declaration schema is a proto-based OpenAPI subset where
- *    `type` is a non-repeating scalar field and `properties` must be a JSON map.
- *    A JSON Schema `type` union (`['string', 'null']`) or an empty `properties`
- *    serialised as `[]` makes Gemini reject the ENTIRE request — including plain
- *    chat — with "Proto field is not repeating, cannot start list" / "Cannot bind
- *    a list to map for field 'properties'". Outgoing tool schemas are normalised:
- *    the union collapses to its first non-"null" member (plus `nullable: true`
- *    when "null" was allowed) and empty `properties` become objects.
+ * 1. Tool-schema normalisation (fix/schema-type-union, google #33 — since
+ *    widened): Gemini's function-declaration schema is not JSON Schema but a
+ *    proto-based OpenAPI subset, and the proto rejects the ENTIRE request —
+ *    including plain chat, since the tool list travels with every call — for
+ *    anything outside that subset. Outgoing tool schemas are therefore rewritten
+ *    into the subset:
+ *
+ *    (a) `type` unions (`['string', 'null']`) collapse to the first non-"null"
+ *        member plus `nullable: true`; the proto field is not repeating
+ *        ("Proto field is not repeating, cannot start list").
+ *    (b) An empty `properties` serialised as `[]` becomes `{}`; the proto field
+ *        is a map ("Cannot bind a list to map for field 'properties'").
+ *    (c) Every keyword the proto does not define is dropped, by allowlist. The
+ *        connector only strips `additionalProperties`, and only along the
+ *        `properties` / `items` paths (GoogleTextGenerationModel::
+ *        removeAdditionalPropertiesKey()), so any of it surviving inside a
+ *        combiner branch — or any other unmodelled keyword such as `const`,
+ *        `$ref` or a REST-schema leftover like `context` — 400s with
+ *        "Unknown name ... Cannot find field". WooCommerce 11.x is the known
+ *        offender: `woocommerce/product-create` and `woocommerce/product-update`
+ *        keep `additionalProperties` in every `oneOf` branch. An allowlist is
+ *        used rather than a blocklist on purpose — an unknown keyword is a hard
+ *        400, whereas dropping a keyword that Gemini would have understood only
+ *        relaxes the tool schema, and WP_Ability re-validates the input against
+ *        the real schema server-side either way.
+ *    (d) `format` is kept only for the type/value pairs the proto documents and
+ *        dropped otherwise (e.g. the `format: uri` WooCommerce puts on
+ *        `external_url`); it is advisory for tool inputs.
+ *    (e) `allOf` has no proto equivalent, so its branches are merged into the
+ *        node that carried them (properties unioned, required added up), which
+ *        is exactly its conjunction semantics. `anyOf` and `oneOf` are modelled
+ *        and are left in place, their branches normalised like any other node.
  *
  * 2. Thought-signature round-trip (fix/thought-signature-round-trip):
  *    Thinking models attach a `thoughtSignature` to every `functionCall` part
@@ -84,6 +109,58 @@ class GoogleConnectorRepairer implements ProviderToolCallRepairerInterface
      * @since 1.1.0
      */
     private const ENABLED = true;
+
+    /**
+     * Schema keywords Gemini's function-declaration proto defines.
+     *
+     * Everything else is dropped from an outgoing tool schema (repair 1c).
+     * `oneOf` is listed alongside `anyOf` because the API demonstrably accepts
+     * it: a payload carrying one is rejected for its CONTENTS
+     * ("Unknown name \"additionalProperties\" at ... parameters.one_of[0]"),
+     * which it could not report had the combiner itself been unmodelled.
+     *
+     * @var string[]
+     * @since 1.2.2
+     */
+    private const SCHEMA_KEYWORDS = [
+        'type',
+        'format',
+        'title',
+        'description',
+        'nullable',
+        'default',
+        'enum',
+        'items',
+        'minItems',
+        'maxItems',
+        'properties',
+        'required',
+        'propertyOrdering',
+        'minProperties',
+        'maxProperties',
+        'minimum',
+        'maximum',
+        'minLength',
+        'maxLength',
+        'pattern',
+        'example',
+        'anyOf',
+        'oneOf',
+    ];
+
+    /**
+     * The `format` values Gemini documents, keyed by the type they apply to.
+     *
+     * A `format` outside this table is dropped rather than sent (repair 1d).
+     *
+     * @var array<string, string[]>
+     * @since 1.2.2
+     */
+    private const SCHEMA_FORMATS = [
+        'integer' => ['int32', 'int64'],
+        'number'  => ['float', 'double'],
+        'string'  => ['enum', 'date-time'],
+    ];
 
     /**
      * Transient key prefix for persisted thought signatures.
@@ -348,13 +425,14 @@ class GoogleConnectorRepairer implements ProviderToolCallRepairerInterface
     }
 
     /**
-     * Recursively normalises a JSON Schema node for Gemini.
+     * Recursively normalises a JSON Schema node into Gemini's subset (repair 1).
      *
-     * Empty `properties` arrays become objects and `type` unions collapse to a
-     * single scalar, exactly like the upstream sanitizer pass. Schema nodes are
-     * stdClass (objects survive json_decode); their nested objects are mutated in
-     * place via PHP's object handles. Arrays (e.g. `anyOf`, `items` lists) are
-     * walked so nested object schemas are reached too.
+     * The walk is schema-aware rather than a blind recursion over every value,
+     * because the keys under `properties` are property NAMES, not keywords, and
+     * must never be filtered against the keyword allowlist. Schema nodes are
+     * stdClass (objects survive the non-associative json_decode); their nested
+     * objects are mutated in place via PHP's object handles. Arrays (combiner
+     * branch lists, tuple-form `items`) are walked so nested schemas are reached.
      *
      * @param mixed $node The schema node to normalise (modified in place).
      *
@@ -363,35 +441,143 @@ class GoogleConnectorRepairer implements ProviderToolCallRepairerInterface
      */
     private function normalizeSchema($node): bool
     {
-        $changed = false;
+        if (is_array($node)) {
+            $changed = false;
 
-        if ($node instanceof stdClass) {
-            foreach ($node as $key => $value) {
-                if ('properties' === $key && is_array($value) && 0 === count($value)) {
-                    $node->properties = new stdClass();
-                    $changed          = true;
-                    continue;
-                }
-
-                if ('type' === $key && is_array($value)) {
-                    $node->type = $this->collapseTypeUnion($value, $node);
-                    $changed    = true;
-                    continue;
-                }
-
-                if ($this->normalizeSchema($value)) {
+            foreach ($node as $entry) {
+                if ($this->normalizeSchema($entry)) {
                     $changed = true;
                 }
             }
-        } elseif (is_array($node)) {
-            foreach ($node as $value) {
-                if ($this->normalizeSchema($value)) {
-                    $changed = true;
+
+            return $changed;
+        }
+
+        if (! $node instanceof stdClass) {
+            return false;
+        }
+
+        // Must run before the allowlist pass, which would otherwise drop the
+        // whole `allOf` and with it every constraint the branches carried.
+        $changed = $this->mergeAllOf($node);
+
+        foreach (get_object_vars($node) as $key => $value) {
+            if (! in_array($key, self::SCHEMA_KEYWORDS, true)) {
+                unset($node->{$key});
+                $changed = true;
+            }
+        }
+
+        if (isset($node->type) && is_array($node->type)) {
+            $node->type = $this->collapseTypeUnion($node->type, $node);
+            $changed    = true;
+        }
+
+        // After the union collapse, so the format is checked against the single
+        // type Gemini will actually see.
+        if (property_exists($node, 'format') && $this->stripUnsupportedFormat($node)) {
+            $changed = true;
+        }
+
+        if (property_exists($node, 'properties')) {
+            if (is_array($node->properties) && 0 === count($node->properties)) {
+                $node->properties = new stdClass();
+                $changed          = true;
+            } elseif ($node->properties instanceof stdClass) {
+                foreach (get_object_vars($node->properties) as $child) {
+                    if ($this->normalizeSchema($child)) {
+                        $changed = true;
+                    }
                 }
             }
         }
 
+        foreach (['items', 'anyOf', 'oneOf'] as $key) {
+            if (isset($node->{$key}) && $this->normalizeSchema($node->{$key})) {
+                $changed = true;
+            }
+        }
+
         return $changed;
+    }
+
+    /**
+     * Merges a node's `allOf` branches into the node itself (repair 1e).
+     *
+     * `allOf` means every branch applies at once, so unioning the properties and
+     * adding up the required lists preserves the schema's meaning. Keys already
+     * present on the node win, so an explicit declaration outranks a branch.
+     *
+     * @param stdClass $node The schema node (modified in place).
+     *
+     * @return bool True if an `allOf` was merged.
+     * @since 1.2.2
+     */
+    private function mergeAllOf(stdClass $node): bool
+    {
+        if (empty($node->allOf) || ! is_array($node->allOf)) {
+            return false;
+        }
+
+        $branches = $node->allOf;
+        unset($node->allOf);
+
+        foreach ($branches as $branch) {
+            if (! $branch instanceof stdClass) {
+                continue;
+            }
+
+            foreach (get_object_vars($branch) as $key => $value) {
+                if ('properties' === $key && $value instanceof stdClass) {
+                    if (! isset($node->properties) || ! $node->properties instanceof stdClass) {
+                        $node->properties = new stdClass();
+                    }
+
+                    foreach (get_object_vars($value) as $name => $child) {
+                        if (! property_exists($node->properties, $name)) {
+                            $node->properties->{$name} = $child;
+                        }
+                    }
+
+                    continue;
+                }
+
+                if ('required' === $key && is_array($value)) {
+                    $existing       = (isset($node->required) && is_array($node->required)) ? $node->required : [];
+                    $node->required = array_values(array_unique(array_merge($existing, $value)));
+
+                    continue;
+                }
+
+                if (! property_exists($node, $key)) {
+                    $node->{$key} = $value;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Drops a `format` Gemini does not document for the node's type (repair 1d).
+     *
+     * @param stdClass $node The schema node (modified in place).
+     *
+     * @return bool True if the format was dropped.
+     * @since 1.2.2
+     */
+    private function stripUnsupportedFormat(stdClass $node): bool
+    {
+        $type    = (isset($node->type) && is_string($node->type)) ? $node->type : '';
+        $allowed = self::SCHEMA_FORMATS[$type] ?? [];
+
+        if (is_string($node->format) && in_array($node->format, $allowed, true)) {
+            return false;
+        }
+
+        unset($node->format);
+
+        return true;
     }
 
     /**
