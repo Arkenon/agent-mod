@@ -88,7 +88,8 @@ final class AdminController
 			'agent-mod-dashboard',
 			'agentModDashboard',
 			[
-				'logoUrl' => AGENT_MOD_URL . 'includes/Presentation/Admin/Assets/img/agent_mod_logo.jpg',
+				'logoUrl'      => AGENT_MOD_URL . 'includes/Presentation/Admin/Assets/img/agent_mod_logo.jpg',
+				'workspaceUrl' => AGENT_MOD_URL . 'includes/Presentation/Admin/Assets/img/ai_workspace.JPG',
 			]
 		);
 	}

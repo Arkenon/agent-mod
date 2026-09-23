@@ -7,8 +7,40 @@
  */
 import { useState, useEffect } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
+import { addQueryArgs } from '@wordpress/url';
 import { DataViews, filterSortAndPaginate } from '@wordpress/dataviews';
 import { __ } from '@wordpress/i18n';
+
+// ---------------------------------------------------------------------------
+// The core abilities endpoint paginates (default per_page=50). A plain
+// apiFetch() to the collection URL only ever returns page 1, which silently
+// drops any ability registered after the first 50 (e.g. everything from a
+// plugin whose abilities register later in the wp_abilities_api_init chain).
+// Page through the full collection instead of trusting a single request.
+// ---------------------------------------------------------------------------
+async function fetchAllAbilities( path ) {
+	const perPage = 100;
+	let page = 1;
+	let items = [];
+
+	while ( true ) {
+		const response = await apiFetch( {
+			path: addQueryArgs( path, { per_page: perPage, page } ),
+			parse: false,
+		} );
+		const data = await response.json();
+
+		items = items.concat( Array.isArray( data ) ? data : [] );
+
+		const totalPages = parseInt( response.headers.get( 'X-WP-TotalPages' ) || '1', 10 );
+		if ( page >= totalPages ) {
+			break;
+		}
+		page += 1;
+	}
+
+	return items;
+}
 
 const DEFAULT_VIEW = {
 	type: 'table',
@@ -250,10 +282,8 @@ export default function AbilityList() {
 	const config = window.agentModAbilityList || {};
 
 	useEffect( () => {
-		apiFetch( { path: config.abilitiesEndpoint || '/wp-abilities/v1/abilities' } )
-			.then( ( data ) => {
-				setAbilities( Array.isArray( data ) ? data : [] );
-			} )
+		fetchAllAbilities( config.abilitiesEndpoint || '/wp-abilities/v1/abilities' )
+			.then( setAbilities )
 			.catch( ( err ) => {
 				setError( err?.message || __( 'Failed to load abilities.', 'agent-mod' ) );
 			} )

@@ -4,7 +4,7 @@ Tags: ai, agent, chatbot, assistant, abilities
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.2.2
+Stable tag: 1.2.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -66,13 +66,17 @@ A comprehensive set of PHP and JavaScript hooks for extending AgentMod:
 
 Unlock advanced features and take your AI Agents to the next level.
 
-* Full-Screen Workspace : Manage all AI features in full screen panel. No distraction!
-* Multi Agent System : Create and manage multiple AI agents.
-* Conversation History : Save and manage conversation history.
-* AI Skills : Add custom AI skills to your agents.
-* Frontend Widgets : Add AI widgets to your website. For example for contact forms or FAQ floating chat panels.
-* Code Snippets : Save and manage code snippets with your AI agents.
-* Import / Export Tools : Export and import settings and custom fields and plugin settings.
+* AgentMod Hub: Browse and import ready-to-use agents, skills, and more from a public hub, no manual setup required.
+* Multi-Agent System: Create and manage multiple specialized AI agents, each with its own role and personality.
+* Agent Tray: Switch between your AI agents right from the chat interface.
+* Conversation History: Automatically save, search, and restore past conversations.
+* Additional Abilities: Unlock 40+ extra abilities for your agents to work with.
+* AI Skills: Attach reusable, custom skills to your agents.
+* Full-Screen Workspace: A dedicated, distraction-free environment to manage every AI feature in one place.
+* Scheduled Tasks: Build multi-step scheduled agent runs and make your website act autonomously.
+* Frontend Widgets: Add AI-powered widgets to your site, such as contact forms or FAQ floating chat panels.
+* Code Snippets: Save, manage, and run code snippets alongside your AI agents.
+* Import / Export Tools: Export and import settings, custom fields, and plugin configuration.
 
 = Provider Agnostic =
 
@@ -118,6 +122,13 @@ Under the AgentMod menu in your WordPress admin, there is a dedicated **Abilitie
 If you ask the agent to create a post, it will show you a confirmation modal summarizing the action before anything is written to the database. You must explicitly approve the action for it to proceed.
 
 == Changelog ==
+
+= 1.2.3 =
+* Improved: Dashboard's "Go Pro" sidebar card and Free vs. Pro comparison table now list every Pro-exclusive feature (AgentMod Hub, Agent Tray, Additional Abilities, Scheduled Tasks included) with clearer, consistent wording.
+* Changed: "Upgrade to Pro" links now point to https://agentmodwp.com/pro-features/ instead of the direct Freemius checkout link.
+* Added: A limited-time discount banner on the Dashboard (coupon `WP50`, 50% off, valid through December 31, 2026, new customers only).
+* Added: A screenshot of the Pro Full-Screen AI Workspace on the Dashboard, above the Free vs. Pro comparison table.
+* Fixed: The "Go Pro" card heading used the wrong text domain and was never translatable under `agent-mod`.
 
 = 1.2.2 =
 * Fixed: Tool calling failed with a "400 Bad Request" on Anthropic and Google when any registered ability declared an input schema those providers do not accept — for example WooCommerce 11.x `product-create` / `product-update`. Because the full tool list travels with every request, one unsupported schema broke every message, including plain chat with no ability call involved.

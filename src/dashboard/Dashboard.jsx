@@ -26,6 +26,13 @@ function DashboardSidebar() {
 
 	return (
 		<VStack spacing={4} style={{ width: '280px', flexShrink: 0 }}>
+			<Button
+				variant="primary"
+				onClick={() => dispatch('agent-mod/chat').openChat()}
+				style={{ width: '100%', justifyContent: 'center' }}
+			>
+				{__('Chat with Your Agent', 'agent-mod')}
+			</Button>
 			<Card>
 				<CardBody>
 					<VStack spacing={3}>
@@ -68,7 +75,7 @@ function DashboardSidebar() {
 						<HStack spacing={2} alignment="left">
 							<Icon icon={shield} size={20} style={{ fill: '#fff' }} />
 							<strong style={{ fontSize: '15px', color: '#fff' }}>
-								{__('Go Pro', 'native-custom-fields')}
+								{__('Go Pro', 'agent-mod')}
 							</strong>
 						</HStack>
 
@@ -78,13 +85,17 @@ function DashboardSidebar() {
 
 						<VStack spacing={1}>
 							{[
-								__('Multi Agent System', 'agent-mod'),
+								__('AgentMod Hub', 'agent-mod'),
+								__('Multi-Agent System', 'agent-mod'),
+								__('Agent Tray', 'agent-mod'),
 								__('Conversation History', 'agent-mod'),
+								__('Additional Abilities (+40)', 'agent-mod'),
 								__('AI Skills', 'agent-mod'),
+								__('Full-Screen Workspace', 'agent-mod'),
+								__('Scheduled Tasks', 'agent-mod'),
 								__('Frontend Widgets', 'agent-mod'),
 								__('Code Snippets', 'agent-mod'),
 								__('Import / Export Tools', 'agent-mod'),
-								__('Full-Screen Workspace', 'agent-mod'),
 							].map((feature, i) => (
 								<HStack key={i} spacing={2} alignment="left">
 									<Icon icon={check} size={14} style={{ fill: '#fff', flexShrink: 0 }} />
@@ -102,7 +113,7 @@ function DashboardSidebar() {
 								justifyContent: 'center',
 								border: 'none',
 							}}
-							href="https://checkout.freemius.com/plugin/35032/plan/57576/"
+							href="https://agentmodwp.com/pro-features/"
 							target="_blank"
 						>
 							{__('Upgrade to Pro →', 'agent-mod')}
@@ -145,13 +156,44 @@ export default function Dashboard() {
 									{__('AgentMod is a WordPress AI Agent Platform. Unlike ordinary chatbot plugins, it acts as an orchestration layer built on WordPress\'s native AI infrastructure — connecting your site to AI providers through a clean, extensible architecture.', 'agent-mod')}
 								</p>
 
-								<Button
-									variant="primary"
-									onClick={() => dispatch('agent-mod/chat').openChat()}
-									style={{marginTop:15}}
-								>
-									{__('Chat with Your Agent', 'agent-mod')}
-								</Button>
+								<div style={{ marginTop: '32px', padding: '16px 20px', borderRadius: '8px', border: '1px dashed var(--wp-admin-theme-color, #3858e9)', background: 'rgba(56,88,233,0.04)' }}>
+									<HStack spacing={2} alignment="left" justify="flex-start">
+										<strong style={{ fontSize: '14px', color: 'var(--wp-admin-theme-color, #3858e9)' }}>
+											{__('🎉 Limited-Time Offer:', 'agent-mod')}
+										</strong>
+										<span style={{ fontSize: '13px', color: '#3c434a' }}>
+											{__('Use coupon', 'agent-mod')}{' '}
+											<strong>WP50</strong>{' '}
+											{__('for 50% off AgentMod Pro.', 'agent-mod')}
+										</span>
+									</HStack>
+									<HStack spacing={3} alignment="left" justify="flex-start" style={{ marginTop: '10px' }}>
+										<Button
+											variant="primary"
+											href="https://agentmodwp.com/pro-features/"
+											target="_blank"
+										>
+											{__('Claim 50% Discount', 'agent-mod')}
+										</Button>
+										<span style={{ fontSize: '11px', color: '#8c8f94' }}>
+											{__('Valid until December 31, 2026. For new customers only, one-time use per customer.', 'agent-mod')}
+										</span>
+									</HStack>
+								</div>
+
+								<h3 style={{ marginTop: '32px', marginBottom: '4px', fontSize: '16px', fontWeight: 600, color: '#1e1e1e' }}>
+									{__('The Full-Screen AI Workspace (Pro)', 'agent-mod')}
+								</h3>
+								<p style={{ margin: '0 0 16px', fontSize: '13px', color: '#646970' }}>
+									{__('Manage agents, skills, widgets, snippets and scheduled tasks in one distraction-free screen.', 'agent-mod')}
+								</p>
+								<div style={{ marginBottom: '32px', overflow: 'hidden', borderRadius: '8px', border: '1px solid #e2e4e7', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+									<img
+										src={window.agentModDashboard?.workspaceUrl || ''}
+										alt={__('AgentMod Pro Full-Screen AI Workspace', 'agent-mod')}
+										style={{ display: 'block', width: '100%', height: 'auto' }}
+									/>
+								</div>
 
 								<h3 style={{ marginTop: '32px', marginBottom: '16px', fontSize: '16px', fontWeight: 600, color: '#1e1e1e' }}>
 									{__('Free vs. Pro Features', 'agent-mod')}
@@ -173,15 +215,19 @@ export default function Dashboard() {
 												{ feature: __('Admin Chat Widget', 'agent-mod'), free: true, pro: true },
 												{ feature: __('Safety Guardrails', 'agent-mod'), free: true, pro: true },
 												{ feature: __('Hard Limits (Cost Control)', 'agent-mod'), free: true, pro: true },
+												{ feature: __('AgentMod Hub', 'agent-mod'), free: false, pro: true },
 												{ feature: __('Full-Screen AI Workspace', 'agent-mod'), free: false, pro: true },
 												{ feature: __('Multi-Agent System', 'agent-mod'), free: false, pro: true },
+												{ feature: __('Agent Tray', 'agent-mod'), free: false, pro: true },
 												{ feature: __('Conversation History', 'agent-mod'), free: false, pro: true },
+												{ feature: __('Additional Abilities (+40)', 'agent-mod'), free: false, pro: true },
 												{ feature: __('Custom AI Skills', 'agent-mod'), free: false, pro: true },
+												{ feature: __('Scheduled Tasks', 'agent-mod'), free: false, pro: true },
 												{ feature: __('Code Snippets', 'agent-mod'), free: false, pro: true },
 												{ feature: __('Frontend Widgets', 'agent-mod'), free: false, pro: true },
-												{ feature: __('Import / Export Tools', 'agent-mod'), free: false, pro: true }												
-											].map((row, index) => (
-												<tr key={index} style={{ borderBottom: index === 9 ? 'none' : '1px solid #f0f0f1', backgroundColor: index % 2 === 0 ? '#fff' : '#fafafa' }}>
+												{ feature: __('Import / Export Tools', 'agent-mod'), free: false, pro: true }
+											].map((row, index, arr) => (
+												<tr key={index} style={{ borderBottom: index === arr.length - 1 ? 'none' : '1px solid #f0f0f1', backgroundColor: index % 2 === 0 ? '#fff' : '#fafafa' }}>
 													<td style={{ padding: '12px 16px', color: '#3c434a', fontWeight: row.free ? 400 : 500 }}>{row.feature}</td>
 													<td style={{ padding: '12px 16px', textAlign: 'center' }}>
 														{row.free ? <span style={{ color: '#00a32a', fontWeight: 'bold', fontSize: '16px' }}>✓</span> : <span style={{ color: '#8c8f94', fontWeight: 'bold' }}>—</span>}
