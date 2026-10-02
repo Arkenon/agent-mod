@@ -22,7 +22,7 @@ use NativeCustomFields\Services\Abilities\OptionsPageAbilitiesService;
 
 defined('ABSPATH') || exit;
 
-final class AbilityContoller
+final class AbilityController
 {
 
     /**

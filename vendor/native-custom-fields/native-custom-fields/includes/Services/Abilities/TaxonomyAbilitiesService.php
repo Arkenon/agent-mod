@@ -19,6 +19,8 @@ defined('ABSPATH') || exit;
 
 class TaxonomyAbilitiesService
 {
+    use AbilityReadTrait;
+
     private TermMetaService $termMetaService;
     private OptionService $optionService;
 
@@ -62,6 +64,8 @@ class TaxonomyAbilitiesService
 
         $permission = fn() => current_user_can('manage_options');
 
+        $this->registerReadAbilities($permission);
+
         wp_register_ability('native-custom-fields/create-taxonomy', [
             'label'               => __('Create Taxonomy', 'native-custom-fields'),
             'description'         => __('Creates a new custom taxonomy and saves its configuration.', 'native-custom-fields'),
@@ -97,6 +101,111 @@ class TaxonomyAbilitiesService
                 ],
             ],
         ]);
+    }
+
+    /**
+     * Register the read-only abilities (list / get) for custom taxonomies.
+     *
+     * @param callable $permission Permission callback
+     * @return void
+     * @since 1.4.1
+     */
+    private function registerReadAbilities(callable $permission): void
+    {
+        $read_meta = $this->getReadAbilityMeta();
+
+        wp_register_ability('native-custom-fields/list-taxonomies', [
+            'label'               => __('List Taxonomies', 'native-custom-fields'),
+            'description'         => __('Lists the custom taxonomies stored in NCF configuration (taxonomy, label, object_type, created_by). Use it to discover existing taxonomies before reading or changing one.', 'native-custom-fields'),
+            'category'            => 'native-custom-fields',
+            'execute_callback'    => [$this, 'listTaxonomies'],
+            'permission_callback' => $permission,
+            'meta'                => $read_meta,
+        ]);
+
+        wp_register_ability('native-custom-fields/get-taxonomy', [
+            'label'               => __('Get Taxonomy', 'native-custom-fields'),
+            'description'         => __('Reads one custom taxonomy configuration in the same shape that update-taxonomy accepts, so the result can be edited and saved back. Also reports whether the builder UI state (Edit screen) exists.', 'native-custom-fields'),
+            'category'            => 'native-custom-fields',
+            'execute_callback'    => [$this, 'getTaxonomy'],
+            'input_schema'        => [
+                'type'       => 'object',
+                'required'   => ['taxonomy'],
+                'properties' => [
+                    'taxonomy' => ['type' => 'string', 'description' => __('Taxonomy slug', 'native-custom-fields')],
+                ],
+            ],
+            'permission_callback' => $permission,
+            'meta'                => $read_meta,
+        ]);
+    }
+
+    /**
+     * List Taxonomies Ability
+     *
+     * @return array Response data
+     * @since 1.4.1
+     */
+    public function listTaxonomies(): array
+    {
+        $taxonomies = [];
+
+        foreach ($this->termMetaService->getTaxonomyConfigurations() as $slug => $config) {
+            $taxonomies[] = [
+                'taxonomy'    => $config['taxonomy'] ?? $slug,
+                'label'       => $config['args']['labels']['menu_name'] ?? '',
+                'object_type' => $config['object_type'] ?? [],
+                'created_by'  => $config['created_by'] ?? '',
+            ];
+        }
+
+        return ['status' => true, 'taxonomies' => $taxonomies];
+    }
+
+    /**
+     * Get Taxonomy Ability
+     *
+     * @param array $input Input data
+     * @return array Response data
+     * @since 1.4.1
+     */
+    public function getTaxonomy(array $input): array
+    {
+        $taxonomy = sanitize_key($input['taxonomy'] ?? '');
+
+        if (empty($taxonomy)) {
+            return ['status' => false, 'message' => __('taxonomy is required.', 'native-custom-fields')];
+        }
+
+        $configs = $this->termMetaService->getTaxonomyConfigurations();
+
+        if (! isset($configs[$taxonomy])) {
+            return ['status' => false, 'message' => __('Taxonomy not found.', 'native-custom-fields')];
+        }
+
+        $config = $configs[$taxonomy];
+        $args   = $config['args'] ?? [];
+        // The stored taxonomy args keep the plural/singular labels under labels.menu_name / labels.name_admin_bar.
+        $label  = $args['labels']['menu_name'] ?? $taxonomy;
+
+        return [
+            'status'        => true,
+            'settings'      => [
+                'taxonomy'          => $config['taxonomy'] ?? $taxonomy,
+                'label'             => $label,
+                'singular_name'     => $args['labels']['name_admin_bar'] ?? $label,
+                'object_type'       => (array) ($config['object_type'] ?? []),
+                'description'       => $args['description'] ?? '',
+                'public'            => ! empty($args['public']),
+                'hierarchical'      => ! empty($args['hierarchical']),
+                'show_admin_column' => ! empty($args['show_admin_column']),
+                'show_in_rest'      => ! empty($args['show_in_rest']),
+            ],
+            'created_by'    => $config['created_by'] ?? '',
+            'builder_state' => [
+                'form_present' => $this->hasBuilderState('native_custom_fields_taxonomy_builder_' . $taxonomy),
+            ],
+        ];
     }
 
     /**

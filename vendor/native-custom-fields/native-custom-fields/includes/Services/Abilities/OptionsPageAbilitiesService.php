@@ -19,6 +19,7 @@ defined('ABSPATH') || exit;
 class OptionsPageAbilitiesService
 {
     use AbilityFieldAdapterTrait;
+    use AbilityReadTrait;
 
     private OptionService $optionService;
 
@@ -81,6 +82,8 @@ class OptionsPageAbilitiesService
 
         $permission = fn() => current_user_can('manage_options');
 
+        $this->registerReadAbilities($permission);
+
         wp_register_ability('native-custom-fields/create-options-page', [
             'label'               => __('Create Options Page', 'native-custom-fields'),
             'description'         => __('Creates a new admin options page.', 'native-custom-fields'),
@@ -137,6 +140,120 @@ class OptionsPageAbilitiesService
     }
 
     /**
+     * Register the read-only abilities (list / get) for options pages.
+     *
+     * @return void
+     * @since 1.4.1
+     */
+    private function registerReadAbilities(callable $permission): void
+    {
+        $read_meta = $this->getReadAbilityMeta();
+
+        wp_register_ability('native-custom-fields/list-options-pages', [
+            'label'               => __('List Options Pages', 'native-custom-fields'),
+            'description'         => __('Lists the options pages stored in NCF configuration (menu_slug, titles, layout, created_by). Use it to discover existing pages before reading or changing one.', 'native-custom-fields'),
+            'category'            => 'native-custom-fields',
+            'execute_callback'    => [$this, 'listOptionsPages'],
+            'permission_callback' => $permission,
+            'meta'                => $read_meta,
+        ]);
+
+        wp_register_ability('native-custom-fields/get-options-page', [
+            'label'               => __('Get Options Page', 'native-custom-fields'),
+            'description'         => __('Reads one options page: its page settings and its sections/fields, returned in the same shape that update-options-page and save-options-page-fields accept, so the result can be edited and saved back. Also reports whether the builder UI state (Edit / Fields screens) exists, which shows if the page is repairable from the builder.', 'native-custom-fields'),
+            'category'            => 'native-custom-fields',
+            'execute_callback'    => [$this, 'getOptionsPage'],
+            'input_schema'        => [
+                'type'       => 'object',
+                'required'   => ['menu_slug'],
+                'properties' => [
+                    'menu_slug' => ['type' => 'string', 'description' => __('The options page menu slug', 'native-custom-fields')],
+                ],
+            ],
+            'permission_callback' => $permission,
+            'meta'                => $read_meta,
+        ]);
+    }
+
+    /**
+     * List Options Pages Ability
+     *
+     * @return array
+     * @since 1.4.1
+     */
+    public function listOptionsPages(): array
+    {
+        $fields_config = $this->optionService->getOptionsPagesFieldsConfigurations();
+        $pages         = [];
+
+        foreach ($this->optionService->getOptionsPagesConfigurations() as $slug => $page) {
+            $pages[] = [
+                'menu_slug'  => $page['menu_slug'] ?? $slug,
+                'page_title' => $page['page_title'] ?? '',
+                'menu_title' => $page['menu_title'] ?? '',
+                'layout'     => $page['layout'] ?? 'stacked',
+                'created_by' => $page['created_by'] ?? '',
+                'has_fields' => ! empty($fields_config[$slug]['sections']),
+            ];
+        }
+
+        return ['status' => true, 'pages' => $pages];
+    }
+
+    /**
+     * Get Options Page Ability
+     *
+     * @param array $input Input data
+     * @return array Response data
+     * @since 1.4.1
+     */
+    public function getOptionsPage(array $input): array
+    {
+        $menu_slug = sanitize_key($input['menu_slug'] ?? '');
+
+        if (empty($menu_slug)) {
+            return ['status' => false, 'message' => __('menu_slug is required.', 'native-custom-fields')];
+        }
+
+        $pages = $this->optionService->getOptionsPagesConfigurations();
+
+        if (! isset($pages[$menu_slug])) {
+            return ['status' => false, 'message' => __('Options page not found.', 'native-custom-fields')];
+        }
+
+        $page          = $pages[$menu_slug];
+        $fields_config = $this->optionService->getOptionsPagesFieldsConfigurations();
+
+        $sections = [];
+        foreach ($fields_config[$menu_slug]['sections'] ?? [] as $section) {
+            $sections[] = [
+                'section_name'  => $section['section_name'] ?? '',
+                'section_title' => $section['section_title'] ?? '',
+                'section_icon'  => $section['section_icon'] ?? '',
+                'fields'        => $this->extractAbilityFields($section['fields'] ?? []),
+            ];
+        }
+
+        return [
+            'status'  => true,
+            'page'    => [
+                'menu_slug'  => $page['menu_slug'] ?? $menu_slug,
+                'page_title' => $page['page_title'] ?? '',
+                'menu_title' => $page['menu_title'] ?? '',
+                'layout'     => $page['layout'] ?? 'stacked',
+                'icon_url'   => $page['icon_url'] ?? '',
+                'position'   => isset($page['position']) ? (int) $page['position'] : null,
+                'created_by' => $page['created_by'] ?? '',
+            ],
+            'sections' => $sections,
+            'builder_state' => [
+                'page_form_present'   => $this->hasBuilderState('native_custom_fields_options_page_builder_' . $menu_slug),
+                'fields_form_present' => $this->hasBuilderState('native_custom_fields_options_page_fields_builder_' . $menu_slug),
+            ],
+        ];
+    }
+
+    /**
      * Save Options Page Ability
      *
      * @param array $input Input data
@@ -167,7 +284,8 @@ class OptionsPageAbilitiesService
                     'menu_slug'  => $menu_slug,
                     'page_title' => $page_title,
                     'menu_title' => $menu_title,
-                    'layout'     => sanitize_text_field($input['layout'] ?? 'stacked'),
+                    'parent_slug' => null,
+                    'layout'    => sanitize_text_field($input['layout'] ?? 'stacked'),
                     'icon_url'   => sanitize_text_field($input['icon_url'] ?? 'dashicons-admin-generic'),
                     'position'   => isset($input['position']) ? (int) $input['position'] : 60,
                 ],
@@ -176,7 +294,8 @@ class OptionsPageAbilitiesService
             $response = $this->optionService->saveOptionsPageConfig($builder_slug, $values);
 
             if ($response->status) {
-                $this->optionService->saveOptions($menu_slug, $values);
+                // The builder UI reads its form values from the builder option, not from the page's own option.
+                $this->optionService->saveOptions($builder_slug, $values);
             }
 
             return ['status' => $response->status, 'message' => $response->message];
@@ -212,9 +331,12 @@ class OptionsPageAbilitiesService
             $sections_or_meta_boxes = [];
             foreach ($sections as $section) {
                 $sections_or_meta_boxes[] = [
+                    'fieldType'                 => 'section',
                     'name'                      => sanitize_key($section['section_name'] ?? ''),
                     'fieldLabel'                => sanitize_text_field($section['section_title'] ?? ''),
                     'field_custom_info_section' => ['section_icon' => sanitize_text_field($section['section_icon'] ?? 'admin-generic')],
+                    'field_base_info'           => $this->getDefaultFieldBaseInfo(),
+                    'field_dependency_info'     => $this->getDefaultDependencyInfo(),
                     'fields'                    => $this->prepareAbilityFields($section['fields'] ?? []),
                 ];
             }
@@ -225,6 +347,11 @@ class OptionsPageAbilitiesService
             ];
 
             $response = $this->optionService->saveOptionPageFieldsConfig($builder_slug, $values);
+
+            if ($response->status) {
+                // The Edit Fields screen loads its tree from the builder option (sections_or_meta_boxes).
+                $this->optionService->saveOptions($builder_slug, $values);
+            }
 
             return ['status' => $response->status, 'message' => $response->message];
         } catch (Exception $e) {

@@ -20,6 +20,7 @@ defined('ABSPATH') || exit;
 class UserMetaFieldsAbilitiesService
 {
     use AbilityFieldAdapterTrait;
+    use AbilityReadTrait;
     private UserMetaService $userMetaService;
     private OptionService $optionService;
     public function __construct(UserMetaService $userMetaService, OptionService $optionService)
@@ -71,6 +72,16 @@ class UserMetaFieldsAbilitiesService
 
         $permission = fn() => current_user_can('manage_options');
 
+        // Takes no input, so no input_schema is passed.
+        wp_register_ability('native-custom-fields/get-user-meta-fields', [
+            'label'               => __('Get User Meta Fields', 'native-custom-fields'),
+            'description'         => __('Reads the custom field configuration shown on user profile pages in the same shape that save-user-meta-fields accepts, so the result can be edited and saved back. Also reports whether the builder UI state (Edit Fields screen) exists.', 'native-custom-fields'),
+            'category'            => 'native-custom-fields',
+            'execute_callback'    => [$this, 'getUserMetaFields'],
+            'permission_callback' => $permission,
+            'meta'                => $this->getReadAbilityMeta(),
+        ]);
+
         wp_register_ability('native-custom-fields/save-user-meta-fields', [
             'label'               => __('Save User Meta Fields', 'native-custom-fields'),
             'description'         => __('Creates or updates the custom field configuration shown on user profile pages (applies to all users).', 'native-custom-fields'),
@@ -88,6 +99,39 @@ class UserMetaFieldsAbilitiesService
                 ],
             ],
         ]);
+    }
+
+    /**
+     * Get User Meta Fields Ability
+     *
+     * @return array Response data
+     * @since 1.4.1
+     */
+    public function getUserMetaFields(): array
+    {
+        $configs = $this->userMetaService->getUserMetaFieldsConfigurations();
+
+        if (empty($configs['all_users'])) {
+            return ['status' => false, 'message' => __('No user meta field configuration found.', 'native-custom-fields')];
+        }
+
+        $sections = [];
+        foreach ($configs['all_users']['sections'] ?? [] as $section) {
+            $sections[] = [
+                'section_name'  => $section['section_name'] ?? '',
+                'section_title' => $section['section_title'] ?? '',
+                'section_icon'  => $section['section_icon'] ?? '',
+                'fields'        => $this->extractAbilityFields($section['fields'] ?? []),
+            ];
+        }
+
+        return [
+            'status'        => true,
+            'sections'      => $sections,
+            'builder_state' => [
+                'fields_form_present' => $this->hasBuilderState('native_custom_fields_user_meta_fields_builder_all_users'),
+            ],
+        ];
     }
 
     /**
@@ -115,6 +159,8 @@ class UserMetaFieldsAbilitiesService
                     'name'                      => sanitize_key($section['section_name'] ?? ''),
                     'fieldLabel'                => sanitize_text_field($section['section_title'] ?? ''),
                     'field_custom_info_section' => ['section_icon' => sanitize_text_field($section['section_icon'] ?? '')],
+                    'field_base_info'           => $this->getDefaultFieldBaseInfo(),
+                    'field_dependency_info'     => $this->getDefaultDependencyInfo(),
                     'fields'                    => $this->prepareAbilityFields($section['fields'] ?? []),
                 ];
             }

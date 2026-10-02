@@ -20,6 +20,7 @@ defined('ABSPATH') || exit;
 class PostMetaFieldsAbilitiesService
 {
     use AbilityFieldAdapterTrait;
+    use AbilityReadTrait;
     private PostMetaService $postMetaService;
     private OptionService $optionService;
     public function __construct(PostMetaService $postMetaService, OptionService $optionService)
@@ -69,6 +70,8 @@ class PostMetaFieldsAbilitiesService
 
         $permission = fn() => current_user_can('manage_options');
 
+        $this->registerReadAbilities($permission);
+
         wp_register_ability('native-custom-fields/save-post-meta-fields', [
             'label'               => __('Save Post Meta Fields', 'native-custom-fields'),
             'description'         => __('Creates or updates the custom field configuration for a post type.', 'native-custom-fields'),
@@ -86,6 +89,112 @@ class PostMetaFieldsAbilitiesService
                 ],
             ],
         ]);
+    }
+
+    /**
+     * Register the read-only abilities (list / get) for post meta field configurations.
+     *
+     * @param callable $permission Permission callback
+     * @return void
+     * @since 1.4.1
+     */
+    private function registerReadAbilities(callable $permission): void
+    {
+        $read_meta = $this->getReadAbilityMeta();
+
+        wp_register_ability('native-custom-fields/list-post-meta-fields', [
+            'label'               => __('List Post Meta Field Configurations', 'native-custom-fields'),
+            'description'         => __('Lists the post types that have a custom field configuration, with their meta box and field counts.', 'native-custom-fields'),
+            'category'            => 'native-custom-fields',
+            'execute_callback'    => [$this, 'listPostMetaFields'],
+            'permission_callback' => $permission,
+            'meta'                => $read_meta,
+        ]);
+
+        wp_register_ability('native-custom-fields/get-post-meta-fields', [
+            'label'               => __('Get Post Meta Fields', 'native-custom-fields'),
+            'description'         => __('Reads the custom field configuration of a post type in the same shape that save-post-meta-fields accepts, so the result can be edited and saved back. Also reports whether the builder UI state (Edit Fields screen) exists.', 'native-custom-fields'),
+            'category'            => 'native-custom-fields',
+            'execute_callback'    => [$this, 'getPostMetaFields'],
+            'input_schema'        => [
+                'type'       => 'object',
+                'required'   => ['post_type'],
+                'properties' => [
+                    'post_type' => ['type' => 'string', 'description' => __('The post type slug', 'native-custom-fields')],
+                ],
+            ],
+            'permission_callback' => $permission,
+            'meta'                => $read_meta,
+        ]);
+    }
+
+    /**
+     * List Post Meta Fields Ability
+     *
+     * @return array Response data
+     * @since 1.4.1
+     */
+    public function listPostMetaFields(): array
+    {
+        $items = [];
+
+        foreach ($this->postMetaService->getPostMetaFieldsConfigurations() as $post_type => $config) {
+            $sections    = $config['sections'] ?? [];
+            $field_count = 0;
+            foreach ($sections as $section) {
+                $field_count += count($section['fields'] ?? []);
+            }
+
+            $items[] = [
+                'post_type'      => $config['post_type'] ?? $post_type,
+                'section_count'  => count($sections),
+                'field_count'    => $field_count,
+            ];
+        }
+
+        return ['status' => true, 'configurations' => $items];
+    }
+
+    /**
+     * Get Post Meta Fields Ability
+     *
+     * @param array $input Input data
+     * @return array Response data
+     * @since 1.4.1
+     */
+    public function getPostMetaFields(array $input): array
+    {
+        $post_type = sanitize_key($input['post_type'] ?? '');
+
+        if (empty($post_type)) {
+            return ['status' => false, 'message' => __('post_type is required.', 'native-custom-fields')];
+        }
+
+        $configs = $this->postMetaService->getPostMetaFieldsConfigurations();
+
+        if (! isset($configs[$post_type])) {
+            return ['status' => false, 'message' => __('No field configuration found for this post type.', 'native-custom-fields')];
+        }
+
+        $sections = [];
+        foreach ($configs[$post_type]['sections'] ?? [] as $section) {
+            $sections[] = [
+                'meta_box_id'       => $section['meta_box_id'] ?? '',
+                'meta_box_title'    => $section['meta_box_title'] ?? '',
+                'meta_box_context'  => $section['meta_box_context'] ?? 'advanced',
+                'meta_box_priority' => $section['meta_box_priority'] ?? 'default',
+                'fields'            => $this->extractAbilityFields($section['fields'] ?? []),
+            ];
+        }
+
+        return [
+            'status'        => true,
+            'post_type'     => $post_type,
+            'sections'      => $sections,
+            'builder_state' => [
+                'fields_form_present' => $this->hasBuilderState('native_custom_fields_post_meta_fields_builder_' . $post_type),
+            ],
+        ];
     }
 
     /**
@@ -122,7 +231,9 @@ class PostMetaFieldsAbilitiesService
                         'meta_box_context'  => sanitize_text_field($section['meta_box_context'] ?? 'advanced'),
                         'meta_box_priority' => sanitize_text_field($section['meta_box_priority'] ?? 'default'),
                     ],
-                    'fields' => $this->prepareAbilityFields($section['fields'] ?? []),
+                    'field_base_info'            => $this->getDefaultFieldBaseInfo(),
+                    'field_dependency_info'      => $this->getDefaultDependencyInfo(),
+                    'fields'                     => $this->prepareAbilityFields($section['fields'] ?? []),
                 ];
             }
 

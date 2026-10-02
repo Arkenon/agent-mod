@@ -12,7 +12,7 @@ use DI\DependencyException;
 use DI\NotFoundException;
 use Exception;
 use NativeCustomFields\Common\DI;
-use NativeCustomFields\Presentation\Admin\Controllers\AbilityContoller;
+use NativeCustomFields\Presentation\Admin\Controllers\AbilityController;
 use NativeCustomFields\Presentation\ControllerInit;
 use NativeCustomFields\Services\AjaxService;
 use NativeCustomFields\Services\ImportExportService;
@@ -100,10 +100,10 @@ final class App {
             );
         }
 
-        // Remove AbilityContoller from the controllers list because it will
+        // Remove AbilityController from the controllers list because it will
         // already be registered/loaded automatically when booted via Composer.
         add_filter( 'native_custom_fields_controllers', static function ( array $controllers ): array {
-            return array_diff( $controllers, [ AbilityContoller::class ] );
+            return array_diff( $controllers, [ AbilityController::class ] );
         } );
 
         ( new self() )->run();

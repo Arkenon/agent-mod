@@ -376,7 +376,7 @@ class OptionService implements OptionServiceInterface
 		];
 
 		//Get options pages configurations
-		$get_config = $this->getOptionsPagesConfigurations();
+		$get_config = $this->getOptionsPagesFieldsConfigurations();
 
 		//Set options page configurations data
 		$get_config[$config_menu_slug] = $fields_config_array;

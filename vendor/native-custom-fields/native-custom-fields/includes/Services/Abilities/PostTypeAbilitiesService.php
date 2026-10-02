@@ -19,6 +19,8 @@ defined('ABSPATH') || exit;
 
 class PostTypeAbilitiesService
 {
+    use AbilityReadTrait;
+
     private PostMetaService $postMetaService;
     private OptionService $optionService;
     public function __construct(PostMetaService $postMetaService, OptionService $optionService)
@@ -82,6 +84,8 @@ class PostTypeAbilitiesService
 
         $permission = fn() => current_user_can('manage_options');
 
+        $this->registerReadAbilities($permission);
+
         wp_register_ability('native-custom-fields/create-post-type', [
             'label'               => __('Create Post Type', 'native-custom-fields'),
             'description'         => __('Creates a new custom post type and saves its configuration.', 'native-custom-fields'),
@@ -117,6 +121,119 @@ class PostTypeAbilitiesService
                 ],
             ],
         ]);
+    }
+
+    /**
+     * Register the read-only abilities (list / get) for custom post types.
+     *
+     * @param callable $permission Permission callback
+     * @return void
+     * @since 1.4.1
+     */
+    private function registerReadAbilities(callable $permission): void
+    {
+        $read_meta = $this->getReadAbilityMeta();
+
+        wp_register_ability('native-custom-fields/list-post-types', [
+            'label'               => __('List Post Types', 'native-custom-fields'),
+            'description'         => __('Lists the custom post types stored in NCF configuration (post_type, label, created_by). Use it to discover existing post types before reading or changing one.', 'native-custom-fields'),
+            'category'            => 'native-custom-fields',
+            'execute_callback'    => [$this, 'listPostTypes'],
+            'permission_callback' => $permission,
+            'meta'                => $read_meta,
+        ]);
+
+        wp_register_ability('native-custom-fields/get-post-type', [
+            'label'               => __('Get Post Type', 'native-custom-fields'),
+            'description'         => __('Reads one custom post type configuration in the same shape that update-post-type accepts, so the result can be edited and saved back. Also reports whether the builder UI state (Edit screen) exists.', 'native-custom-fields'),
+            'category'            => 'native-custom-fields',
+            'execute_callback'    => [$this, 'getPostType'],
+            'input_schema'        => [
+                'type'       => 'object',
+                'required'   => ['post_type'],
+                'properties' => [
+                    'post_type' => ['type' => 'string', 'description' => __('Post type slug', 'native-custom-fields')],
+                ],
+            ],
+            'permission_callback' => $permission,
+            'meta'                => $read_meta,
+        ]);
+    }
+
+    /**
+     * List Post Types Ability
+     *
+     * @return array Response data
+     * @since 1.4.1
+     */
+    public function listPostTypes(): array
+    {
+        $post_types = [];
+
+        foreach ($this->postMetaService->getPostTypesConfigurations() as $slug => $config) {
+            $post_types[] = [
+                'post_type'  => $config['post_type'] ?? $slug,
+                'label'      => $config['args']['label'] ?? '',
+                'created_by' => $config['created_by'] ?? '',
+            ];
+        }
+
+        return ['status' => true, 'post_types' => $post_types];
+    }
+
+    /**
+     * Get Post Type Ability
+     *
+     * @param array $input Input data
+     * @return array Response data
+     * @since 1.4.1
+     */
+    public function getPostType(array $input): array
+    {
+        $post_type = sanitize_key($input['post_type'] ?? '');
+
+        if (empty($post_type)) {
+            return ['status' => false, 'message' => __('post_type is required.', 'native-custom-fields')];
+        }
+
+        $configs = $this->postMetaService->getPostTypesConfigurations();
+
+        if (! isset($configs[$post_type])) {
+            return ['status' => false, 'message' => __('Post type not found.', 'native-custom-fields')];
+        }
+
+        $config = $configs[$post_type];
+        $args   = $config['args'] ?? [];
+
+        $data = [
+            'post_type'     => $config['post_type'] ?? $post_type,
+            'label'         => $args['label'] ?? '',
+            'singular_name' => $args['labels']['singular_name'] ?? ($args['label'] ?? ''),
+            'description'   => $args['description'] ?? '',
+            'menu_position' => isset($args['menu_position']) ? (int) $args['menu_position'] : null,
+            'menu_icon'     => $args['menu_icon'] ?? '',
+            'has_archive'   => ! empty($args['has_archive']),
+            'supports'      => $args['supports'] ?? [],
+            'taxonomies'    => $args['taxonomies'] ?? [],
+            'public'        => ! empty($args['public']),
+            'hierarchical'  => ! empty($args['hierarchical']),
+            'show_in_rest'  => ! empty($args['show_in_rest']),
+            'map_meta_cap'  => ! empty($args['map_meta_cap']),
+        ];
+
+        // Null would fail the integer input schema when the result is saved back.
+        if (null === $data['menu_position']) {
+            unset($data['menu_position']);
+        }
+
+        return [
+            'status'        => true,
+            'settings'      => $data,
+            'created_by'   => $config['created_by'] ?? '',
+            'builder_state' => [
+                'form_present' => $this->hasBuilderState('native_custom_fields_post_type_builder_' . $post_type),
+            ],
+        ];
     }
 
     /**
