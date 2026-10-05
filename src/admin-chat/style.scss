@@ -740,21 +740,97 @@
 	margin: 8px;
 }
 
-// Live tool-call progress (shown next to the loading spinner).
+// Live tool-call progress card (see ToolProgress.jsx).
 .agent-mod-chat__progress {
+	width: 100%;
+	max-width: 520px;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	background: #fff;
+	overflow: hidden;
+}
+
+.agent-mod-chat__progress-header {
 	display: flex;
-	flex-direction: column;
-	gap: 4px;
-	margin-left: 8px;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 8px 10px;
+	border: 0;
+	background: #f6f7f7;
+	text-align: left;
+	cursor: pointer;
+
+	&:hover {
+		background: #f0f0f1;
+	}
+
+	&:focus-visible {
+		outline: 2px solid #2271b1;
+		outline-offset: -2px;
+	}
+
+	.components-spinner {
+		flex: 0 0 auto;
+		margin: 0;
+	}
 }
 
 .agent-mod-chat__progress-status {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
 	font-size: 12px;
-	color: #757575;
 	font-style: italic;
+	color: #50575e;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.agent-mod-chat__progress-count {
+	flex: 0 0 auto;
+	padding: 1px 8px;
+	border-radius: 10px;
+	background: #e5f0fa;
+	color: #2271b1;
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.agent-mod-chat__progress-chevron {
+	flex: 0 0 auto;
+	color: #757575;
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+}
+
+.agent-mod-chat__progress-body {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px 10px 10px;
+	border-top: 1px solid #dcdcde;
+}
+
+.agent-mod-chat__progress-more {
+	align-self: flex-start;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: #2271b1;
+	font-size: 12px;
+	cursor: pointer;
+
+	&:hover {
+		text-decoration: underline;
+	}
 }
 
 .agent-mod-chat__progress-calls {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
 	margin: 0;
 	padding: 0;
 	list-style: none;
@@ -762,23 +838,63 @@
 	li {
 		display: flex;
 		align-items: center;
-		gap: 4px;
+		gap: 8px;
 		margin: 0;
+		padding: 6px 8px;
+		border: 1px solid #e0e0e0;
+		border-left-width: 3px;
+		border-radius: 4px;
+		background: #fff;
 		font-size: 12px;
 
-		.dashicons-yes {
-			color: #00a32a;
+		&.is-done {
+			border-left-color: #00a32a;
+		}
+
+		&.is-running {
+			border-color: #c5d9ed;
+			border-left-color: #2271b1;
+			background: #f5f9fd;
+		}
+
+		.dashicons {
+			flex: 0 0 auto;
 			font-size: 16px;
 			width: 16px;
 			height: 16px;
 		}
 
-		code {
-			background: transparent;
-			font-size: 11px;
-			color: #757575;
+		.dashicons-yes-alt {
+			color: #00a32a;
+		}
+
+		.dashicons-update {
+			color: #2271b1;
 		}
 	}
+}
+
+.agent-mod-chat__progress-call {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.agent-mod-chat__progress-name {
+	padding: 0;
+	background: transparent;
+	font-size: 11px;
+	font-weight: 600;
+	color: #1e1e1e;
+}
+
+.agent-mod-chat__progress-args {
+	overflow: hidden;
+	font-family: Menlo, Consolas, monaco, monospace;
+	font-size: 11px;
+	color: #757575;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 }
 
 // Per-message token usage, shown below the tool-calls/actions row.

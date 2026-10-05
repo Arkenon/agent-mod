@@ -2,17 +2,17 @@
  * Renders the list of chat messages and auto-scrolls to the latest one.
  *
  * While a response is loading, live tool-call progress (polled from the
- * chat-progress endpoint) is shown next to the spinner. Auto-scroll only
+ * chat-progress endpoint) is shown in a collapsible card (see ToolProgress). Auto-scroll only
  * follows new content when the user is already near the bottom, so live
  * tool-call updates never yank the view while they read earlier messages.
  */
 import { useSelect } from '@wordpress/data';
 import { useRef, useEffect } from '@wordpress/element';
-import { Spinner } from '@wordpress/components';
-import { __, sprintf } from '@wordpress/i18n';
+import { __ } from '@wordpress/i18n';
 
 import { STORE_NAME } from '../store';
 import MessageItem from './MessageItem';
+import ToolProgress from './ToolProgress';
 
 export default function MessageList() {
 	const { messages, loading, progress } = useSelect( ( select ) => {
@@ -50,16 +50,6 @@ export default function MessageList() {
 		}
 	}, [ messages.length, loading, progress ] );
 
-	const doneCalls = ( progress?.executedCalls || [] ).filter(
-		( call ) => 'done' === call.status
-	);
-
-	// AgentMod is built around tool calls, so there's no separate "generating
-	// a plain-text answer" phase worth naming — only an active tool call gets
-	// a status line; every other moment (including between tool calls) just
-	// shows the spinner.
-	const isRunningTool = 'running_tool' === progress?.status && progress?.currentTool;
-
 	return (
 		<div
 			className="agent-mod-chat__messages"
@@ -78,33 +68,7 @@ export default function MessageList() {
 
 			{ loading && (
 				<div className="agent-mod-chat__loading">
-					<Spinner />
-
-					{ isRunningTool && (
-						<div className="agent-mod-chat__progress">
-							<span className="agent-mod-chat__progress-status">
-								{ sprintf(
-									/* translators: %s: tool name(s) being executed. */
-									__( 'Running tool: %s…', 'agent-mod' ),
-									progress.currentTool
-								) }
-							</span>
-
-							{ 0 < doneCalls.length && (
-								<ul className="agent-mod-chat__progress-calls">
-									{ doneCalls.map( ( call, index ) => (
-										<li key={ index }>
-											<span
-												className="dashicons dashicons-yes"
-												aria-hidden="true"
-											/>
-											<code>{ call.name }</code>
-										</li>
-									) ) }
-								</ul>
-							) }
-						</div>
-					) }
+					<ToolProgress progress={ progress } />
 				</div>
 			) }
 
