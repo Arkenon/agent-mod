@@ -135,6 +135,15 @@ export function selectMode( mode ) {
 }
 
 /**
+ * Selects how write actions are approved in execute mode.
+ *
+ * @param {string} approvalMode 'manual' (confirm each action) or 'auto' (never ask).
+ */
+export function selectApprovalMode( approvalMode ) {
+	return { type: 'SELECT_APPROVAL_MODE', approvalMode };
+}
+
+/**
  * Lazily fetches the text-generation models for a provider and caches them in
  * the store. No-op when the models are already loaded.
  *
@@ -246,7 +255,7 @@ async function resolveConfirmation( { dispatch, select }, token, conversationId,
 				conversationId,
 				requestId,
 				decision,
-				autoApprovedAbilities: select.getSessionApprovedAbilities(),
+				autoApprovedAbilities: select.getAutoApprovedAbilities(),
 			},
 			signal,
 		} );
@@ -568,7 +577,7 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 			attachments: files.map( toWireAttachment ),
 			conversationId: select.getConversationId(),
 			requestId,
-			autoApprovedAbilities: select.getSessionApprovedAbilities(),
+			autoApprovedAbilities: select.getAutoApprovedAbilities(),
 		};
 
 		const payload = applyFilters( 'agent_mod.send_message_payload', basePayload );

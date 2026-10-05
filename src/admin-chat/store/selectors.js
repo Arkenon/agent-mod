@@ -57,6 +57,28 @@ export function getSelectedMode( state ) {
 	return state.selectedMode;
 }
 
+export function getApprovalMode( state ) {
+	return state.approvalMode;
+}
+
+/**
+ * The ability allowlist sent with chat/confirm requests.
+ *
+ * Auto approval in execute mode sends the server's '*' wildcard so no tool call
+ * pauses for confirmation; otherwise only the names the user approved for the
+ * session ("don't ask again") are sent.
+ *
+ * @param {Object} state Store state.
+ * @return {string[]} Ability names, or [ '*' ] for blanket approval.
+ */
+export function getAutoApprovedAbilities( state ) {
+	if ( 'auto' === state.approvalMode && 'execute' === ( state.selectedMode || 'execute' ) ) {
+		return [ '*' ];
+	}
+
+	return state.sessionApprovedAbilities;
+}
+
 /**
  * The provider/model pair that will actually be used for the next message.
  *

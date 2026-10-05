@@ -34,6 +34,7 @@ import AttachmentUploader from './AttachmentUploader';
 import AgentSelector from './AgentSelector';
 import ProviderModelSelector from './ProviderModelSelector';
 import ModeSelector from './ModeSelector';
+import ApprovalModeSelector from './ApprovalModeSelector';
 import AbilityTray from './AbilityTray';
 
 /**
@@ -321,6 +322,7 @@ export default function Composer() {
 					<div className="agent-mod-chat__tools">
 						<AgentSelector />
 						<ModeSelector />
+						<ApprovalModeSelector />
 						<ProviderModelSelector />
 						<AbilityTray
 							onInsert={(name) => insertToken('@' + name)}

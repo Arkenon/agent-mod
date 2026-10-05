@@ -21,6 +21,10 @@ const DEFAULT_STATE = {
 	selectedProvider: null, // provider id chosen in the provider/model picker
 	selectedModel: null, // model id chosen for the selected provider
 	selectedMode: 'execute', // interaction mode: 'ask' | 'plan' | 'execute'
+	// Write-action approval in execute mode: 'manual' (confirmation modal) or
+	// 'auto' (every tool call runs without asking). Memory only, so a page
+	// reload always falls back to manual.
+	approvalMode: 'manual',
 	// providerId -> [{ id, name }]. Hydrated from localStorage so the picker is
 	// populated instantly across page loads; refreshed by the background prefetch.
 	providerModels: loadProviderModels(),
@@ -110,6 +114,9 @@ export default function reducer( state = DEFAULT_STATE, action ) {
 
 		case 'SELECT_MODE':
 			return { ...state, selectedMode: action.mode };
+
+		case 'SELECT_APPROVAL_MODE':
+			return { ...state, approvalMode: action.approvalMode };
 
 		case 'SET_PROGRESS':
 			return { ...state, progress: action.progress };

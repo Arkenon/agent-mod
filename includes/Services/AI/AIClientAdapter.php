@@ -866,8 +866,8 @@ class AIClientAdapter
 	/**
 	 * Whether the user has session-approved an ability by name.
 	 *
-	 * The literal '*' entry approves every write for the session; it is the
-	 * mechanism-level blanket variant and is not currently surfaced in the UI.
+	 * The literal '*' entry approves every write; the chat UI sends it when the
+	 * user picks the "Auto" approval mode in Execute mode.
 	 *
 	 * @param string   $name      Ability name.
 	 * @param string[] $allowlist Session-approved ability names.
