@@ -227,3 +227,21 @@ and it enforces a layered, maintainable structure.
 5. Follow **GPL v2 or later** license compatibility
 
 Your task: When I describe a feature, requirement, or entity, implement it strictly within this boilerplate’s architecture, ensuring clean code, separation of concerns, and WordPress best practices.
+
+## WordPress.org SVN release
+
+After the Git release is pushed, the same version is published to WordPress.org through SVN. Do this only when asked.
+
+- Working copy: `%USERPROFILE%\Desktop\svn\agent-mod` (`trunk/`, `tags/<version>/`, `assets/`). Tag folders have no `v` prefix (`tags/1.2.6`).
+- Only TortoiseSVN is installed (`C:\Program Files\TortoiseSVN\bin\TortoiseProc.exe`); there is no `svn` command line client. The user commits from the TortoiseSVN dialog.
+- `trunk/` holds only the runtime files: `build/`, `includes/`, `languages/`, `vendor/`, `composer.json`, `agent-mod.php`, `readme.txt`, `uninstall.php`, `LICENSE`. Never copy `src/`, `docs/`, `node_modules/`, `package*.json`, `webpack.config.js`, `composer.lock`, `.editorconfig`, `.gitignore`, `claude.md` or other dev files.
+- Steps:
+  1. Check that `trunk/` equals the previous `tags/<previous version>/` (`diff -rq`), so the starting point is known.
+  2. Compare `trunk/` with the plugin folder (`diff -rq` on `includes`, `build`, `languages` and the root files listed above) and copy every changed file into `trunk/`. If JS changed, run `npm run build` first so `build/` is current (npm is broken on this machine, run wp-scripts with node, see memory). Update `vendor/` only when Composer dependencies changed (`composer install --no-dev`).
+  3. Files deleted in Git must also be deleted in `trunk/`. A plain file delete shows up as "missing" in the commit dialog; the user ticks it to commit the deletion.
+  4. Create `tags/<version>/` as a copy of `trunk/` (`cp -r trunk tags/<version>`) and confirm with `diff -rq trunk tags/<version>`. Never change an existing tag folder.
+  5. Check that `Version:` in `agent-mod.php` (`AGENT_MOD_VERSION` is read from this header) and `Stable tag:` in `readme.txt` match the new version in both `trunk/` and the tag.
+  6. Open the commit dialog for the user (it commits nothing on its own):
+     `TortoiseProc.exe /command:commit /path:"<working copy>" /logmsg:"Release <version>: <short summary>"`
+     Tell the user to tick the unversioned `tags/<version>` folder (and any missing/deleted files) and press OK.
+- `assets/` (banners, icons, screenshots) is changed only when asked.
