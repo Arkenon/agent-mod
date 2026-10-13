@@ -19,6 +19,8 @@ use AgentMod\Presentation\Admin\Controllers\AbilitiesController;
 use AgentMod\Presentation\Admin\Controllers\AIChatRestController;
 use AgentMod\Presentation\Admin\Controllers\AIChatWidgetController;
 use AgentMod\Presentation\Admin\Controllers\SettingsController;
+use AgentMod\Presentation\Admin\Controllers\SetupController;
+use AgentMod\Presentation\Admin\Controllers\SetupRestController;
 
 final class ControllerInit
 {
@@ -33,6 +35,8 @@ final class ControllerInit
 		SettingsController::class,
 		AIChatWidgetController::class,
 		AbilitiesController::class,
+		SetupController::class,
+		SetupRestController::class,
 	];
 
 	/**

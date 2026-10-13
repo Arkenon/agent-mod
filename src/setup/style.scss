@@ -1,0 +1,259 @@
+// Pulls in DataViews + Abilities page styles (the ability list is embedded in the wizard).
+@import "../ability-list/style";
+
+// Full-screen: cover the whole admin chrome (menu, admin bar).
+.agent-mod-setup {
+	position: fixed;
+	inset: 0;
+	z-index: 100000;
+	overflow-y: auto;
+	box-sizing: border-box;
+	padding: 32px max(16px, calc((100vw - 1100px) / 2));
+	background: #f0f0f1;
+	font-size: 14px;
+	line-height: 1.6;
+
+	p,
+	li,
+	label,
+	.components-base-control__help,
+	.components-base-control__label,
+	.components-form-token-field__input-container,
+	.components-text-control__input,
+	.components-textarea-control__input,
+	.components-select-control__input {
+		font-size: 14px !important;
+	}
+
+	.components-base-control__help {
+		font-size: 13px !important;
+	}
+
+	.components-text-control__input,
+	.components-select-control__input {
+		min-height: 48px;
+	}
+
+	.components-button:not(.agent-mod-abilities .components-button) {
+		font-size: 14px;
+		min-height: 48px;
+		padding: 0 24px;
+		height: auto;
+	}
+
+	.components-button.is-link {
+		min-height: 0;
+		padding: 0;
+	}
+
+	// Token field chips: undo the big-button sizing so the chip and its remove (x) stay aligned.
+	.components-form-token-field__token {
+		font-size: 14px;
+		line-height: 1;
+
+		.components-form-token-field__token-text,
+		.components-form-token-field__remove-token.components-button {
+			display: inline-flex;
+			align-items: center;
+			height: 32px;
+			line-height: 1;
+		}
+
+		.components-form-token-field__remove-token.components-button {
+			min-height: 0;
+			min-width: 0;
+			padding: 0 8px;
+			font-size: 14px;
+		}
+	}
+
+	.components-form-token-field__input-container {
+		padding: 6px;
+	}
+
+	.components-card__body {
+		padding: 32px;
+	}
+
+	.components-notice {
+		font-size: 14px;
+	}
+
+	&__header {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+
+		h1 {
+			margin: 0;
+		}
+
+		img {
+			border-radius: 8px;
+		}
+	}
+
+	&__steps {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px 16px;
+		list-style: none;
+		margin: 16px 0;
+		padding: 0;
+		font-size: 14px;
+		color: #757575;
+
+		span {
+			display: inline-block;
+			min-width: 20px;
+			height: 20px;
+			line-height: 20px;
+			text-align: center;
+			border-radius: 50%;
+			background: #dcdcde;
+			color: #1e1e1e;
+		}
+
+		.is-current {
+			color: #1e1e1e;
+			font-weight: 600;
+
+			span {
+				background: var(--wp-admin-theme-color, #3858e9);
+				color: #fff;
+			}
+		}
+
+		.is-done span {
+			background: #00a32a;
+			color: #fff;
+		}
+	}
+
+	h1 {
+		font-size: 30px;
+	}
+
+	h2 {
+		margin-top: 0;
+		font-size: 18px;
+	}
+
+	h3 {
+		font-size: 16px;
+	}
+
+	.components-base-control,
+	.components-toggle-control,
+	.components-form-token-field {
+		margin-bottom: 16px;
+	}
+
+	&__frame {
+		position: relative;
+		margin: 16px 0;
+		border: 1px solid #dcdcde;
+		border-radius: 4px;
+		overflow: hidden;
+
+		iframe {
+			display: block;
+			width: 100%;
+			height: 60vh;
+			min-height: 420px;
+			border: 0;
+		}
+
+		.components-spinner {
+			position: absolute;
+			top: 12px;
+			left: 12px;
+		}
+	}
+
+	&__row,
+	&__nav {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		align-items: center;
+	}
+
+	&__nav {
+		margin-top: 16px;
+	}
+
+	&__spacer {
+		flex: 1;
+	}
+
+	&__preset {
+		display: grid;
+		gap: 8px;
+		margin-bottom: 16px;
+		padding: 12px;
+		border: 1px solid #dcdcde;
+		border-radius: 4px;
+	}
+
+	&__grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+		gap: 16px;
+		margin-top: 20px;
+	}
+
+	&__card {
+		display: flex;
+		flex-direction: column;
+		padding: 20px;
+		border: 1px solid #dcdcde;
+		border-radius: 10px;
+		background: #fafafa;
+
+		h3 {
+			margin: 14px 0 6px;
+		}
+
+		p {
+			flex: 1;
+			margin: 0 0 16px;
+			color: #50575e;
+		}
+
+		.components-base-control {
+			margin: 0;
+		}
+	}
+
+	&__card-top {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	&__badge {
+		padding: 2px 10px;
+		border-radius: 10px;
+		background: #7b2ff7;
+		color: #fff;
+		font-size: 11px;
+		font-weight: 600;
+		text-decoration: none;
+		white-space: nowrap;
+
+		&:hover {
+			color: #fff;
+			opacity: 0.85;
+		}
+	}
+
+	&__info {
+		margin: 0 0 24px;
+	}
+
+	.agent-mod-abilities {
+		max-width: none;
+		padding: 0;
+	}
+}

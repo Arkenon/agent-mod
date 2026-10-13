@@ -274,7 +274,7 @@ const FIELDS = [
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function AbilityList() {
+export default function AbilityList( { embedded = false } ) {
 	const [ abilities, setAbilities ] = useState( [] );
 	const [ isLoading, setIsLoading ] = useState( true );
 	const [ error, setError ] = useState( null );
@@ -298,9 +298,11 @@ export default function AbilityList() {
 
 	return (
 		<div className="agent-mod-abilities">
-			<h1 className="agent-mod-abilities__title">
-				{ __( 'Abilities', 'agent-mod' ) }
-			</h1>
+			{ ! embedded && (
+				<h1 className="agent-mod-abilities__title">
+					{ __( 'Abilities', 'agent-mod' ) }
+				</h1>
+			) }
 
 			{ isLoading && <p>{ __( 'Loading…', 'agent-mod' ) }</p> }
 
@@ -310,7 +312,7 @@ export default function AbilityList() {
 				</div>
 			) }
 
-			{ ! isLoading && ! error && (
+			{ ! embedded && ! isLoading && ! error && (
 				<div className="notice notice-info agent-mod-abilities__notice">
 					<p>
 						{ __(

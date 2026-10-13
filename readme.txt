@@ -4,7 +4,7 @@ Tags: ai, agent, chatbot, assistant, abilities
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.2.6
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -122,6 +122,11 @@ Under the AgentMod menu in your WordPress admin, there is a dedicated **Abilitie
 If you ask the agent to create a post, it will show you a confirmation modal summarizing the action before anything is written to the database. You must explicitly approve the action for it to proceed.
 
 == Changelog ==
+= 1.3.0 =
+* Added: Setup wizard. After activation (and from the "No provider" link in the chat) a full-screen wizard walks you through connecting an AI provider via WordPress Connectors, choosing the basic agent settings (role, goal, base system prompt, personality, RAG, web search, default model, preset prompts), previewing Pro features and browsing the abilities the agent can use. Every settings step can be skipped.
+* Added: Dashboard reminder to finish the setup until it is completed or dismissed.
+* Improved: The Abilities list component can now be embedded in other screens.
+
 = 1.2.6 =
 * Added: Approval mode picker in Execute mode. "Manual" (default) keeps the confirmation dialog for every write action; "Auto" runs every tool call without asking. The choice is kept in memory only, so a page reload always falls back to Manual.
 * Improved: Live tool-call progress is now shown in a collapsible card with the running tool and a call counter in its header. Each call appears as a bordered row with its status (running/done) and a one-line argument preview, and long runs show only the latest calls until "Show earlier calls" is clicked.

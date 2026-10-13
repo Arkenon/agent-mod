@@ -157,7 +157,7 @@ final class AIChatWidgetController
 			[
 				'restPath'      => Constants::REST_NAMESPACE . '/chat',
 				'restNamespace' => Constants::REST_NAMESPACE,
-				'connectorsUrl' => admin_url('options-connectors.php'),
+				'connectorsUrl' => SetupController::pageUrl('provider'),
 				'defaultAgent'  => [
 					'id'          => null,
 					'name'        => __('AgentMod Assistant', 'agent-mod'),

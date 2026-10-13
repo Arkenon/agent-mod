@@ -54,6 +54,7 @@ module.exports = {
 			'src/ability-list',
 			'index.js'
 		),
+		'setup/index': path.resolve(process.cwd(), 'src/setup', 'index.js'),
 		'settings-editor/index': path.resolve(
 			process.cwd(),
 			'src/settings-editor',
