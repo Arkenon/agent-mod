@@ -126,50 +126,6 @@ class AbilityRegistrarService
 		}
 
 		// -------------------------------------------------------------------------
-		// AgentMod core abilities
-		// -------------------------------------------------------------------------
-
-		wp_register_ability(
-			'agent-mod/list-recent-posts',
-			[
-				'label'               => __('List Recent Posts', 'agent-mod'),
-				'description'         => __('Returns the most recent published posts with their titles, links and dates.', 'agent-mod'),
-				'category'            => self::CATEGORY,
-				'execute_callback'    => [$this, 'executeListRecentPosts'],
-				'permission_callback' => static function (): bool {
-					return current_user_can('edit_posts');
-				},
-				'input_schema'        => [
-					'type'       => 'object',
-					'properties' => [
-						'count' => [
-							'type'        => 'integer',
-							'description' => __('How many posts to return (1-20).', 'agent-mod'),
-							'minimum'     => 1,
-							'maximum'     =>$this->settings_service->getMaxSearchResults(),
-						],
-					],
-				],
-				'output_schema'       => [
-					'type'  => 'array',
-					'items' => [
-						'type'       => 'object',
-						'properties' => [
-							'id'    => ['type' => 'integer'],
-							'title' => ['type' => 'string'],
-							'link'  => ['type' => 'string'],
-							'date'  => ['type' => 'string'],
-						],
-					],
-				],
-				'meta'                => [
-					'annotations'  => ['readonly' => true],
-					'show_in_rest' => true,
-				],
-			]
-		);
-
-		// -------------------------------------------------------------------------
 		// Block Design: Template abilities
 		// -------------------------------------------------------------------------
 
@@ -442,7 +398,7 @@ class AbilityRegistrarService
 			'agent-mod/list-posts',
 			[
 				'label'               => __('List Posts and Pages', 'agent-mod'),
-				'description'         => __('Returns a paginated list of posts/pages. Use "s" to search by title instead of browsing. Returns post_id for use with get-post.', 'agent-mod'),
+				'description'         => __('Returns a paginated list of posts/pages in any status (drafts included). Use "s" to search by title instead of browsing; for the latest posts use orderby "date" with order "DESC". Returns post_id for use with get-post.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeListPosts'],
 				'permission_callback' => static function (): bool {
@@ -455,6 +411,11 @@ class AbilityRegistrarService
 							'type'        => 'string',
 							'description' => __('Any registered post type slug (e.g. "post", "page", or a custom post type), or "any" for all public post types. Default "post".', 'agent-mod'),
 						],
+						'post_status'    => [
+							'type'        => 'string',
+							'enum'        => ['any', 'publish', 'draft', 'pending', 'private', 'future'],
+							'description' => __('Filter by status. Default "any" (every status except trash).', 'agent-mod'),
+						],
 						'posts_per_page' => [
 							'type'        => 'integer',
 							'description' => __('Results per page. Default 10, capped at the Max Search Results setting.', 'agent-mod'),
@@ -466,6 +427,14 @@ class AbilityRegistrarService
 						's'              => [
 							'type'        => 'string',
 							'description' => __('Keyword search in title and content.', 'agent-mod'),
+						],
+						'meta_key'       => [
+							'type'        => 'string',
+							'description' => __('Optional. Only return posts that have this custom field.', 'agent-mod'),
+						],
+						'meta_value'     => [
+							'type'        => 'string',
+							'description' => __('Optional, used with meta_key. Only return posts whose meta_key equals this value.', 'agent-mod'),
 						],
 						'orderby'        => [
 							'type'        => 'string',
@@ -499,7 +468,7 @@ class AbilityRegistrarService
 			'agent-mod/get-post',
 			[
 				'label'               => __('Get Post or Page', 'agent-mod'),
-				'description'         => __('Returns a post raw block markup as html by post_id. Use list-posts to find post_id first. The returned html can be modified and passed straight back to update-post as the html parameter.', 'agent-mod'),
+				'description'         => __('Returns a post raw block markup as html by post_id, plus its status and custom fields (meta). Use list-posts to find post_id first. The returned html can be modified and passed straight back to update-post as the html parameter.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeGetPost'],
 				'permission_callback' => static function (): bool {
@@ -517,6 +486,11 @@ class AbilityRegistrarService
 							'type'        => 'string',
 							'description' => __('The expected post type of post_id (e.g. "post", "page", or a custom post type). Default "post".', 'agent-mod'),
 						],
+						'meta_keys' => [
+							'type'        => 'array',
+							'items'       => ['type' => 'string'],
+							'description' => __('Optional. Custom field keys to return. When omitted, every public (non-underscore) custom field is returned; name underscore-prefixed keys (e.g. SEO plugin fields) here to read them.', 'agent-mod'),
+						],
 					],
 				],
 				'output_schema'       => [
@@ -527,8 +501,10 @@ class AbilityRegistrarService
 						'post_name' => ['type' => 'string'],
 						'title'     => ['type' => 'string'],
 						'post_type' => ['type' => 'string'],
+						'status'    => ['type' => 'string'],
 						'url'       => ['type' => 'string'],
 						'html'      => ['type' => 'string'],
+						'meta'      => ['type' => 'object'],
 						'error'     => ['type' => 'string'],
 					],
 				],
@@ -543,7 +519,7 @@ class AbilityRegistrarService
 			'agent-mod/create-post',
 			[
 				'label'               => __('Create Post or Page', 'agent-mod'),
-				'description'         => __('Creates a new post/page. Provide title and optionally html. The html parameter must be complete, valid serialized block markup; it is parsed with parse_blocks() and re-serialized as-is — attribute/innerHTML consistency is NOT validated server-side. Returns the new post_id for use with get-post/update-post.', 'agent-mod'),
+				'description'         => __('Creates a new post/page. Provide title and optionally html and meta. The html parameter must be complete, valid serialized block markup; it is parsed with parse_blocks() and re-serialized as-is — attribute/innerHTML consistency is NOT validated server-side. Returns the new post_id for use with get-post/update-post.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeCreatePost'],
 				'permission_callback' => static function (): bool {
@@ -570,6 +546,7 @@ class AbilityRegistrarService
 							'enum'        => ['draft', 'publish', 'pending', 'private'],
 							'description' => __('Publication status. Default "draft".', 'agent-mod'),
 						],
+						'meta'        => $this->metaWriteSchema(),
 					],
 				],
 				'output_schema'       => [
@@ -594,7 +571,7 @@ class AbilityRegistrarService
 			'agent-mod/update-post',
 			[
 				'label'               => __('Update Post or Page', 'agent-mod'),
-				'description'         => __('Saves content to a post. Provide post_id and html. The html parameter must be complete, valid serialized block markup; it is parsed with parse_blocks() and re-serialized as-is — attribute/innerHTML consistency is NOT validated server-side.', 'agent-mod'),
+				'description'         => __('Updates a post. Provide post_id plus any of html, title, post_status and meta; fields left out stay unchanged. The html parameter must be complete, valid serialized block markup; it is parsed with parse_blocks() and re-serialized as-is — attribute/innerHTML consistency is NOT validated server-side.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeUpdatePost'],
 				'permission_callback' => static function (): bool {
@@ -602,24 +579,30 @@ class AbilityRegistrarService
 				},
 				'input_schema'        => [
 					'type'       => 'object',
-					'required'   => ['post_id', 'html'],
+					'required'   => ['post_id'],
 					'properties' => [
-						'post_id'   => [
+						'post_id'     => [
 							'type'        => 'integer',
 							'description' => __('Post/page ID from get-post.', 'agent-mod'),
 						],
-						'post_type' => [
+						'post_type'   => [
 							'type'        => 'string',
 							'description' => __('The expected post type of post_id (e.g. "post", "page", or a custom post type). Default "post".', 'agent-mod'),
 						],
-						'html'      => [
+						'html'        => [
 							'type'        => 'string',
-							'description' => __('Serialized block markup (WordPress block comment format). Use the output of get-post for round-trip editing. Replaces existing content entirely.', 'agent-mod'),
+							'description' => __('Optional. Serialized block markup (WordPress block comment format). Use the output of get-post for round-trip editing. Replaces existing content entirely; omit it to keep the content unchanged.', 'agent-mod'),
 						],
-						'title'     => [
+						'title'       => [
 							'type'        => 'string',
 							'description' => __('Optional. Updates the post/page title if provided.', 'agent-mod'),
 						],
+						'post_status' => [
+							'type'        => 'string',
+							'enum'        => ['draft', 'publish', 'pending', 'private'],
+							'description' => __('Optional. Changes the publication status (e.g. publish a draft).', 'agent-mod'),
+						],
+						'meta'        => $this->metaWriteSchema(),
 					],
 				],
 				'output_schema'       => [
@@ -628,6 +611,7 @@ class AbilityRegistrarService
 						'success'   => ['type' => 'boolean'],
 						'post_id'   => ['type' => 'integer'],
 						'post_type' => ['type' => 'string'],
+						'status'    => ['type' => 'string'],
 						'url'       => ['type' => 'string'],
 						'error'     => ['type' => 'string'],
 					],
@@ -1070,44 +1054,6 @@ class AbilityRegistrarService
 			'url'         => (string) home_url(),
 			'wp_version'  => (string) get_bloginfo('version'),
 		];
-	}
-
-	/**
-	 * Execute callback for agent-mod/list-recent-posts.
-	 *
-	 * @param mixed $input Input data (expects an optional 'count').
-	 *
-	 * @return array<int, array<string, mixed>>
-	 * @since 1.0.0
-	 */
-	public function executeListRecentPosts($input = null): array
-	{
-		$count = 5;
-		if (is_array($input) && isset($input['count'])) {
-			$count = (int) $input['count'];
-		}
-		$count = max(1, min($this->settings_service->getMaxSearchResults(), $count));
-
-		$posts = get_posts(
-			[
-				'numberposts' => $count,
-				'post_status' => 'publish',
-				'orderby'     => 'date',
-				'order'       => 'DESC',
-			]
-		);
-
-		$result = [];
-		foreach ($posts as $post) {
-			$result[] = [
-				'id'    => $post->ID,
-				'title' => get_the_title($post),
-				'link'  => (string) get_permalink($post),
-				'date'  => get_the_date('c', $post),
-			];
-		}
-
-		return $result;
 	}
 
 	// =========================================================================
@@ -1563,10 +1509,15 @@ class AbilityRegistrarService
 		$search       = isset($input['s']) ? sanitize_text_field((string) $input['s']) : '';
 		$orderby      = isset($input['orderby']) ? $input['orderby'] : 'title';
 		$order        = isset($input['order']) ? strtoupper((string) $input['order']) : 'ASC';
+		$postStatus   = isset($input['post_status']) && in_array($input['post_status'], ['any', 'publish', 'draft', 'pending', 'private', 'future'], true)
+			? $input['post_status']
+			: 'any';
 
 		$queryArgs = [
 			'post_type'      => $postType,
-			'post_status'    => 'publish',
+			'post_status'    => $postStatus,
+			// Private posts of other authors only when the user may read them.
+			'perm'           => 'readable',
 			'posts_per_page' => $postsPerPage,
 			'paged'          => $paged,
 			'orderby'        => $orderby,
@@ -1575,6 +1526,14 @@ class AbilityRegistrarService
 
 		if (! empty($search)) {
 			$queryArgs['s'] = $search;
+		}
+
+		if (! empty($input['meta_key'])) {
+			$queryArgs['meta_key'] = sanitize_text_field((string) $input['meta_key']);
+
+			if (isset($input['meta_value']) && '' !== (string) $input['meta_value']) {
+				$queryArgs['meta_value'] = sanitize_text_field((string) $input['meta_value']);
+			}
 		}
 
 		$query = new WP_Query($queryArgs);
@@ -1600,6 +1559,7 @@ class AbilityRegistrarService
 				'title'     => $post->post_title,
 				'post_type' => $post->post_type,
 				'status'    => $post->post_status,
+				'date'      => $post->post_date,
 				'modified'  => $post->post_modified,
 				'url'       => get_permalink($post->ID),
 			];
@@ -1621,7 +1581,7 @@ class AbilityRegistrarService
 	/**
 	 * Execute callback for agent-mod/get-post.
 	 *
-	 * @param mixed $input Input data (expects 'post_id').
+	 * @param mixed $input Input data (expects 'post_id', optional 'post_type', 'meta_keys').
 	 *
 	 * @return array<string, mixed>
 	 * @since 1.0.0
@@ -1663,6 +1623,10 @@ class AbilityRegistrarService
 			];
 		}
 
+		if (! current_user_can('edit_post', $postId)) {
+			return ['success' => false, 'error' => __('You are not allowed to edit this post.', 'agent-mod')];
+		}
+
 		$fullContentReads++;
 
 		return [
@@ -1671,15 +1635,17 @@ class AbilityRegistrarService
 			'post_name' => $post->post_name,
 			'title'     => $post->post_title,
 			'post_type' => $post->post_type,
+			'status'    => $post->post_status,
 			'url'       => (string) get_permalink($post->ID),
 			'html'      => $post->post_content,
+			'meta'      => $this->readPostMeta($post->ID, $input['meta_keys'] ?? null),
 		];
 	}
 
 	/**
 	 * Execute callback for agent-mod/create-post.
 	 *
-	 * @param mixed $input Input data (expects 'title', optional 'html', 'post_type', 'post_status').
+	 * @param mixed $input Input data (expects 'title', optional 'html', 'post_type', 'post_status', 'meta').
 	 *
 	 * @return array<string, mixed>
 	 * @since 1.0.0
@@ -1692,11 +1658,21 @@ class AbilityRegistrarService
 
 		$title      = sanitize_text_field((string) $input['title']);
 		$postType   = (isset($input['post_type']))
-			? sanitize_text_field($input['post_type'])
+			? sanitize_key((string) $input['post_type'])
 			: 'post';
 		$postStatus = (isset($input['post_status']))
-			? sanitize_text_field($input['post_status'])
+			? sanitize_key((string) $input['post_status'])
 			: 'draft';
+
+		if (! post_type_exists($postType)) {
+			/* translators: %s: post type slug */
+			return ['success' => false, 'error' => sprintf(__('Post type "%s" does not exist.', 'agent-mod'), $postType)];
+		}
+
+		$statusError = $this->checkPostStatus($postType, $postStatus);
+		if (is_wp_error($statusError)) {
+			return ['success' => false, 'error' => $statusError->get_error_message()];
+		}
 
 		$serializedContent = '';
 
@@ -1715,12 +1691,17 @@ class AbilityRegistrarService
 			}
 		}
 
+		// Meta capabilities can only be checked against an existing post, so a
+		// post with meta starts as a draft: it can be rolled back without side
+		// effects, and publish-time hooks (SEO, sharing) see the final meta.
+		$hasMeta = ! empty($input['meta']);
+
 		$result = wp_insert_post(
 			[
 				'post_title'   => $title,
 				'post_content' => $serializedContent,
 				'post_type'    => $postType,
-				'post_status'  => $postStatus,
+				'post_status'  => $hasMeta ? 'draft' : $postStatus,
 			],
 			true
 		);
@@ -1729,27 +1710,55 @@ class AbilityRegistrarService
 			return ['success' => false, 'error' => $result->get_error_message()];
 		}
 
+		$postId = (int) $result;
+
+		if ($hasMeta) {
+			$metaWrites = $this->prepareMetaWrites($postId, $input['meta']);
+			if (is_wp_error($metaWrites)) {
+				wp_delete_post($postId, true);
+				return ['success' => false, 'error' => $metaWrites->get_error_message()];
+			}
+
+			$this->applyMetaWrites($postId, $metaWrites);
+
+			if ('draft' !== $postStatus) {
+				$statusResult = wp_update_post(['ID' => $postId, 'post_status' => $postStatus], true);
+				if (is_wp_error($statusResult)) {
+					return ['success' => false, 'error' => $statusResult->get_error_message()];
+				}
+			}
+		}
+
 		return [
 			'success'   => true,
-			'post_id'   => (int) $result,
+			'post_id'   => $postId,
 			'post_type' => $postType,
-			'status'    => $postStatus,
-			'url'       => (string) get_permalink($result),
+			'status'    => (string) get_post_status($postId),
+			'url'       => (string) get_permalink($postId),
 		];
 	}
 
 	/**
 	 * Execute callback for agent-mod/update-post.
 	 *
-	 * @param mixed $input Input data (expects 'post_id', 'html', optional 'title').
+	 * @param mixed $input Input data (expects 'post_id' plus any of 'html', 'title', 'post_status', 'meta').
 	 *
 	 * @return array<string, mixed>
 	 * @since 1.0.0
 	 */
 	public function executeUpdatePost($input = null): array
 	{
-		if (! is_array($input) || empty($input['post_id']) || empty($input['html'])) {
-			return ['success' => false, 'error' => __('post_id and html are required.', 'agent-mod')];
+		if (! is_array($input) || empty($input['post_id'])) {
+			return ['success' => false, 'error' => __('post_id is required.', 'agent-mod')];
+		}
+
+		$hasHtml   = isset($input['html']) && '' !== trim((string) $input['html']);
+		$hasTitle  = ! empty($input['title']);
+		$hasStatus = ! empty($input['post_status']);
+		$hasMeta   = ! empty($input['meta']);
+
+		if (! $hasHtml && ! $hasTitle && ! $hasStatus && ! $hasMeta) {
+			return ['success' => false, 'error' => __('Nothing to update: provide at least one of html, title, post_status or meta.', 'agent-mod')];
 		}
 
 		$postId   = absint($input['post_id']);
@@ -1768,41 +1777,255 @@ class AbilityRegistrarService
 			];
 		}
 
-		$blocks = $this->resolveBlocks($input);
-		if (is_wp_error($blocks)) {
-			return ['success' => false, 'error' => $blocks->get_error_message()];
+		if (! current_user_can('edit_post', $postId)) {
+			return ['success' => false, 'error' => __('You are not allowed to edit this post.', 'agent-mod')];
 		}
 
-		$serializedContent = '';
-		foreach ($blocks as $block) {
-			$serializedContent .= serialize_block($block);
+		$updateArgs = ['ID' => $postId];
+
+		if ($hasStatus) {
+			$postStatus  = sanitize_key((string) $input['post_status']);
+			$statusError = $this->checkPostStatus($post->post_type, $postStatus);
+			if (is_wp_error($statusError)) {
+				return ['success' => false, 'error' => $statusError->get_error_message()];
+			}
+
+			$updateArgs['post_status'] = $postStatus;
 		}
 
-		if (empty(trim($serializedContent))) {
-			return ['success' => false, 'error' => __('Block serialization failed. Check your updated block structure.', 'agent-mod')];
+		if ($hasHtml) {
+			$blocks = $this->resolveBlocks($input);
+			if (is_wp_error($blocks)) {
+				return ['success' => false, 'error' => $blocks->get_error_message()];
+			}
+
+			$serializedContent = '';
+			foreach ($blocks as $block) {
+				$serializedContent .= serialize_block($block);
+			}
+
+			if (empty(trim($serializedContent))) {
+				return ['success' => false, 'error' => __('Block serialization failed. Check your updated block structure.', 'agent-mod')];
+			}
+
+			$updateArgs['post_content'] = $serializedContent;
 		}
 
-		$updateArgs = [
-			'ID'           => $postId,
-			'post_content' => $serializedContent,
-		];
-
-		if (! empty($input['title'])) {
+		if ($hasTitle) {
 			$updateArgs['post_title'] = sanitize_text_field((string) $input['title']);
 		}
 
-		$result = wp_update_post($updateArgs);
+		// Every check runs before the first write, so a rejected call changes nothing.
+		$metaWrites = $this->prepareMetaWrites($postId, $input['meta'] ?? null);
+		if (is_wp_error($metaWrites)) {
+			return ['success' => false, 'error' => $metaWrites->get_error_message()];
+		}
 
-		if (is_wp_error($result)) {
-			return ['success' => false, 'error' => $result->get_error_message()];
+		// Meta first, so publish-time hooks fired by a status change see it.
+		$this->applyMetaWrites($postId, $metaWrites);
+
+		if (count($updateArgs) > 1) {
+			$result = wp_update_post($updateArgs, true);
+
+			if (is_wp_error($result)) {
+				return ['success' => false, 'error' => $result->get_error_message()];
+			}
 		}
 
 		return [
 			'success'   => true,
 			'post_id'   => $postId,
 			'post_type' => $post->post_type,
+			'status'    => (string) get_post_status($postId),
 			'url'       => (string) get_permalink($postId),
 		];
+	}
+
+	/**
+	 * Input schema shared by the create-post and update-post meta parameter.
+	 *
+	 * A list of {key, value} items rather than a free-form object: providers
+	 * disagree on additionalProperties support, a fixed item shape works everywhere.
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	private function metaWriteSchema(): array
+	{
+		return [
+			'type'        => 'array',
+			'description' => __('Optional. Custom fields (post meta) to set or delete. Underscore-prefixed (protected) keys are only accepted when the plugin that owns them allows it.', 'agent-mod'),
+			'items'       => [
+				'type'       => 'object',
+				'required'   => ['key'],
+				'properties' => [
+					'key'    => [
+						'type'        => 'string',
+						'description' => __('Meta key.', 'agent-mod'),
+					],
+					'value'  => [
+						'type'        => 'string',
+						'description' => __('New value. Replaces the existing value.', 'agent-mod'),
+					],
+					'delete' => [
+						'type'        => 'boolean',
+						'description' => __('true removes the field; value is ignored.', 'agent-mod'),
+					],
+				],
+			],
+		];
+	}
+
+	/**
+	 * Reads post meta for get-post.
+	 *
+	 * Without explicit keys only public (non-underscore) meta is returned, which
+	 * keeps editor/plugin internals (_edit_lock, _wp_page_template…) out of the
+	 * agent's context. Single values are unwrapped; repeated keys stay a list.
+	 *
+	 * @param int   $postId Post ID.
+	 * @param mixed $keys   Requested meta keys, or null for all public keys.
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	private function readPostMeta(int $postId, $keys): array
+	{
+		$explicit = is_array($keys) && ! empty($keys);
+
+		if ($explicit) {
+			$keys = array_unique(array_filter(array_map(static function ($key) {
+				return sanitize_text_field((string) $key);
+			}, $keys)));
+		} else {
+			$keys = array_filter(array_keys((array) get_post_meta($postId)), static function ($key) {
+				return ! is_protected_meta($key, 'post');
+			});
+		}
+
+		$meta = [];
+		foreach ($keys as $key) {
+			$values = get_post_meta($postId, $key, false);
+
+			if (empty($values)) {
+				// Tell the agent a requested key is absent instead of dropping it.
+				if ($explicit) {
+					$meta[$key] = null;
+				}
+				continue;
+			}
+
+			$meta[$key] = 1 === count($values) ? $values[0] : $values;
+		}
+
+		return $meta;
+	}
+
+	/**
+	 * Validates meta write items and checks the per-key capabilities.
+	 *
+	 * Nothing is written here, so callers can reject the whole request before
+	 * touching the post. Core's edit_post_meta / delete_post_meta caps deny
+	 * protected keys unless their owner registered an auth callback.
+	 *
+	 * @param int   $postId Post ID the meta belongs to.
+	 * @param mixed $items  The 'meta' ability input.
+	 *
+	 * @return array<int, array{key: string, value: string, delete: bool}>|WP_Error
+	 * @since x.x.x
+	 */
+	private function prepareMetaWrites(int $postId, $items)
+	{
+		if (empty($items)) {
+			return [];
+		}
+
+		if (! is_array($items)) {
+			return new WP_Error('invalid_meta', __('meta must be a list of {key, value} objects.', 'agent-mod'));
+		}
+
+		$writes = [];
+		foreach ($items as $item) {
+			$key = is_array($item) && isset($item['key']) ? trim(sanitize_text_field((string) $item['key'])) : '';
+			if ('' === $key) {
+				return new WP_Error('invalid_meta', __('Each meta item needs a non-empty key.', 'agent-mod'));
+			}
+
+			$delete = ! empty($item['delete']);
+			if (! $delete && ! array_key_exists('value', $item)) {
+				/* translators: %s: meta key */
+				return new WP_Error('invalid_meta', sprintf(__('Meta item "%s" needs a value, or delete: true to remove it.', 'agent-mod'), $key));
+			}
+
+			if (! current_user_can($delete ? 'delete_post_meta' : 'edit_post_meta', $postId, $key)) {
+				return new WP_Error(
+					'meta_forbidden',
+					/* translators: %s: meta key */
+					sprintf(__('You are not allowed to change the custom field "%s". Underscore-prefixed (protected) fields can only be changed when the plugin that owns them allows it.', 'agent-mod'), $key)
+				);
+			}
+
+			$value = $delete || is_array($item['value']) ? '' : (string) $item['value'];
+			if (! $delete && ! current_user_can('unfiltered_html')) {
+				$value = wp_kses_post($value);
+			}
+
+			$writes[] = ['key' => $key, 'value' => $value, 'delete' => $delete];
+		}
+
+		return $writes;
+	}
+
+	/**
+	 * Saves meta writes validated by prepareMetaWrites().
+	 *
+	 * @param int                                                          $postId Post ID.
+	 * @param array<int, array{key: string, value: string, delete: bool}> $writes Validated writes.
+	 *
+	 * @return void
+	 * @since x.x.x
+	 */
+	private function applyMetaWrites(int $postId, array $writes): void
+	{
+		foreach ($writes as $write) {
+			if ($write['delete']) {
+				delete_post_meta($postId, $write['key']);
+				continue;
+			}
+
+			// update_post_meta() unslashes its value.
+			update_post_meta($postId, $write['key'], wp_slash($write['value']));
+		}
+	}
+
+	/**
+	 * Checks that a status is allowed and that the user may set it.
+	 *
+	 * wp_insert_post()/wp_update_post() do no capability checks of their own,
+	 * so publishing is gated here the way the editor gates it.
+	 *
+	 * @param string $postType   Post type slug.
+	 * @param string $postStatus Requested status.
+	 *
+	 * @return true|WP_Error
+	 * @since x.x.x
+	 */
+	private function checkPostStatus(string $postType, string $postStatus)
+	{
+		if (! in_array($postStatus, ['draft', 'publish', 'pending', 'private'], true)) {
+			/* translators: %s: post status */
+			return new WP_Error('invalid_status', sprintf(__('Invalid post_status "%s". Use draft, publish, pending or private.', 'agent-mod'), $postStatus));
+		}
+
+		if (in_array($postStatus, ['publish', 'private'], true)) {
+			$postTypeObject = get_post_type_object($postType);
+
+			if (! $postTypeObject || ! current_user_can($postTypeObject->cap->publish_posts)) {
+				return new WP_Error('status_forbidden', __('You are not allowed to publish this post type. Use "draft" or "pending" instead.', 'agent-mod'));
+			}
+		}
+
+		return true;
 	}
 
 	// =========================================================================

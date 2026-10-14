@@ -338,7 +338,7 @@ class SiteManagementAbilityService
 			'agent-mod/install-plugin',
 			[
 				'label'               => __('Install Plugin', 'agent-mod'),
-				'description'         => __('Downloads and installs a plugin from the WordPress.org directory, optionally activating it. Requires user confirmation. Fails if the plugin is already installed — use manage-plugin to activate or update an installed plugin instead.', 'agent-mod'),
+				'description'         => __('Downloads and installs a plugin from the WordPress.org directory, optionally activating it. Fails if the plugin is already installed — use manage-plugin to activate or update an installed plugin instead.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					$input = $this->toArray($input);
@@ -388,7 +388,7 @@ class SiteManagementAbilityService
 			'agent-mod/upload-plugin',
 			[
 				'label'               => __('Upload Plugin', 'agent-mod'),
-				'description'         => __('Installs a plugin from a .zip archive that is not in the WordPress.org directory, either from an https:// URL or from a .zip already uploaded to the media library. Requires user confirmation.', 'agent-mod'),
+				'description'         => __('Installs a plugin from a .zip archive that is not in the WordPress.org directory, either from an https:// URL or from a .zip already uploaded to the media library.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					return $this->plugins->upload($this->toArray($input));
@@ -439,7 +439,7 @@ class SiteManagementAbilityService
 			'agent-mod/manage-plugin',
 			[
 				'label'               => __('Manage Plugin', 'agent-mod'),
-				'description'         => __('Activates, deactivates or updates a plugin that is already installed. Requires user confirmation. Note that activating a plugin loads its code immediately.', 'agent-mod'),
+				'description'         => __('Activates, deactivates or updates a plugin that is already installed. Note that activating a plugin loads its code immediately.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					$input = $this->toArray($input);
@@ -488,7 +488,7 @@ class SiteManagementAbilityService
 			'agent-mod/remove-plugin',
 			[
 				'label'               => __('Remove Plugin', 'agent-mod'),
-				'description'         => __('Deactivates and permanently deletes an installed plugin, running its uninstall routine — this usually deletes the plugin\'s stored data as well. This cannot be undone and requires user confirmation.', 'agent-mod'),
+				'description'         => __('Deactivates and permanently deletes an installed plugin, running its uninstall routine — this usually deletes the plugin\'s stored data as well. This cannot be undone. Unless the user explicitly asked to delete this specific item, confirm it with them before calling.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					$input = $this->toArray($input);
@@ -675,7 +675,7 @@ class SiteManagementAbilityService
 			'agent-mod/install-theme',
 			[
 				'label'               => __('Install Theme', 'agent-mod'),
-				'description'         => __('Downloads and installs a theme from the WordPress.org directory, optionally switching the site to it. Requires user confirmation. Fails if the theme is already installed — use manage-theme to activate or update an installed theme instead.', 'agent-mod'),
+				'description'         => __('Downloads and installs a theme from the WordPress.org directory, optionally switching the site to it. Fails if the theme is already installed — use manage-theme to activate or update an installed theme instead.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					$input = $this->toArray($input);
@@ -725,7 +725,7 @@ class SiteManagementAbilityService
 			'agent-mod/upload-theme',
 			[
 				'label'               => __('Upload Theme', 'agent-mod'),
-				'description'         => __('Installs a theme from a .zip archive that is not in the WordPress.org directory, either from an https:// URL or from a .zip already uploaded to the media library. Requires user confirmation.', 'agent-mod'),
+				'description'         => __('Installs a theme from a .zip archive that is not in the WordPress.org directory, either from an https:// URL or from a .zip already uploaded to the media library.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					return $this->themes->upload($this->toArray($input));
@@ -774,7 +774,7 @@ class SiteManagementAbilityService
 			'agent-mod/manage-theme',
 			[
 				'label'               => __('Manage Theme', 'agent-mod'),
-				'description'         => __('Activates or updates a theme that is already installed. Activating a theme changes the public appearance of the whole site. Requires user confirmation. Themes cannot be deactivated — a site always has exactly one active theme.', 'agent-mod'),
+				'description'         => __('Activates or updates a theme that is already installed. Activating a theme changes the public appearance of the whole site. Themes cannot be deactivated — a site always has exactly one active theme.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					$input = $this->toArray($input);
@@ -823,7 +823,7 @@ class SiteManagementAbilityService
 			'agent-mod/remove-theme',
 			[
 				'label'               => __('Remove Theme', 'agent-mod'),
-				'description'         => __('Permanently deletes an installed theme and its files. The active theme, the parent of an active child theme and the default fallback theme cannot be deleted. This cannot be undone and requires user confirmation.', 'agent-mod'),
+				'description'         => __('Permanently deletes an installed theme and its files. The active theme, the parent of an active child theme and the default fallback theme cannot be deleted. This cannot be undone. Unless the user explicitly asked to delete this specific item, confirm it with them before calling.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					$input = $this->toArray($input);
@@ -930,7 +930,7 @@ class SiteManagementAbilityService
 			'agent-mod/update-setting',
 			[
 				'label'               => __('Update Setting', 'agent-mod'),
-				'description'         => __('Changes one of WordPress\' registered settings, for example the site title, tagline, date format, posts per page or comment defaults. The new value is validated against the setting\'s declared type before it is saved. Requires user confirmation. Call get-settings first to confirm the exact name and expected type.', 'agent-mod'),
+				'description'         => __('Changes one of WordPress\' registered settings, for example the site title, tagline, date format, posts per page or comment defaults. The new value is validated against the setting\'s declared type before it is saved. Call get-settings first to confirm the exact name and expected type.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					$input = $this->toArray($input);
@@ -1018,7 +1018,7 @@ class SiteManagementAbilityService
 			'agent-mod/update-option',
 			[
 				'label'               => __('Update Option', 'agent-mod'),
-				'description'         => __('Writes a single row in the WordPress options table. Prefer update-setting for anything that appears in get-settings, because that path validates the value against a declared schema. Options controlling site addressing, active plugins and themes, role definitions or credentials are refused. Requires user confirmation.', 'agent-mod'),
+				'description'         => __('Writes a single row in the WordPress options table. Prefer update-setting for anything that appears in get-settings, because that path validates the value against a declared schema. Options controlling site addressing, active plugins and themes, role definitions or credentials are refused.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					return $this->options->updateOption($this->toArray($input));
@@ -1259,7 +1259,7 @@ class SiteManagementAbilityService
 			'agent-mod/manage-user',
 			[
 				'label'               => __('Manage User', 'agent-mod'),
-				'description'         => __('Creates a user account, edits an existing user\'s profile fields, changes their role, or emails them a password reset link. Requires user confirmation. Passwords are never chosen or shown here: new accounts and resets go out as standard WordPress emails. Usernames cannot be changed after creation.', 'agent-mod'),
+				'description'         => __('Creates a user account, edits an existing user\'s profile fields, changes their role, or emails them a password reset link. Passwords are never chosen or shown here: new accounts and resets go out as standard WordPress emails. Usernames cannot be changed after creation.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					return $this->users->manage($this->toArray($input));
@@ -1326,7 +1326,7 @@ class SiteManagementAbilityService
 			'agent-mod/remove-user',
 			[
 				'label'               => __('Remove User', 'agent-mod'),
-				'description'         => __('Permanently deletes a user account and reassigns everything they authored to another user, which reassign_to must name. The account you are signed in as and the site\'s only administrator cannot be deleted. This cannot be undone and requires user confirmation.', 'agent-mod'),
+				'description'         => __('Permanently deletes a user account and reassigns everything they authored to another user, which reassign_to must name. The account you are signed in as and the site\'s only administrator cannot be deleted. This cannot be undone. Unless the user explicitly asked to delete this specific item, confirm it with them before calling.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					return $this->users->remove($this->toArray($input));

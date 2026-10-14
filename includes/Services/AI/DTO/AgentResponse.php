@@ -98,6 +98,36 @@ final class AgentResponse
 	public array $pendingToolCalls = [];
 
 	/**
+	 * What the paused run waits for: 'confirmation' (write actions to approve)
+	 * or 'questions' (the agent asked the user via the ask-user tool).
+	 *
+	 * Both kinds set $isPendingConfirmation, so every caller that only needs
+	 * to know "the run is paused for the user" keeps working unchanged.
+	 *
+	 * @var string
+	 * @since x.x.x
+	 */
+	public string $pendingKind = '';
+
+	/**
+	 * The questions the agent asked, as {intro: string, questions: array}.
+	 *
+	 * @var array<string, mixed>
+	 * @since x.x.x
+	 */
+	public array $pendingQuestions = [];
+
+	/**
+	 * Set when the agent delivered a plan through present-plan, as
+	 * {summary: string}. The turn is finished (the plan is its text); the chat
+	 * opens the plan review modal for the next step.
+	 *
+	 * @var array<string, string>
+	 * @since x.x.x
+	 */
+	public array $planReview = [];
+
+	/**
 	 * Constructor.
 	 *
 	 * @param string                            $text       Final assistant text.
@@ -160,8 +190,39 @@ final class AgentResponse
 	): self {
 		$instance                       = new self('', $toolCalls, $messages, $tokenUsage);
 		$instance->isPendingConfirmation = true;
+		$instance->pendingKind          = 'confirmation';
 		$instance->confirmationToken    = $token;
 		$instance->pendingToolCalls     = $pendingToolCalls;
+
+		return $instance;
+	}
+
+	/**
+	 * Creates a response paused on questions the agent asked the user.
+	 *
+	 * @param string                           $token     UUID token for the transient store.
+	 * @param array<string, mixed>             $questions Normalized {intro, questions} payload.
+	 * @param string                           $text      Text the model wrote alongside the call.
+	 * @param Message[]                        $messages  Message history ending with the asking message.
+	 * @param array<string, int>               $tokenUsage Token usage so far.
+	 * @param array<int, array<string, mixed>> $toolCalls Tool calls already executed in this run.
+	 *
+	 * @return self
+	 * @since x.x.x
+	 */
+	public static function pendingQuestions(
+		string $token,
+		array $questions,
+		string $text,
+		array $messages,
+		array $tokenUsage,
+		array $toolCalls = []
+	): self {
+		$instance                        = new self($text, $toolCalls, $messages, $tokenUsage);
+		$instance->isPendingConfirmation = true;
+		$instance->pendingKind           = 'questions';
+		$instance->confirmationToken     = $token;
+		$instance->pendingQuestions      = $questions;
 
 		return $instance;
 	}
@@ -198,6 +259,16 @@ final class AgentResponse
 			];
 		}
 
+		if ('questions' === $this->pendingKind) {
+			return [
+				'success'           => true,
+				'pendingQuestions'  => $this->pendingQuestions,
+				'confirmationToken' => $this->confirmationToken,
+				'text'              => $this->text,
+				'toolCalls'         => $this->toolCalls,
+			];
+		}
+
 		if ($this->isPendingConfirmation) {
 			$first = $this->pendingToolCalls[0] ?? [];
 
@@ -225,6 +296,10 @@ final class AgentResponse
 
 		if ('' !== $this->stopReason) {
 			$payload['stopReason'] = $this->stopReason;
+		}
+
+		if (! empty($this->planReview)) {
+			$payload['planReview'] = $this->planReview;
 		}
 
 		return $payload;

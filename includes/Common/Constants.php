@@ -203,7 +203,7 @@ class Constants
 				'agent-mod'
 			),
 			__(
-				'When a user request is ambiguous or missing required details, ask one short clarifying question before calling any tools. Do not assume intent.',
+				'When a tool requires a detail the user has not given and you cannot look it up with the available tools or reasonably default it, ask the user before calling that tool. Do not ask about details you can find yourself.',
 				'agent-mod'
 			),
 			__(

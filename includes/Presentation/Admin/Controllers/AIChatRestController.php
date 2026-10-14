@@ -23,6 +23,7 @@ use AgentMod\Services\AI\ConfirmationStore;
 use AgentMod\Services\AI\ProgressStore;
 use AgentMod\Services\AI\ProviderInfoService;
 use AgentMod\Services\AI\DTO\AgentConfig;
+use AgentMod\Services\AskUserAbilityService;
 use AgentMod\Services\SettingsService;
 
 defined('ABSPATH') || exit;
@@ -68,12 +69,22 @@ final class AIChatRestController
 	private SettingsService $settings_service;
 
 	/**
+	 * Ask-user ability service (answer normalization).
+	 *
+	 * @var AskUserAbilityService
+	 * @since x.x.x
+	 */
+	private AskUserAbilityService $askUser;
+
+	/**
 	 * Constructor (PHP-DI autowired). Binds the REST route registration.
 	 *
 	 * @param AIOrchestratorService  $orchestrator           AI orchestrator service.
 	 * @param ConfirmationStore      $confirmationStore      Pending write-action store.
 	 * @param ProviderInfoService    $providerInfo           Connected-provider info service.
 	 * @param ProgressStore          $progressStore          Live tool-call progress store.
+	 * @param SettingsService        $settingsService        Settings service.
+	 * @param AskUserAbilityService  $askUser                Ask-user ability service.
 	 *
 	 * @since 1.0.0
 	 */
@@ -82,13 +93,15 @@ final class AIChatRestController
 		ConfirmationStore $confirmationStore,
 		ProviderInfoService $providerInfo,
 		ProgressStore $progressStore,
-		SettingsService $settingsService
+		SettingsService $settingsService,
+		AskUserAbilityService $askUser
 	) {
 		$this->orchestrator           = $orchestrator;
 		$this->confirmationStore      = $confirmationStore;
 		$this->providerInfo           = $providerInfo;
 		$this->progressStore          = $progressStore;
 		$this->settings_service       = $settingsService;
+		$this->askUser                = $askUser;
 		add_action('rest_api_init', [$this, 'registerRoutes']);
 	}
 
@@ -158,6 +171,17 @@ final class AIChatRestController
 			[
 				'methods'             => 'POST',
 				'callback'            => [$this, 'handleConfirmAction'],
+				'permission_callback' => [$this, 'checkPermission'],
+			]
+		);
+
+		// Resumes a run that paused on questions the agent asked the user.
+		register_rest_route(
+			Constants::REST_NAMESPACE,
+			'/answer-questions',
+			[
+				'methods'             => 'POST',
+				'callback'            => [$this, 'handleAnswerQuestions'],
 				'permission_callback' => [$this, 'checkPermission'],
 			]
 		);
@@ -246,6 +270,11 @@ final class AIChatRestController
 		$agentData = (array) apply_filters('agent_mod_agent_config_data', $agentData);
 
 		$agent = AgentConfig::fromArray($agentData);
+
+		// The admin chat has a person at the keyboard: offer the ask-user tool.
+		// Decided here, never from request data; resumed runs carry it in the
+		// stored AgentConfig.
+		$agent->interactive = true;
 
 		$conversationId = (int) $request->get_param('conversationId');
 
@@ -378,29 +407,122 @@ final class AIChatRestController
 	 */
 	public function handleConfirmAction(WP_REST_Request $request)
 	{
-		$token          = sanitize_text_field((string) $request->get_param('token'));
-		$conversationId = (int) $request->get_param('conversationId');
-		$decision       = sanitize_key((string) $request->get_param('decision'));
-		$decision       = in_array($decision, ['approve', 'decline'], true) ? $decision : 'approve';
+		$decision = sanitize_key((string) $request->get_param('decision'));
+		$decision = in_array($decision, ['approve', 'decline'], true) ? $decision : 'approve';
+
+		$state = $this->consumePendingState($request, 'confirmation');
+
+		if ($state instanceof WP_Error) {
+			return $state;
+		}
+
+		if (empty($this->normalizeToolCalls($state['pendingCalls'] ?? []))) {
+			return new WP_Error('corrupt_state', __('The pending confirmation state is invalid.', 'agent-mod'), ['status' => 500]);
+		}
+
+		return $this->resumePendingRun($request, $state, $decision);
+	}
+
+	/**
+	 * Resumes a run that paused on questions the agent asked the user.
+	 *
+	 * The answers become the ask-user call's function response, validated
+	 * against the questions stored with the paused state (not against what the
+	 * client claims was asked). "skipped" tells the model to continue with
+	 * defaults instead.
+	 *
+	 * @param WP_REST_Request $request The REST request.
+	 *
+	 * @return WP_REST_Response|WP_Error
+	 * @since x.x.x
+	 */
+	public function handleAnswerQuestions(WP_REST_Request $request)
+	{
+		$state = $this->consumePendingState($request, 'questions');
+
+		if ($state instanceof WP_Error) {
+			return $state;
+		}
+
+		$questions = is_array($state['questions'] ?? null) ? $state['questions'] : [];
+
+		if (empty($questions['questions'])) {
+			return new WP_Error('corrupt_state', __('The pending questions are invalid.', 'agent-mod'), ['status' => 500]);
+		}
+
+		$payload = $this->askUser->buildAnswerPayload(
+			$questions,
+			$request->get_param('answers'),
+			rest_sanitize_boolean($request->get_param('skipped'))
+		);
+
+		return $this->resumePendingRun($request, $state, 'answer', $payload);
+	}
+
+	/**
+	 * Loads and consumes a paused run's state of the expected kind.
+	 *
+	 * The kind is checked before consuming, so a token sent to the wrong
+	 * endpoint stays usable for the right one. States saved before kinds
+	 * existed count as confirmations.
+	 *
+	 * @param WP_REST_Request $request The REST request.
+	 * @param string          $kind    'confirmation' or 'questions'.
+	 *
+	 * @return array<string, mixed>|WP_Error
+	 * @since x.x.x
+	 */
+	private function consumePendingState(WP_REST_Request $request, string $kind)
+	{
+		$token = sanitize_text_field((string) $request->get_param('token'));
 
 		if ('' === $token) {
 			return new WP_Error('missing_token', __('A confirmation token is required.', 'agent-mod'), ['status' => 400]);
 		}
 
-		$state = $this->confirmationStore->consume($token);
+		$state = $this->confirmationStore->load($token);
 
 		if (null === $state) {
 			return new WP_Error('invalid_token', __('The confirmation token is invalid or has expired.', 'agent-mod'), ['status' => 404]);
 		}
 
-		$agent         = $state['agent'];
+		$stateKind = (string) ($state['kind'] ?? '') ?: 'confirmation';
+
+		if ($kind !== $stateKind) {
+			return new WP_Error('wrong_token_kind', __('This token belongs to a different kind of pending request.', 'agent-mod'), ['status' => 400]);
+		}
+
+		$this->confirmationStore->consume($token);
+
+		return $state;
+	}
+
+	/**
+	 * Resumes a paused run and persists the completed turn.
+	 *
+	 * Shared by the confirmation and the answer endpoints. The resumed run may
+	 * pause again (another write to confirm, more questions), in which case
+	 * nothing is persisted yet and the new pending payload goes to the client.
+	 *
+	 * @param WP_REST_Request      $request       The REST request.
+	 * @param array<string, mixed> $state         The consumed pending state.
+	 * @param string               $decision      'approve', 'decline' or 'answer'.
+	 * @param array<string, mixed> $answerPayload Ask-user function response ('answer' only).
+	 *
+	 * @return WP_REST_Response|WP_Error
+	 * @since x.x.x
+	 */
+	private function resumePendingRun(WP_REST_Request $request, array $state, string $decision, array $answerPayload = [])
+	{
+		$conversationId = (int) $request->get_param('conversationId');
+
+		$agent         = $state['agent'] ?? null;
 		$wireHistory   = is_array($state['wireHistory'] ?? null) ? $state['wireHistory'] : [];
 		$message       = (string) ($state['message'] ?? '');
 		$attachments   = is_array($state['attachments'] ?? null) ? $state['attachments'] : [];
-		$pendingCalls  = $this->normalizeToolCalls($state['pendingCalls'] ?? []);
 		$executedCalls = $this->normalizeToolCalls($state['executedCalls'] ?? []);
 
-		if (! $agent instanceof AgentConfig || empty($wireHistory) || empty($pendingCalls)) {
+		if (! $agent instanceof AgentConfig || empty($wireHistory)) {
 			return new WP_Error('corrupt_state', __('The pending confirmation state is invalid.', 'agent-mod'), ['status' => 500]);
 		}
 
@@ -412,7 +534,8 @@ final class AIChatRestController
 			$attachments,
 			$this->sanitizeRequestId($request),
 			$this->sanitizeAutoApprovedAbilities($request->get_param('autoApprovedAbilities')),
-			'approve' === $decision
+			$decision,
+			$answerPayload
 		);
 
 		if ($response->isError()) {

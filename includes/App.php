@@ -13,6 +13,7 @@ use DI\DependencyException;
 use DI\NotFoundException;
 use Exception;
 use AgentMod\Services\AbilityRegistrarService;
+use AgentMod\Services\AskUserAbilityService;
 use AgentMod\Common\DI;
 use AgentMod\Presentation\ControllerInit;
 use AgentMod\Services\LibraryService;
@@ -34,6 +35,7 @@ final class App
 		AbilityRegistrarService::class,
 		SiteManagementAbilityService::class,
 		TaxonomyAbilityService::class,
+		AskUserAbilityService::class,
 		LibraryService::class,
 		SettingsService::class,
 	];

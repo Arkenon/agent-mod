@@ -78,6 +78,130 @@ export function setPendingConfirmation( data ) {
 	return { type: 'SET_PENDING_CONFIRMATION', data };
 }
 
+export function setPendingQuestions( data ) {
+	doAction( 'agent_mod.questions_requested', data );
+	return { type: 'SET_PENDING_QUESTIONS', data };
+}
+
+export function clearQuestions() {
+	return { type: 'CLEAR_QUESTIONS' };
+}
+
+export function setPlanReview( data ) {
+	doAction( 'agent_mod.plan_review_requested', data );
+	return { type: 'SET_PLAN_REVIEW', data };
+}
+
+export function clearPlanReview() {
+	return { type: 'CLEAR_PLAN_REVIEW' };
+}
+
+/**
+ * Appends a finished assistant turn and, when it delivered a plan, opens the
+ * plan review modal.
+ *
+ * @param {Function} dispatch Store dispatch.
+ * @param {Object}   data     Successful, non-paused REST response.
+ */
+function appendAssistantTurn( dispatch, data ) {
+	dispatch.appendMessage( {
+		role: 'assistant',
+		text: data.text || '',
+		toolCalls: Array.isArray( data.toolCalls ) ? data.toolCalls : [],
+		tokenUsage: data.tokenUsage || null,
+	} );
+
+	if ( data.planReview ) {
+		dispatch.setPlanReview( {
+			summary: data.planReview.summary || '',
+			text: data.text || '',
+		} );
+	}
+}
+
+/**
+ * Approves the delivered plan: switches to Execute mode with the chosen
+ * approval mode and asks the agent to carry the plan out.
+ *
+ * The approval travels as a normal user message, so it is visible in the
+ * conversation and the agent works from the plan already in the history.
+ *
+ * @param {string} approvalMode 'manual' or 'auto'.
+ */
+export const approvePlan = ( approvalMode ) => async ( { dispatch } ) => {
+	dispatch.clearPlanReview();
+	dispatch.selectApprovalMode( approvalMode );
+	dispatch.selectMode( 'execute' );
+
+	await dispatch.sendMessage( __( 'The plan is approved. Carry it out now.', 'agent-mod' ) );
+};
+
+/**
+ * Asks the agent to review its own plan; stays in Plan mode, so the revised
+ * plan comes back through the review modal.
+ */
+export const requestPlanReview = () => async ( { dispatch } ) => {
+	dispatch.clearPlanReview();
+
+	await dispatch.sendMessage(
+		__(
+			'Review your plan critically against the site data — look for mistakes, conflicts and missing steps — then present the corrected plan.',
+			'agent-mod'
+		)
+	);
+};
+
+/**
+ * Sends the user's requested changes to the plan; stays in Plan mode.
+ *
+ * @param {string} text The requested changes.
+ */
+export const requestPlanChanges = ( text ) => async ( { dispatch } ) => {
+	dispatch.clearPlanReview();
+
+	await dispatch.sendMessage( text );
+};
+
+/**
+ * Opens the modal a paused run waits on, if the response is a paused one.
+ *
+ * Shared by the chat request and every resume (confirm, decline, answer), since
+ * any of them can come back paused on a write to confirm or on questions.
+ *
+ * @param {Function} dispatch Store dispatch.
+ * @param {Object}   data     REST response.
+ * @return {boolean} True when the response paused the run.
+ */
+function openPendingModal( dispatch, data ) {
+	const executedCalls = Array.isArray( data?.toolCalls ) ? data.toolCalls : [];
+
+	if ( data?.pendingQuestions ) {
+		dispatch.setPendingQuestions( {
+			token:     data.confirmationToken,
+			intro:     data.pendingQuestions.intro || '',
+			questions: Array.isArray( data.pendingQuestions.questions )
+				? data.pendingQuestions.questions
+				: [],
+			text: data.text || '',
+			executedCalls,
+		} );
+		return true;
+	}
+
+	if ( data?.pendingConfirmation ) {
+		dispatch.setPendingConfirmation( {
+			token:            data.confirmationToken,
+			actionName:       data.pendingAction?.name || '',
+			args:             data.pendingAction?.args || {},
+			pendingToolCalls: data.pendingToolCalls || [],
+			executedCalls,
+		} );
+		return true;
+	}
+
+	return false;
+}
+
 /**
  * Adds ability names to the session-approval list ("don't ask again").
  *
@@ -227,19 +351,19 @@ export const fetchAgents = () => async ( { dispatch, select } ) => {
 };
 
 /**
- * Resolves a pending confirmation (approve or decline) via the confirm-action
- * REST endpoint and handles the resumed run's response.
+ * Resumes a paused run through one of the resume endpoints and handles the
+ * resumed run's response.
  *
- * @param {Object} thunkArgs      Store thunk args ({ dispatch, select }).
- * @param {string} token          Confirmation token.
- * @param {number} conversationId Current conversation ID.
- * @param {string} decision       'approve' or 'decline'.
+ * @param {Object} thunkArgs Store thunk args ({ dispatch, select }).
+ * @param {string} endpoint  '/confirm-action' or '/answer-questions'.
+ * @param {Object} body      Endpoint-specific fields (token, decision, answers…).
  */
-async function resolveConfirmation( { dispatch, select }, token, conversationId, decision ) {
+async function resumeRun( { dispatch, select }, endpoint, body ) {
 	// Close the modal immediately; don't wait for the request to resolve. If
-	// the resumed run hits another write action needing approval, the
-	// pendingConfirmation branch below re-opens it.
+	// the resumed run pauses again (another write to approve, more questions),
+	// openPendingModal() below re-opens the right one.
 	dispatch.clearConfirmation();
+	dispatch.clearQuestions();
 	dispatch.setLoading( true );
 
 	const requestId   = generateRequestId();
@@ -248,19 +372,18 @@ async function resolveConfirmation( { dispatch, select }, token, conversationId,
 
 	try {
 		const data = await apiFetch( {
-			path:   select.getRestNamespace() + '/confirm-action',
+			path:   select.getRestNamespace() + endpoint,
 			method: 'POST',
 			data:   {
-				token,
-				conversationId,
+				...body,
 				requestId,
-				decision,
 				autoApprovedAbilities: select.getAutoApprovedAbilities(),
 			},
 			signal,
 		} );
 
 		dispatch.clearConfirmation();
+		dispatch.clearQuestions();
 
 		// The conversation may have been created lazily at any point of the
 		// chain; keep the id in sync on every leg, not just the terminal one.
@@ -268,21 +391,10 @@ async function resolveConfirmation( { dispatch, select }, token, conversationId,
 			dispatch.setConversationId( data.conversationId );
 		}
 
-		if ( data && data.success && ! data.pendingConfirmation ) {
-			dispatch.appendMessage( {
-				role: 'assistant',
-				text: data.text || '',
-				toolCalls: Array.isArray( data.toolCalls ) ? data.toolCalls : [],
-				tokenUsage: data.tokenUsage || null,
-			} );
-		} else if ( data && data.pendingConfirmation ) {
-			dispatch.setPendingConfirmation( {
-				token:            data.confirmationToken,
-				actionName:       data.pendingAction?.name || '',
-				args:             data.pendingAction?.args || {},
-				pendingToolCalls: data.pendingToolCalls || [],
-				executedCalls:    Array.isArray( data.toolCalls ) ? data.toolCalls : [],
-			} );
+		if ( data && data.success && openPendingModal( dispatch, data ) ) {
+			// Paused again: the modal is open, nothing to append yet.
+		} else if ( data && data.success ) {
+			appendAssistantTurn( dispatch, data );
 		} else {
 			const message =
 				( data?.error?.message ) ||
@@ -291,6 +403,7 @@ async function resolveConfirmation( { dispatch, select }, token, conversationId,
 		}
 	} catch ( err ) {
 		dispatch.clearConfirmation();
+		dispatch.clearQuestions();
 		if ( isStopError( err ) ) {
 			// Approved actions may have run before the stop landed; say so
 			// instead of failing silently.
@@ -309,9 +422,9 @@ async function resolveConfirmation( { dispatch, select }, token, conversationId,
 	} finally {
 		untrackRequest( requestId );
 		stopPolling();
-		// A chained confirmation re-opened the modal: keep the composer locked
-		// so there is no enabled-disabled flicker between modals.
-		if ( ! select.getPendingConfirmation() ) {
+		// A chained modal re-opened: keep the composer locked so there is no
+		// enabled-disabled flicker between modals.
+		if ( ! select.isAwaitingUser() ) {
 			dispatch.setLoading( false );
 		}
 	}
@@ -324,8 +437,31 @@ async function resolveConfirmation( { dispatch, select }, token, conversationId,
  * @param {number} conversationId Current conversation ID.
  */
 export const confirmAction = ( token, conversationId ) => async ( { dispatch, select } ) => {
-	await resolveConfirmation( { dispatch, select }, token, conversationId, 'approve' );
+	await resumeRun( { dispatch, select }, '/confirm-action', {
+		token,
+		conversationId,
+		decision: 'approve',
+	} );
 };
+
+/**
+ * Sends the user's answers to the agent's questions and resumes the run.
+ *
+ * @param {string}  token          Pending-questions token.
+ * @param {number}  conversationId Current conversation ID.
+ * @param {Object}  answers        Keyed by question id: { selected: string[], other: string }.
+ * @param {boolean} skipped        True when the user skipped the questions.
+ */
+export const answerQuestions =
+	( token, conversationId, answers, skipped = false ) =>
+	async ( { dispatch, select } ) => {
+		await resumeRun( { dispatch, select }, '/answer-questions', {
+			token,
+			conversationId,
+			answers: skipped ? {} : answers,
+			skipped,
+		} );
+	};
 
 /**
  * Declines a pending write action. The model receives a "declined" function
@@ -335,7 +471,11 @@ export const confirmAction = ( token, conversationId ) => async ( { dispatch, se
  * @param {number} conversationId Current conversation ID.
  */
 export const declineAction = ( token, conversationId ) => async ( { dispatch, select } ) => {
-	await resolveConfirmation( { dispatch, select }, token, conversationId, 'decline' );
+	await resumeRun( { dispatch, select }, '/confirm-action', {
+		token,
+		conversationId,
+		decision: 'decline',
+	} );
 };
 
 /**
@@ -594,22 +734,11 @@ export const sendMessage = ( text, attachments = [] ) => async ( {
 		if ( data && data.success ) {
 			doAction( 'agent_mod.after_message_sent', data, agent );
 
-			if ( data.pendingConfirmation ) {
-				// A write action needs user confirmation before executing.
-				dispatch.setPendingConfirmation( {
-					token:            data.confirmationToken,
-					actionName:       data.pendingAction?.name || '',
-					args:             data.pendingAction?.args || {},
-					pendingToolCalls: data.pendingToolCalls || [],
-					executedCalls:    Array.isArray( data.toolCalls ) ? data.toolCalls : [],
-				} );
+			if ( openPendingModal( dispatch, data ) ) {
+				// Paused: a write action needs confirmation, or the agent asked
+				// the user questions. The matching modal is open.
 			} else {
-				dispatch.appendMessage( {
-					role: 'assistant',
-					text: data.text || '',
-					toolCalls: Array.isArray( data.toolCalls ) ? data.toolCalls : [],
-					tokenUsage: data.tokenUsage || null,
-				} );
+				appendAssistantTurn( dispatch, data );
 
 				if ( data.conversationId ) {
 					dispatch.setConversationId( data.conversationId );

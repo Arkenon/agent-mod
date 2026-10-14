@@ -12,7 +12,7 @@ import { __ } from '@wordpress/i18n';
 
 import { STORE_NAME } from '../store';
 
-const APPROVAL_MODES = [
+export const APPROVAL_MODES = [
 	{
 		id: 'manual',
 		icon: 'shield',

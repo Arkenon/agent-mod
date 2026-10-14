@@ -19,6 +19,7 @@
 namespace AgentMod\Services\AI;
 
 use AgentMod\Services\AI\DTO\AgentConfig;
+use AgentMod\Services\AskUserAbilityService;
 
 defined('ABSPATH') || exit;
 
@@ -159,8 +160,15 @@ class PromptBuilder
 	/**
 	 * Builds the directive for the active interaction mode.
 	 *
-	 * Execute mode adds nothing; ask/plan modes steer the agent away from
-	 * making changes (write abilities are also removed by the AbilityResolver).
+	 * Execute mode tells the agent to finish the work in the same turn instead
+	 * of announcing it — the loop ends on any reply without a tool call, so a
+	 * "here is what I will do" message stops the run. Ask/plan modes steer the
+	 * agent away from making changes (write abilities are also removed by the
+	 * AbilityResolver).
+	 *
+	 * Questions are never ruled out. On an interactive channel they go through
+	 * the ask-user tool (a form the user answers, after which the run carries
+	 * on); elsewhere nobody would answer, so the agent defaults instead.
 	 *
 	 * @param AgentConfig $agent The agent configuration.
 	 *
@@ -169,7 +177,13 @@ class PromptBuilder
 	 */
 	private function buildModeDirective(AgentConfig $agent): string
 	{
-		$directive = '';
+		$askUser = $agent->interactive
+			? sprintf(
+				/* translators: %s: ask-user ability name. */
+				__('If a question really is needed, ask it with the %s tool (all questions in one call) instead of writing it as plain text, then continue once it is answered.', 'agent-mod'),
+				AskUserAbilityService::NAME
+			)
+			: '';
 
 		if ('ask' === $agent->mode) {
 			$directive = __(
@@ -178,9 +192,43 @@ class PromptBuilder
 			);
 		} elseif ('plan' === $agent->mode) {
 			$directive = __(
-				'You are in Plan mode: produce a clear, step-by-step plan of what you WOULD do, including which tools you would call and with what arguments. You may read site data with the available tools, but do not execute any changes. Suggest switching to Execute mode to carry the plan out.',
+				'You are in Plan mode: produce a clear, step-by-step plan of what you WOULD do, including which tools you would call and with what arguments. You may read site data with the available tools, but do not execute any changes.',
 				'agent-mod'
 			);
+
+			// On an interactive channel the plan is handed over through
+			// present-plan, which opens the review modal; elsewhere the user
+			// has to be told how to carry it out.
+			$directive .= ' ' . ($agent->interactive
+				? sprintf(
+					/* translators: %s: present-plan ability name. */
+					__('When the plan is complete, deliver it by calling the %s tool with the full plan in Markdown instead of writing it as a reply. The user then gets options to approve it, have it reviewed or request changes, so do not tell them to switch modes or ask whether to proceed. If the user only asked a question, answer it normally without that tool.', 'agent-mod'),
+					AskUserAbilityService::PRESENT_PLAN
+				)
+				: __('Suggest switching to Execute mode to carry the plan out.', 'agent-mod'));
+
+			// Plan mode is where open choices get settled, so the bar for asking
+			// is deliberately lower here than in Execute mode.
+			if ($agent->interactive) {
+				$askUser = sprintf(
+					/* translators: %s: ask-user ability name. */
+					__('Plan mode is where decisions are settled together with the user. Before you write the plan, if the request leaves open choices that shape the result — for example which fields, options or sections to include, names and slugs, scope or structure — ask about them with the %s tool, even when the user left the choice to you. Read the site data you need first so your options fit the site, offer your own proposals as the options with your recommendation marked, and ask everything in one call. Then write the plan from the answers. Skip the questions only when the request leaves nothing open.', 'agent-mod'),
+					AskUserAbilityService::NAME
+				);
+			}
+		} else {
+			$directive = __(
+				'You are in Execute mode: carry the request out with the tools in this same turn. Do not describe what you are about to do and then stop — call the tools. Write actions pass through the system\'s own approval step, so call them directly instead of asking for permission in chat; only a tool description that explicitly says to confirm first overrides this.',
+				'agent-mod'
+			);
+
+			$askUser = $agent->interactive
+				? __('Ask the user only when a missing detail would materially change the outcome and cannot be found with the tools or reasonably defaulted.', 'agent-mod') . ' ' . $askUser
+				: __('When a detail is missing, choose a sensible default and state it in your answer.', 'agent-mod');
+		}
+
+		if ('' !== $askUser) {
+			$directive .= ' ' . $askUser;
 		}
 
 		return (string) apply_filters('agent_mod_mode_directive', $directive, $agent->mode, $agent);

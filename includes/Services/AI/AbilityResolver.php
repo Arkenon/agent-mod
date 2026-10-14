@@ -15,6 +15,7 @@ namespace AgentMod\Services\AI;
 
 use WP_Ability;
 use AgentMod\Services\AI\DTO\AgentConfig;
+use AgentMod\Services\AskUserAbilityService;
 
 defined('ABSPATH') || exit;
 
@@ -43,6 +44,8 @@ class AbilityResolver
 			$abilities = $this->filterReadonly($abilities);
 		}
 
+		$abilities = $this->applyInteractiveTools($abilities, $agent);
+
 		// Stable, name-sorted tool ordering keeps the serialized tool block
 		// byte-identical across requests, which lets providers with automatic
 		// prefix caching (e.g. OpenAI) reuse the cached prompt prefix.
@@ -54,6 +57,49 @@ class AbilityResolver
 		});
 
 		return (array) apply_filters('agent_mod_resolved_abilities', $abilities, $agent);
+	}
+
+	/**
+	 * Offers the interactive chat tools exactly when somebody can use them.
+	 *
+	 * ask-user is offered on an interactive channel; present-plan only there
+	 * and in Plan mode. On such a channel they are added even when the agent
+	 * uses a "selected" ability list, because they are part of the chat itself
+	 * rather than site capabilities. Everywhere else (widgets, scheduled runs)
+	 * they are removed, even when "all" abilities were resolved: nobody would
+	 * see the questions or the review options.
+	 *
+	 * @param WP_Ability[] $abilities Resolved abilities.
+	 * @param AgentConfig  $agent     The agent configuration.
+	 *
+	 * @return WP_Ability[]
+	 * @since x.x.x
+	 */
+	private function applyInteractiveTools(array $abilities, AgentConfig $agent): array
+	{
+		$interactiveTools = [AskUserAbilityService::NAME, AskUserAbilityService::PRESENT_PLAN];
+
+		$abilities = array_values(array_filter($abilities, static function ($ability) use ($interactiveTools): bool {
+			return ! ($ability instanceof WP_Ability && in_array($ability->get_name(), $interactiveTools, true));
+		}));
+
+		if (! $agent->interactive) {
+			return $abilities;
+		}
+
+		$offered = 'plan' === $agent->mode
+			? $interactiveTools
+			: [AskUserAbilityService::NAME];
+
+		foreach ($offered as $name) {
+			$ability = wp_get_ability($name);
+
+			if ($ability instanceof WP_Ability) {
+				$abilities[] = $ability;
+			}
+		}
+
+		return $abilities;
 	}
 
 	/**

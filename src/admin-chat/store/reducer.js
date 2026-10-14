@@ -14,6 +14,10 @@ const DEFAULT_STATE = {
 	agents: [],
 	selectedAgentId: null,
 	pendingConfirmation: null, // { token, actionName, args, pendingToolCalls, executedCalls }
+	pendingQuestions: null, // { token, intro, questions, text, executedCalls }
+	// A plan the agent delivered in Plan mode, waiting for approve / review /
+	// changes. The turn itself is finished, so this never locks the composer.
+	pendingPlanReview: null, // { summary, text }
 	// Ability names the user approved for the whole session ("don't ask again").
 	// Kept in memory only, so a page reload always starts prompting again.
 	sessionApprovedAbilities: [],
@@ -64,6 +68,7 @@ export default function reducer( state = DEFAULT_STATE, action ) {
 				...state,
 				messages: [],
 				error: null,
+				pendingPlanReview: null,
 				sessionApprovedAbilities: [],
 				selectedProvider: null,
 				selectedModel: null,
@@ -129,6 +134,18 @@ export default function reducer( state = DEFAULT_STATE, action ) {
 
 		case 'CLEAR_CONFIRMATION':
 			return { ...state, pendingConfirmation: null };
+
+		case 'SET_PENDING_QUESTIONS':
+			return { ...state, pendingQuestions: action.data, isLoading: false };
+
+		case 'CLEAR_QUESTIONS':
+			return { ...state, pendingQuestions: null };
+
+		case 'SET_PLAN_REVIEW':
+			return { ...state, pendingPlanReview: action.data };
+
+		case 'CLEAR_PLAN_REVIEW':
+			return { ...state, pendingPlanReview: null };
 
 		case 'ADD_SESSION_APPROVED_ABILITIES':
 			return {

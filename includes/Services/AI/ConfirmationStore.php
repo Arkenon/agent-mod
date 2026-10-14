@@ -40,13 +40,14 @@ class ConfirmationStore
 	 *
 	 * @param string               $token The UUID token.
 	 * @param array<string, mixed> $state Serializable state array.
+	 * @param int                  $ttl   Time-to-live in seconds; 0 uses the default.
 	 *
 	 * @return void
 	 * @since 1.0.0
 	 */
-	public function save(string $token, array $state): void
+	public function save(string $token, array $state, int $ttl = 0): void
 	{
-		set_transient(self::PREFIX . $token, $state, self::TTL);
+		set_transient(self::PREFIX . $token, $state, $ttl > 0 ? $ttl : self::TTL);
 	}
 
 	/**

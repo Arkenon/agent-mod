@@ -167,7 +167,9 @@ class AIOrchestratorService
 	 * @param array<int, array<string, string>> $attachments           Attachments of the paused turn.
 	 * @param string                            $requestId             Optional client-generated UUID for live progress reporting.
 	 * @param string[]                          $autoApprovedAbilities Session-approved ability names.
-	 * @param bool                              $approved              True to execute the pending calls, false to decline them.
+	 * @param string                            $decision              'approve' or 'decline' the pending calls, or
+	 *                                                                 'answer' the agent's questions.
+	 * @param array<string, mixed>              $answerPayload         Function response for the ask-user call ('answer' only).
 	 *
 	 * @return AgentResponse
 	 * @since 1.1.0
@@ -180,7 +182,8 @@ class AIOrchestratorService
 		array $attachments,
 		string $requestId,
 		array $autoApprovedAbilities,
-		bool $approved
+		string $decision,
+		array $answerPayload = []
 	): AgentResponse {
 		$guard = $this->guard($agent->provider);
 		if ($guard instanceof WP_Error) {
@@ -220,7 +223,8 @@ class AIOrchestratorService
 			$autoApprovedAbilities,
 			$agent->webSearchEnabled,
 			$executedCalls,
-			$approved
+			$decision,
+			$answerPayload
 		);
 
 		if ($response->isPendingConfirmation) {
@@ -267,7 +271,13 @@ class AIOrchestratorService
 				// Complete across the whole chain: the generation loop is seeded
 				// with the earlier legs' calls.
 				'executedCalls' => $response->toolCalls,
-			]
+				// 'questions' states are only accepted by the answer endpoint, and
+				// the answers are validated against exactly these questions.
+				'kind'          => $response->pendingKind,
+				'questions'     => $response->pendingQuestions,
+			],
+			// A person thinking over questions needs longer than a yes/no.
+			'questions' === $response->pendingKind ? HOUR_IN_SECONDS : 0
 		);
 	}
 

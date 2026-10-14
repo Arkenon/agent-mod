@@ -41,6 +41,36 @@ export function getPendingConfirmation( state ) {
 	return state.pendingConfirmation;
 }
 
+/**
+ * Questions the agent asked and is waiting on, or null.
+ *
+ * @param {Object} state Store state.
+ * @return {Object|null} { token, intro, questions, text, executedCalls }.
+ */
+export function getPendingQuestions( state ) {
+	return state.pendingQuestions;
+}
+
+/**
+ * A plan the agent delivered and the user has not acted on yet, or null.
+ *
+ * @param {Object} state Store state.
+ * @return {Object|null} { summary, text }.
+ */
+export function getPendingPlanReview( state ) {
+	return state.pendingPlanReview;
+}
+
+/**
+ * Whether the run is paused waiting for the user (a confirmation or questions).
+ *
+ * @param {Object} state Store state.
+ * @return {boolean} True while a modal is waiting for input.
+ */
+export function isAwaitingUser( state ) {
+	return null !== state.pendingConfirmation || null !== state.pendingQuestions;
+}
+
 export function getSessionApprovedAbilities( state ) {
 	return state.sessionApprovedAbilities;
 }

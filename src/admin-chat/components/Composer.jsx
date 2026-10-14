@@ -75,9 +75,7 @@ export default function Composer() {
 	} = useSelect((select) => {
 		const storeSelect = select(STORE_NAME);
 		return {
-			loading:
-				storeSelect.isLoading() ||
-				null !== storeSelect.getPendingConfirmation(),
+			loading: storeSelect.isLoading() || storeSelect.isAwaitingUser(),
 			hasMessages: storeSelect.getMessages().length > 0,
 			strings: storeSelect.getStrings(),
 			maxCount: storeSelect.getAttachmentLimits().maxCount,

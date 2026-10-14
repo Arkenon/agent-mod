@@ -407,7 +407,7 @@ class TaxonomyAbilityService
 			'agent-mod/delete-term',
 			[
 				'label'               => __('Delete Term', 'agent-mod'),
-				'description'         => __('Permanently deletes a term and removes it from every post it was assigned to. On a hierarchical taxonomy its children move up to the deleted term\'s parent rather than being deleted. The posts themselves are never deleted. This cannot be undone and requires user confirmation.', 'agent-mod'),
+				'description'         => __('Permanently deletes a term and removes it from every post it was assigned to. On a hierarchical taxonomy its children move up to the deleted term\'s parent rather than being deleted. The posts themselves are never deleted. This cannot be undone. Unless the user explicitly asked to delete this specific item, confirm it with them before calling.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeDeleteTerm'],
 				'permission_callback' => function ($input = null): bool {

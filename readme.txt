@@ -4,7 +4,7 @@ Tags: ai, agent, chatbot, assistant, abilities
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.3.0
+Stable tag: 1.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -122,6 +122,18 @@ Under the AgentMod menu in your WordPress admin, there is a dedicated **Abilitie
 If you ask the agent to create a post, it will show you a confirmation modal summarizing the action before anything is written to the database. You must explicitly approve the action for it to proceed.
 
 == Changelog ==
+= 1.3.1 =
+* Added: The agent can ask you questions in a dialog instead of in the chat. Single-choice questions use radio buttons, multiple-choice questions use checkboxes, every question can take your own answer in a text field, and the option the agent recommends is preselected. Submitting continues the agent's run where it stopped; "Skip" lets it continue with sensible defaults, which it names. Questions are only offered in the admin chat, never in unattended runs.
+* Added: Plan review dialog. In Plan mode the agent hands over the finished plan with its new present-plan tool; the plan stays in the conversation and a dialog offers "Approve & Execute" (with a Manual or Auto approval choice), "Ask Agent to Review", "Request Changes" (typed right in the dialog) and "Close". Answers to general questions in Plan mode do not open it.
+* Improved: Execute mode now tells the agent to carry the request out in the same turn instead of describing what it is about to do and stopping, and to call write tools directly, since their approval is handled by the confirmation dialog. It asks only when a missing detail would materially change the outcome.
+* Improved: In Plan mode the agent settles open choices (which fields or options to include, names and slugs, scope) with you before writing the plan, even when the request left the choice to it.
+* Improved: Ability descriptions no longer say "Requires user confirmation", which made agents ask for permission in chat before every write. The four irreversible deletions (plugin, theme, user, term) still ask for confirmation unless you explicitly requested that deletion.
+* Improved: The default base system prompt asks before calling a tool only when that tool needs a detail you have not given and the agent cannot look up or reasonably default, instead of "before calling any tools". Sites that saved their own prompt keep it; update it under Settings to pick up the new wording.
+* Improved: list-posts returns posts in any status (drafts included) and can filter by `post_status` and by a custom field (`meta_key`/`meta_value`).
+* Improved: get-post also returns the post status and its custom fields; create-post and update-post can write custom fields, and update-post can change the status (e.g. publish a draft). In update-post every field except post_id is now optional, so fields left out stay unchanged.
+* Removed: The `agent-mod/list-recent-posts` ability; use list-posts with orderby "date" and order "DESC".
+* Fixed: Inline citation markers from provider web search (e.g. "citeturn1view1") no longer show up in answers.
+
 = 1.3.0 =
 * Added: Setup wizard. After activation (and from the "No provider" link in the chat) a full-screen wizard walks you through connecting an AI provider via WordPress Connectors, choosing the basic agent settings (role, goal, base system prompt, personality, RAG, web search, default model, preset prompts), previewing Pro features and browsing the abilities the agent can use. Every settings step can be skipped.
 * Added: Dashboard reminder to finish the setup until it is completed or dismissed.

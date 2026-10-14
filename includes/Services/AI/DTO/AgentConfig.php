@@ -180,6 +180,18 @@ final class AgentConfig
 	public string $baseSystemPrompt;
 
 	/**
+	 * Whether a person is present to answer the agent's questions.
+	 *
+	 * Set server-side by the admin chat endpoint only, never read from request
+	 * data. When true the agent gets the ask-user tool and the question modal;
+	 * unattended channels (front-end widgets, scheduled tasks) keep false.
+	 *
+	 * @var bool
+	 * @since x.x.x
+	 */
+	public bool $interactive = false;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param string|null $name                   Agent name.

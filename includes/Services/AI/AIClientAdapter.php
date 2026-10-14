@@ -23,6 +23,7 @@ use WP_Ability;
 use AgentMod\Services\AI\DTO\AgentResponse;
 use AgentMod\Services\AI\Http\HttpTimeoutManager;
 use AgentMod\Services\AI\Http\ToolCallRepairManager;
+use AgentMod\Services\AskUserAbilityService;
 use WordPress\AiClient\Messages\DTO\Message;
 use WordPress\AiClient\Messages\DTO\MessagePart;
 use WordPress\AiClient\Messages\DTO\UserMessage;
@@ -69,12 +70,21 @@ class AIClientAdapter
 	private HistoryCompactor $historyCompactor;
 
 	/**
+	 * Ask-user ability service (question normalization).
+	 *
+	 * @var AskUserAbilityService
+	 * @since x.x.x
+	 */
+	private AskUserAbilityService $askUser;
+
+	/**
 	 * Constructor (PHP-DI autowired).
 	 *
 	 * @param ToolCallRepairManager $toolCallRepairs  Provider tool-call repair manager.
 	 * @param ProgressStore         $progressStore    Live tool-call progress store.
 	 * @param HttpTimeoutManager    $httpTimeouts     AI provider HTTP timeout manager.
 	 * @param HistoryCompactor      $historyCompactor In-loop history compactor.
+	 * @param AskUserAbilityService $askUser          Ask-user ability service.
 	 *
 	 * @since 1.0.0
 	 */
@@ -82,12 +92,14 @@ class AIClientAdapter
 		ToolCallRepairManager $toolCallRepairs,
 		ProgressStore $progressStore,
 		HttpTimeoutManager $httpTimeouts,
-		HistoryCompactor $historyCompactor
+		HistoryCompactor $historyCompactor,
+		AskUserAbilityService $askUser
 	) {
 		$this->toolCallRepairs  = $toolCallRepairs;
 		$this->progressStore    = $progressStore;
 		$this->httpTimeouts     = $httpTimeouts;
 		$this->historyCompactor = $historyCompactor;
+		$this->askUser          = $askUser;
 	}
 
 	/**
@@ -164,6 +176,9 @@ class AIClientAdapter
 	 * to the history; the generation loop then continues the model's own plan.
 	 * On decline, each call receives a synthetic "declined" function response so
 	 * the model can acknowledge gracefully instead of the request being dropped.
+	 * On answer (the run paused on an ask-user call), that call receives the
+	 * user's answers as its response; any other call batched next to it is
+	 * returned unexecuted so the model calls it again with the answers in hand.
 	 *
 	 * @param string      $systemInstruction     Full system instruction.
 	 * @param Message[]   $messages              History ending with the paused model message.
@@ -175,7 +190,8 @@ class AIClientAdapter
 	 * @param string[]    $autoApprovedAbilities Ability names approved for the whole session.
 	 * @param bool        $webSearchEnabled      Whether to enable the provider's native web search tool.
 	 * @param array<int, array<string, mixed>>  $executedCalls Calls already executed in earlier legs of this chain.
-	 * @param bool        $approved              True to execute the pending calls, false to decline them.
+	 * @param string      $decision              'approve', 'decline' or 'answer'.
+	 * @param array<string, mixed> $answerPayload Function response for the ask-user call ('answer' only).
 	 *
 	 * @return AgentResponse
 	 * @since 1.1.0
@@ -191,7 +207,8 @@ class AIClientAdapter
 		array $autoApprovedAbilities,
 		bool $webSearchEnabled,
 		array $executedCalls,
-		bool $approved
+		string $decision,
+		array $answerPayload = []
 	): AgentResponse {
 		if (! function_exists('wp_ai_client_prompt')) {
 			return AgentResponse::fromError(
@@ -218,7 +235,20 @@ class AIClientAdapter
 		$this->httpTimeouts->register();
 
 		try {
-			if ($approved) {
+			if ('answer' === $decision) {
+				$responses  = $this->buildAnswerResponses($lastMessage, $answerPayload);
+				$messages[] = $responses;
+
+				// Only the ask-user call goes into the chain's executed list; the
+				// calls returned unexecuted will be requested again.
+				$askCalls = array_values(array_filter($pendingCalls, function (array $call): bool {
+					return $this->isAskUserCall($call);
+				}));
+				$executedCalls = array_merge(
+					$executedCalls,
+					$this->attachResultDigests($askCalls, $this->onlyAskUserResponses($responses))
+				);
+			} elseif ('approve' === $decision) {
 				$this->reportProgress(
 					$requestId,
 					'running_tool',
@@ -272,6 +302,62 @@ class AIClientAdapter
 	 */
 	private function buildDeclinedResponses(Message $message): Message
 	{
+		return $this->buildSyntheticResponses(
+			$message,
+			static function (): array {
+				return [
+					'declined' => true,
+					'error'    => __('The user declined this action. Do not retry it; acknowledge and ask how to proceed.', 'agent-mod'),
+				];
+			}
+		);
+	}
+
+	/**
+	 * Builds the function-response message for a paused ask-user call.
+	 *
+	 * The ask-user call receives the user's answers. Any other call the model
+	 * batched into the same message is answered as "not executed", because it
+	 * was planned before the answers were known.
+	 *
+	 * @param Message              $message       The paused model message.
+	 * @param array<string, mixed> $answerPayload The ask-user function response.
+	 *
+	 * @return Message
+	 * @since x.x.x
+	 */
+	private function buildAnswerResponses(Message $message, array $answerPayload): Message
+	{
+		return $this->buildSyntheticResponses(
+			$message,
+			static function (string $abilityName) use ($answerPayload): array {
+				if (AskUserAbilityService::NAME === $abilityName) {
+					return $answerPayload;
+				}
+
+				return [
+					'not_executed' => true,
+					'error'        => __('Not executed: it was requested together with questions to the user. Call it again if it is still needed after the answers.', 'agent-mod'),
+				];
+			}
+		);
+	}
+
+	/**
+	 * Answers every function call of a model message without executing it.
+	 *
+	 * Providers require a response for each outstanding call before the
+	 * conversation can continue; $payloadFor decides each call's response from
+	 * its ability name.
+	 *
+	 * @param Message  $message    The paused model message.
+	 * @param callable $payloadFor Receives the ability name, returns the response payload.
+	 *
+	 * @return Message
+	 * @since x.x.x
+	 */
+	private function buildSyntheticResponses(Message $message, callable $payloadFor): Message
+	{
 		$parts = [];
 
 		foreach ($message->getParts() as $part) {
@@ -284,19 +370,148 @@ class AIClientAdapter
 				continue;
 			}
 
+			$abilityName = WP_AI_Client_Ability_Function_Resolver::function_name_to_ability_name((string) $functionCall->getName());
+
 			$parts[] = new MessagePart(
 				new FunctionResponse(
 					$functionCall->getId(),
 					$functionCall->getName(),
-					[
-						'declined' => true,
-						'error'    => __('The user declined this action. Do not retry it; acknowledge and ask how to proceed.', 'agent-mod'),
-					]
+					$payloadFor($abilityName)
 				)
 			);
 		}
 
 		return new UserMessage($parts);
+	}
+
+	/**
+	 * Keeps only the ask-user responses of a function-response message.
+	 *
+	 * Lets attachResultDigests() pair them by position with the ask-user calls.
+	 *
+	 * @param Message $responses The function-response message.
+	 *
+	 * @return Message
+	 * @since x.x.x
+	 */
+	private function onlyAskUserResponses(Message $responses): Message
+	{
+		$parts = array_values(array_filter(
+			$responses->getParts(),
+			static function (MessagePart $part): bool {
+				$response = $part->getFunctionResponse();
+
+				return $response instanceof FunctionResponse
+					&& AskUserAbilityService::NAME === WP_AI_Client_Ability_Function_Resolver::function_name_to_ability_name((string) $response->getName());
+			}
+		));
+
+		return new UserMessage($parts);
+	}
+
+	/**
+	 * Returns the first ask-user call among the requested calls, if any.
+	 *
+	 * @param array<int, array<string, mixed>> $calls Extracted tool calls.
+	 *
+	 * @return array<string, mixed>|null
+	 * @since x.x.x
+	 */
+	private function findAskUserCall(array $calls): ?array
+	{
+		return $this->findCall($calls, AskUserAbilityService::NAME);
+	}
+
+	/**
+	 * Returns the first requested call to the given ability, if any.
+	 *
+	 * @param array<int, array<string, mixed>> $calls       Extracted tool calls.
+	 * @param string                           $abilityName Ability name.
+	 *
+	 * @return array<string, mixed>|null
+	 * @since x.x.x
+	 */
+	private function findCall(array $calls, string $abilityName): ?array
+	{
+		foreach ($calls as $call) {
+			if ($abilityName === (string) ($call['name'] ?? '')) {
+				return $call;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Builds the final response for a plan delivered through present-plan.
+	 *
+	 * The plan becomes the turn's text, so it is shown and persisted like any
+	 * answer. Every call of the message is answered in the history (providers
+	 * require it for the next turn); the recorded present-plan call drops the
+	 * plan itself, which already is the message text.
+	 *
+	 * @param string                           $plan       The delivered plan (Markdown).
+	 * @param array<string, mixed>             $planCall   The extracted present-plan call.
+	 * @param Message                          $message    The model message holding the call.
+	 * @param Message[]                        $history    History ending with that message.
+	 * @param array<int, array<string, mixed>> $toolCalls  Calls executed so far in this run.
+	 * @param array<string, int>               $tokenUsage Token usage of the last call.
+	 * @param GenerativeAiResult               $result     The model result.
+	 *
+	 * @return AgentResponse
+	 * @since x.x.x
+	 */
+	private function presentedPlanResponse(
+		string $plan,
+		array $planCall,
+		Message $message,
+		array $history,
+		array $toolCalls,
+		array $tokenUsage,
+		GenerativeAiResult $result
+	): AgentResponse {
+		$summary = mb_substr(sanitize_text_field((string) ($planCall['args']['summary'] ?? '')), 0, 300);
+
+		$history[] = $this->buildSyntheticResponses(
+			$message,
+			static function (string $abilityName): array {
+				return AskUserAbilityService::PRESENT_PLAN === $abilityName
+					? ['presented' => true]
+					: ['not_executed' => true, 'error' => __('Not executed: it was requested together with the plan.', 'agent-mod')];
+			}
+		);
+
+		$toolCalls[] = [
+			'name'   => AskUserAbilityService::PRESENT_PLAN,
+			'args'   => '' !== $summary ? ['summary' => $summary] : [],
+			'result' => '{"presented":true}',
+		];
+
+		$response = new AgentResponse(
+			$plan,
+			$toolCalls,
+			$history,
+			$tokenUsage,
+			null,
+			$this->extractStopReason($result)
+		);
+
+		$response->planReview = ['summary' => $summary];
+
+		return $response;
+	}
+
+	/**
+	 * Whether an extracted tool call is the ask-user call.
+	 *
+	 * @param array<string, mixed> $call Extracted tool call (name/args).
+	 *
+	 * @return bool
+	 * @since x.x.x
+	 */
+	private function isAskUserCall(array $call): bool
+	{
+		return AskUserAbilityService::NAME === (string) ($call['name'] ?? '');
 	}
 
 	/**
@@ -432,10 +647,67 @@ class AIClientAdapter
 				);
 			}
 
+			$requestedCalls = $this->extractToolCalls($message);
+
+			// Questions to the user pause the run before anything else, write
+			// confirmations included: the answers may change what gets written.
+			// Session auto-approval does not apply — a question is not a write.
+			$askCall = $this->findAskUserCall($requestedCalls);
+
+			if (null !== $askCall) {
+				$questions = $this->askUser->normalizeQuestions((array) ($askCall['args'] ?? []));
+
+				if (! empty($questions['questions'])) {
+					return AgentResponse::pendingQuestions(
+						wp_generate_uuid4(),
+						$questions,
+						$this->extractText($result),
+						$history,
+						$tokenUsage,
+						$toolCalls
+					);
+				}
+
+				// Nothing showable came through: tell the model, run nothing
+				// else from this message, and let it try again.
+				$history[] = $this->buildSyntheticResponses(
+					$message,
+					static function (string $abilityName): array {
+						return AskUserAbilityService::NAME === $abilityName
+							? ['error' => __('No valid question was provided. Each question needs an id, the question text and a type.', 'agent-mod')]
+							: ['not_executed' => true, 'error' => __('Not executed: it was requested together with an invalid ask-user call.', 'agent-mod')];
+					}
+				);
+
+				continue;
+			}
+
+			// A delivered plan ends the turn without another model call: the
+			// plan is the answer, and the chat offers approve / review / change.
+			$planCall = $this->findCall($requestedCalls, AskUserAbilityService::PRESENT_PLAN);
+
+			if (null !== $planCall) {
+				$plan = trim((string) ($planCall['args']['plan'] ?? ''));
+
+				if ('' !== $plan) {
+					return $this->presentedPlanResponse($plan, $planCall, $message, $history, $toolCalls, $tokenUsage, $result);
+				}
+
+				$history[] = $this->buildSyntheticResponses(
+					$message,
+					static function (string $abilityName): array {
+						return AskUserAbilityService::PRESENT_PLAN === $abilityName
+							? ['error' => __('The "plan" argument was empty. Pass the complete plan in Markdown.', 'agent-mod')]
+							: ['not_executed' => true, 'error' => __('Not executed: it was requested together with an invalid present-plan call.', 'agent-mod')];
+					}
+				);
+
+				continue;
+			}
+
 			// Intercept write operations before execution to allow user confirmation.
 			// Abilities the user session-approved are exempted by name.
-			$requestedCalls = $this->extractToolCalls($message);
-			$writeCalls     = $this->filterWriteToolCalls($requestedCalls, $autoApprovedAbilities);
+			$writeCalls = $this->filterWriteToolCalls($requestedCalls, $autoApprovedAbilities);
 
 			if (! empty($writeCalls)) {
 				// $toolCalls carries what already ran in this iteration set; the
@@ -625,13 +897,42 @@ class AIClientAdapter
 					continue;
 				}
 
-				$blocks[] = $text;
+				$blocks[] = $this->stripCitationMarkers($text);
 			}
 
 			return implode("\n\n", $blocks);
 		} catch (Throwable $e) {
 			return '';
 		}
+	}
+
+	/**
+	 * Removes inline citation markers that some providers leave in answer text.
+	 *
+	 * OpenAI web search embeds references such as "citeturn1view1" wrapped
+	 * in private-use characters (U+E200 opens, U+E202 separates, U+E201
+	 * closes). They are meant for the provider's own UI and render as noise
+	 * here. The bare form (private-use characters already lost) is removed too;
+	 * "cite" directly followed by "turnNkindN" does not occur in normal prose.
+	 *
+	 * @param string $text Answer text.
+	 *
+	 * @return string
+	 * @since x.x.x
+	 */
+	private function stripCitationMarkers(string $text): string
+	{
+		$cleaned = preg_replace(
+			[
+				'/[ \t]*\x{E200}[^\x{E200}\x{E201}]*\x{E201}/u',
+				'/[ \t]*\bcite(?:turn\d+[a-z_]+\d+)+/u',
+				'/[\x{E200}-\x{E202}]/u',
+			],
+			'',
+			$text
+		);
+
+		return null === $cleaned ? $text : $cleaned;
 	}
 
 	/**

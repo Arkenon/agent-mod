@@ -12,6 +12,8 @@ import { __, sprintf } from '@wordpress/i18n';
 
 import { STORE_NAME } from '../store';
 import ConfirmationModal from './ConfirmationModal';
+import QuestionModal from './QuestionModal';
+import PlanReviewModal from './PlanReviewModal';
 import MessageList from './MessageList';
 import Composer from './Composer';
 
@@ -37,6 +39,8 @@ export default function ChatPanel({ className = '' }) {
 				)}
 
 				<ConfirmationModal />
+				<QuestionModal />
+				<PlanReviewModal />
 				<MessageList />
 				{0 < sessionTokenUsage.totalTokens && (
 					<div

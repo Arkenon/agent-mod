@@ -29,6 +29,8 @@ import ChatPanel from './components/ChatPanel';
 import Composer from './components/Composer';
 import MessageList from './components/MessageList';
 import ConfirmationModal from './components/ConfirmationModal';
+import QuestionModal from './components/QuestionModal';
+import PlanReviewModal from './components/PlanReviewModal';
 import './style.scss';
 
 /**
@@ -103,6 +105,8 @@ Object.assign( window.agentMod, {
 	Composer,
 	MessageList,
 	ConfirmationModal,
+	QuestionModal,
+	PlanReviewModal,
 	storeName: STORE_NAME,
 	mentions: {
 		MENTION_PATTERN,
