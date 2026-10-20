@@ -94,6 +94,50 @@ final class SettingsService
 	}
 
 	/**
+	 * Short schema hint telling the model how many items a list ability returns per call.
+	 *
+	 * @return string
+	 * @since x.x.x
+	 */
+	public function getSearchLimitHint(): string
+	{
+		return sprintf(
+			/* translators: %d: Max Search Results setting value. */
+			__('Returns at most %d items per call (Max Search Results setting).', 'agent-mod'),
+			$this->getMaxSearchResults()
+		);
+	}
+
+	/**
+	 * Notice added to a list ability result that hit the Max Search Results cap.
+	 *
+	 * Tells the model where the cap comes from so it can point the user at the
+	 * setting instead of retrying the same call.
+	 *
+	 * @param int  $limit     The cap that was applied.
+	 * @param bool $paginated Whether the ability can page past the cap.
+	 *
+	 * @return string
+	 * @since x.x.x
+	 */
+	public function getSearchLimitNotice(int $limit, bool $paginated = false): string
+	{
+		if ($paginated) {
+			return sprintf(
+				/* translators: %d: Max Search Results setting value. */
+				__('Results are limited to %d per call by the "Max Search Results" setting (AgentMod > Settings > AI Limits). Fetch the remaining pages with "paged" while pagination.has_more is true; never repeat a call with the same arguments. If many pages remain, tell the user about this limit and suggest raising that setting or narrowing the request.', 'agent-mod'),
+				$limit
+			);
+		}
+
+		return sprintf(
+			/* translators: %d: Max Search Results setting value. */
+			__('Results are limited to %d per call by the "Max Search Results" setting (AgentMod > Settings > AI Limits). If the user asked for all items, tell them about this limit and suggest raising that setting or narrowing the request; do not retry the same call.', 'agent-mod'),
+			$limit
+		);
+	}
+
+	/**
 	 * @return int
 	 * @since 1.0.0
 	 */

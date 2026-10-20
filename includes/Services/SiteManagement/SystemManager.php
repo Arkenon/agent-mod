@@ -177,7 +177,7 @@ class SystemManager
 
 		$total = count($events);
 
-		return [
+		$result = [
 			'events'         => array_slice($events, 0, $limit),
 			'total'          => $total,
 			'truncated'      => $total > $limit,
@@ -186,6 +186,12 @@ class SystemManager
 				? __('DISABLE_WP_CRON is set: these events only run if a real system cron job triggers wp-cron.php.', 'agent-mod')
 				: '',
 		];
+
+		if ($result['truncated']) {
+			$result['limit_notice'] = $this->settings->getSearchLimitNotice($limit);
+		}
+
+		return $result;
 	}
 
 	/**

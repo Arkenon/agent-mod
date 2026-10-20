@@ -110,11 +110,17 @@ class ThemeManager
 
 		$total = count($themes);
 
-		return [
+		$result = [
 			'themes'    => array_slice($themes, 0, $limit),
 			'total'     => $total,
 			'truncated' => $total > $limit,
 		];
+
+		if ($result['truncated']) {
+			$result['limit_notice'] = $this->settings->getSearchLimitNotice($limit);
+		}
+
+		return $result;
 	}
 
 	/**

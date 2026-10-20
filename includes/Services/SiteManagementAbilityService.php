@@ -103,13 +103,22 @@ class SiteManagementAbilityService
 	private UserManager $users;
 
 	/**
+	 * Settings service.
+	 *
+	 * @var SettingsService
+	 * @since x.x.x
+	 */
+	private SettingsService $settings;
+
+	/**
 	 * Constructor. Binds the abilities API hooks.
 	 *
-	 * @param PluginManager $plugins Plugin manager.
-	 * @param ThemeManager  $themes  Theme manager.
-	 * @param OptionManager $options Option manager.
-	 * @param SystemManager $system  System manager.
-	 * @param UserManager   $users   User manager.
+	 * @param PluginManager   $plugins  Plugin manager.
+	 * @param ThemeManager    $themes   Theme manager.
+	 * @param OptionManager   $options  Option manager.
+	 * @param SystemManager   $system   System manager.
+	 * @param UserManager     $users    User manager.
+	 * @param SettingsService $settings Settings service.
 	 *
 	 * @since 1.1.0
 	 */
@@ -118,13 +127,15 @@ class SiteManagementAbilityService
 		ThemeManager $themes,
 		OptionManager $options,
 		SystemManager $system,
-		UserManager $users
+		UserManager $users,
+		SettingsService $settings
 	) {
-		$this->plugins = $plugins;
-		$this->themes  = $themes;
-		$this->options = $options;
-		$this->system  = $system;
-		$this->users   = $users;
+		$this->plugins  = $plugins;
+		$this->themes   = $themes;
+		$this->options  = $options;
+		$this->system   = $system;
+		$this->users    = $users;
+		$this->settings = $settings;
 
 		add_action('wp_abilities_api_categories_init', [$this, 'registerCategories']);
 		add_action('wp_abilities_api_init', [$this, 'registerAbilities']);
@@ -202,7 +213,7 @@ class SiteManagementAbilityService
 			'agent-mod/get-plugins',
 			[
 				'label'               => __('Get Plugins', 'agent-mod'),
-				'description'         => __('Lists the plugins installed on this site with their version, activation status and whether an update is available. Use this before activating, updating or removing a plugin to find its exact slug.', 'agent-mod'),
+				'description'         => __('Lists the plugins installed on this site with their version, activation status and whether an update is available. Use this before activating, updating or removing a plugin to find its exact slug.', 'agent-mod') . ' ' . $this->settings->getSearchLimitHint(),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					return $this->plugins->listPlugins($this->toArray($input));
@@ -247,7 +258,8 @@ class SiteManagementAbilityService
 							],
 						],
 						'total'     => ['type' => 'integer'],
-						'truncated' => ['type' => 'boolean'],
+						'truncated'    => ['type' => 'boolean'],
+						'limit_notice' => ['type' => 'string'],
 					],
 				],
 				'meta'                => [
@@ -541,7 +553,7 @@ class SiteManagementAbilityService
 			'agent-mod/get-themes',
 			[
 				'label'               => __('Get Themes', 'agent-mod'),
-				'description'         => __('Lists the themes installed on this site with their version, whether each is the active theme, its parent theme and whether an update is available. Use this to find a theme\'s exact slug before activating, updating or removing it.', 'agent-mod'),
+				'description'         => __('Lists the themes installed on this site with their version, whether each is the active theme, its parent theme and whether an update is available. Use this to find a theme\'s exact slug before activating, updating or removing it.', 'agent-mod') . ' ' . $this->settings->getSearchLimitHint(),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					return $this->themes->listThemes($this->toArray($input));
@@ -584,7 +596,8 @@ class SiteManagementAbilityService
 							],
 						],
 						'total'     => ['type' => 'integer'],
-						'truncated' => ['type' => 'boolean'],
+						'truncated'    => ['type' => 'boolean'],
+						'limit_notice' => ['type' => 'string'],
 					],
 				],
 				'meta'                => [
@@ -1110,7 +1123,7 @@ class SiteManagementAbilityService
 			'agent-mod/get-cron-events',
 			[
 				'label'               => __('Get Cron Events', 'agent-mod'),
-				'description'         => __('Lists the tasks WordPress has scheduled, when each next runs, whether any are overdue, and whether the built-in cron trigger is disabled. Useful for diagnosing background work that is not happening.', 'agent-mod'),
+				'description'         => __('Lists the tasks WordPress has scheduled, when each next runs, whether any are overdue, and whether the built-in cron trigger is disabled. Useful for diagnosing background work that is not happening.', 'agent-mod') . ' ' . $this->settings->getSearchLimitHint(),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					return $this->system->getCronEvents($this->toArray($input));
@@ -1134,6 +1147,7 @@ class SiteManagementAbilityService
 						'events'        => ['type' => 'array'],
 						'total'         => ['type' => 'integer'],
 						'truncated'     => ['type' => 'boolean'],
+						'limit_notice'  => ['type' => 'string'],
 						'cron_disabled' => ['type' => 'boolean'],
 					],
 				],
@@ -1205,7 +1219,7 @@ class SiteManagementAbilityService
 			'agent-mod/get-users',
 			[
 				'label'               => __('Get Users', 'agent-mod'),
-				'description'         => __('Lists user accounts with their ID, username, display name, email address, roles and registration date, and reports which roles exist on this site. Use this to find a user\'s ID before changing or deleting their account.', 'agent-mod'),
+				'description'         => __('Lists user accounts with their ID, username, display name, email address, roles and registration date, and reports which roles exist on this site. Use this to find a user\'s ID before changing or deleting their account.', 'agent-mod') . ' ' . $this->settings->getSearchLimitHint(),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => function ($input = null) {
 					return $this->users->listUsers($this->toArray($input));
@@ -1244,7 +1258,8 @@ class SiteManagementAbilityService
 							],
 						],
 						'total'     => ['type' => 'integer'],
-						'truncated' => ['type' => 'boolean'],
+						'truncated'    => ['type' => 'boolean'],
+						'limit_notice' => ['type' => 'string'],
 						'roles'     => ['type' => 'array', 'items' => ['type' => 'string']],
 					],
 				],

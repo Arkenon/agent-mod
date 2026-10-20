@@ -107,11 +107,17 @@ class PluginManager
 
 		$total = count($plugins);
 
-		return [
+		$result = [
 			'plugins'   => array_slice($plugins, 0, $limit),
 			'total'     => $total,
 			'truncated' => $total > $limit,
 		];
+
+		if ($result['truncated']) {
+			$result['limit_notice'] = $this->settings->getSearchLimitNotice($limit);
+		}
+
+		return $result;
 	}
 
 	/**

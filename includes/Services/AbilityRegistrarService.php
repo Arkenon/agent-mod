@@ -398,7 +398,7 @@ class AbilityRegistrarService
 			'agent-mod/list-posts',
 			[
 				'label'               => __('List Posts and Pages', 'agent-mod'),
-				'description'         => __('Returns a paginated list of posts/pages in any status (drafts included). Use "s" to search by title instead of browsing; for the latest posts use orderby "date" with order "DESC". Returns post_id for use with get-post.', 'agent-mod'),
+				'description'         => __('Returns a paginated list of posts/pages in any status (drafts included). Use "s" to search by title instead of browsing; for the latest posts use orderby "date" with order "DESC". Returns post_id for use with get-post.', 'agent-mod') . ' ' . $this->settings_service->getSearchLimitHint(),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeListPosts'],
 				'permission_callback' => static function (): bool {
@@ -418,11 +418,15 @@ class AbilityRegistrarService
 						],
 						'posts_per_page' => [
 							'type'        => 'integer',
-							'description' => __('Results per page. Default 10, capped at the Max Search Results setting.', 'agent-mod'),
+							'description' => sprintf(
+								/* translators: %d: Max Search Results setting value. */
+								__('Results per page. Default 10, maximum %d (Max Search Results setting); larger values are reduced. To get more, page with "paged" until pagination.has_more is false.', 'agent-mod'),
+								$this->settings_service->getMaxSearchResults()
+							),
 						],
 						'paged'          => [
 							'type'        => 'integer',
-							'description' => __('Page number. Default 1.', 'agent-mod'),
+							'description' => __('Page number. Default 1. A page past pagination.total_pages returns no posts.', 'agent-mod'),
 						],
 						's'              => [
 							'type'        => 'string',
@@ -451,10 +455,11 @@ class AbilityRegistrarService
 				'output_schema'       => [
 					'type'       => 'object',
 					'properties' => [
-						'success'    => ['type' => 'boolean'],
-						'posts'      => ['type' => 'array'],
-						'pagination' => ['type' => 'object'],
-						'error'      => ['type' => 'string'],
+						'success'      => ['type' => 'boolean'],
+						'posts'        => ['type' => 'array'],
+						'pagination'   => ['type' => 'object'],
+						'limit_notice' => ['type' => 'string'],
+						'error'        => ['type' => 'string'],
 					],
 				],
 				'meta'                => [
@@ -1504,7 +1509,8 @@ class AbilityRegistrarService
 		$input        = is_array($input) ? $input : [];
 		$postType     = ! empty($input['post_type']) ? sanitize_key((string) $input['post_type']) : 'post';
 		$maxResults   = $this->settings_service->getMaxSearchResults();
-		$postsPerPage = isset($input['posts_per_page']) ? min(absint($input['posts_per_page']), $maxResults) : min(10, $maxResults);
+		$requested    = isset($input['posts_per_page']) ? absint($input['posts_per_page']) : 10;
+		$postsPerPage = max(1, min($requested, $maxResults));
 		$paged        = isset($input['paged']) ? max(absint($input['paged']), 1) : 1;
 		$search       = isset($input['s']) ? sanitize_text_field((string) $input['s']) : '';
 		$orderby      = isset($input['orderby']) ? $input['orderby'] : 'title';
@@ -1539,16 +1545,42 @@ class AbilityRegistrarService
 		$query = new WP_Query($queryArgs);
 
 		if (! $query->have_posts()) {
+			$pagination = [
+				'total_posts'    => 0,
+				'total_pages'    => 0,
+				'current_page'   => $paged,
+				'posts_per_page' => $postsPerPage,
+				'has_more'       => false,
+			];
+
+			// WP_Query skips found_posts on an empty page, so a page past the
+			// last one would read as "no posts at all". Count separately.
+			if ($paged > 1) {
+				$countQuery = new WP_Query(array_merge($queryArgs, [
+					'fields'                 => 'ids',
+					'posts_per_page'         => 1,
+					'paged'                  => 1,
+					'update_post_meta_cache' => false,
+					'update_post_term_cache' => false,
+				]));
+
+				$totalPosts = (int) $countQuery->found_posts;
+				$totalPages = (int) ceil($totalPosts / $postsPerPage);
+
+				$pagination['total_posts'] = $totalPosts;
+				$pagination['total_pages'] = $totalPages;
+				$pagination['notice']      = sprintf(
+					/* translators: 1: requested page number, 2: last page number. */
+					__('Page %1$d is past the last page (%2$d); there are no more posts.', 'agent-mod'),
+					$paged,
+					$totalPages
+				);
+			}
+
 			return [
 				'success'    => true,
 				'posts'      => [],
-				'pagination' => [
-					'total_posts'    => 0,
-					'total_pages'    => 0,
-					'current_page'   => $paged,
-					'posts_per_page' => $postsPerPage,
-					'has_more'       => false,
-				],
+				'pagination' => $pagination,
 			];
 		}
 
@@ -1565,7 +1597,9 @@ class AbilityRegistrarService
 			];
 		}, $query->posts);
 
-		return [
+		$hasMore = $paged < $query->max_num_pages;
+
+		$result = [
 			'success'    => true,
 			'posts'      => $posts,
 			'pagination' => [
@@ -1573,9 +1607,15 @@ class AbilityRegistrarService
 				'total_pages'    => (int) $query->max_num_pages,
 				'current_page'   => $paged,
 				'posts_per_page' => $postsPerPage,
-				'has_more'       => $paged < $query->max_num_pages,
+				'has_more'       => $hasMore,
 			],
 		];
+
+		if ($requested > $maxResults || ($hasMore && $postsPerPage >= $maxResults)) {
+			$result['limit_notice'] = $this->settings_service->getSearchLimitNotice($maxResults, true);
+		}
+
+		return $result;
 	}
 
 	/**

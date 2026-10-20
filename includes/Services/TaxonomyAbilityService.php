@@ -182,7 +182,7 @@ class TaxonomyAbilityService
 			'agent-mod/list-terms',
 			[
 				'label'               => __('List Terms', 'agent-mod'),
-				'description'         => __('Lists the terms in one taxonomy with their ID, name, slug, description, parent and post count. Empty terms are included by default, so freshly seeded categories show up too. Call this before creating terms to see what already exists, and to collect the parent IDs needed for a hierarchy.', 'agent-mod'),
+				'description'         => __('Lists the terms in one taxonomy with their ID, name, slug, description, parent and post count. Empty terms are included by default, so freshly seeded categories show up too. Call this before creating terms to see what already exists, and to collect the parent IDs needed for a hierarchy.', 'agent-mod') . ' ' . $this->settings->getSearchLimitHint(),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeListTerms'],
 				'permission_callback' => static function ($input = null): bool {
@@ -213,10 +213,11 @@ class TaxonomyAbilityService
 				'output_schema'       => [
 					'type'       => 'object',
 					'properties' => [
-						'terms'     => ['type' => 'array', 'items' => $termShape],
-						'total'     => ['type' => 'integer'],
-						'truncated' => ['type' => 'boolean'],
-						'error'     => ['type' => 'string'],
+						'terms'        => ['type' => 'array', 'items' => $termShape],
+						'total'        => ['type' => 'integer'],
+						'truncated'    => ['type' => 'boolean'],
+						'limit_notice' => ['type' => 'string'],
+						'error'        => ['type' => 'string'],
 					],
 				],
 				'meta'                => [
@@ -554,11 +555,17 @@ class TaxonomyAbilityService
 		$truncated = count($terms) > $limit;
 		$terms     = array_slice($terms, 0, $limit);
 
-		return [
+		$result = [
 			'terms'     => array_map([$this, 'formatTerm'], $terms),
 			'total'     => count($terms),
 			'truncated' => $truncated,
 		];
+
+		if ($truncated) {
+			$result['limit_notice'] = $this->settings->getSearchLimitNotice($limit);
+		}
+
+		return $result;
 	}
 
 	/**

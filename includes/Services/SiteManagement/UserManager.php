@@ -116,12 +116,18 @@ class UserManager
 
 		$total = (int) $query->get_total();
 
-		return [
+		$result = [
 			'users'     => $users,
 			'total'     => $total,
 			'truncated' => $total > count($users),
 			'roles'     => array_keys(wp_roles()->roles),
 		];
+
+		if ($result['truncated']) {
+			$result['limit_notice'] = $this->settings->getSearchLimitNotice($limit);
+		}
+
+		return $result;
 	}
 
 	/**
