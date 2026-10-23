@@ -4,7 +4,7 @@ Tags: ai, agent, chatbot, assistant, abilities
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.3.1
+Stable tag: 1.3.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -122,6 +122,23 @@ Under the AgentMod menu in your WordPress admin, there is a dedicated **Abilitie
 If you ask the agent to create a post, it will show you a confirmation modal summarizing the action before anything is written to the database. You must explicitly approve the action for it to proceed.
 
 == Changelog ==
+= 1.3.2 =
+* Added: Navigation menu abilities. `list-navigations` lists the block theme's menus (wp_navigation) with their item count and the templates / template parts that show them (e.g. the footer). `get-navigation` returns a menu as a tree of items addressed by path. `update-navigation` edits the existing menu in place with add / update / remove / move operations (a link that gets children becomes a submenu), or replaces its markup; all operations are validated before anything is saved. Previously the agent could not reliably edit an existing menu and created a new one instead.
+* Added: Approval request dialog in Execute mode with Manual approval. When the agent wants your go-ahead before acting (for example because it chose a different approach than you asked for, such as a code snippet instead of editing a plugin file, the scope grew, or a step cannot be undone), it calls its new request-approval tool. A dialog shows what it will do, with "Continue", "Request changes" (typed right in the dialog) and "Cancel"; closing the dialog counts as Cancel. On Continue the agent carries the action out in the same run, and write actions still pass through the usual confirmation dialog. The tool is not offered in Auto mode, in Ask or Plan mode, or in unattended runs.
+* Fixed: In Manual approval mode the agent could end its turn by announcing an action ("I am preparing the snippet") without doing it or asking, which read as if the work was done. Execute mode now tells the agent never to end a turn by announcing work it has not performed, and in Manual mode to ask for the go-ahead with the approval dialog instead of in plain text.
+* Improved: When get-post or update-post is called with the wrong post_type, the error now names the post's actual type. Navigation menus are pointed to the navigation abilities and templates to the template abilities, instead of every mismatch being sent to the template abilities.
+* Fixed: The full-content read limit of get-post now counts distinct posts. Re-reading the same post (e.g. after its earlier result was compacted out of the history) no longer uses up the limit and locks the agent out of that post.
+* Fixed: create-post, update-post, create-pattern, update-pattern, duplicate-pattern and add-or-update-template / add-or-update-template-part stripped backslashes from the saved content. Escaped characters in block attributes (e.g. `"` for a quote) were lost, and a backslash in an attribute value left invalid JSON behind, so the block lost its attributes in the editor. Backslashes in titles were stripped too.
+* Improved: Error notices in the chat panel are shown right above the composer instead of at the top of the conversation, so a stopped run is noticed without scrolling up.
+* Improved: The chat modal no longer shows a second scrollbar; it uses the full height available and only the conversation scrolls. On very short screens the modal still scrolls as a fallback so the composer stays reachable.
+* Improved: The composer (presets, message field and toolbar) stays fixed at the bottom of the chat modal from the first open, as in the AI Workspace, instead of sitting right below the last message.
+* Improved: The conversation scrollbar in the chat modal and the Pro AI Workspace is thinner and light gray.
+* Fixed: Long answers typed in the question dialog or as "Request changes" in the approval dialog were cut off. The agent saw only the first 2000 characters while answering, and only about 500 characters of the answer in later messages (fewer with non-Latin characters such as Turkish letters). A long list pasted as an answer was therefore treated as a much shorter list. Answers are now kept in full for the rest of the conversation, even in long runs and in older turns. If an answer is still longer than the limit, the agent is told that it was cut off.
+* Added: "Max Answer Length (characters)" setting under Settings > AI Limits. It sets the longest answer kept from the question and approval dialogs. Default: 20000.
+* Improved: Tool results kept in the conversation history no longer store non-Latin characters as escape sequences. Text with accented letters (e.g. Turkish) now takes much less of the history space.
+* Updated: NCF library (native-custom-fields) to v1.4.6
+* Fixed: The "Details" buttons on the Abilities page were always blue. They now use the admin color scheme chosen in your profile, like the other primary buttons.
+
 = 1.3.1 =
 * Added: The agent can ask you questions in a dialog instead of in the chat. Single-choice questions use radio buttons, multiple-choice questions use checkboxes, every question can take your own answer in a text field, and the option the agent recommends is preselected. Submitting continues the agent's run where it stopped; "Skip" lets it continue with sensible defaults, which it names. Questions are only offered in the admin chat, never in unattended runs.
 * Added: Plan review dialog. In Plan mode the agent hands over the finished plan with its new present-plan tool; the plan stays in the conversation and a dialog offers "Approve & Execute" (with a Manual or Auto approval choice), "Ask Agent to Review", "Request Changes" (typed right in the dialog) and "Close". Answers to general questions in Plan mode do not open it.

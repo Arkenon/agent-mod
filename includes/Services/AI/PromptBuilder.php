@@ -164,7 +164,9 @@ class PromptBuilder
 	 * of announcing it — the loop ends on any reply without a tool call, so a
 	 * "here is what I will do" message stops the run. Ask/plan modes steer the
 	 * agent away from making changes (write abilities are also removed by the
-	 * AbilityResolver).
+	 * AbilityResolver). With manual approval on an interactive channel, a
+	 * go-ahead the agent wants goes through request-approval instead of an
+	 * announcement in plain text.
 	 *
 	 * Questions are never ruled out. On an interactive channel they go through
 	 * the ask-user tool (a form the user answers, after which the run carries
@@ -221,6 +223,20 @@ class PromptBuilder
 				'You are in Execute mode: carry the request out with the tools in this same turn. Do not describe what you are about to do and then stop — call the tools. Write actions pass through the system\'s own approval step, so call them directly instead of asking for permission in chat; only a tool description that explicitly says to confirm first overrides this.',
 				'agent-mod'
 			);
+
+			// The loop ends on any reply without a tool call, so an announcement
+			// reads to the user as work that was done.
+			$directive .= ' ' . __('Never end your turn by announcing an action you have not performed (for example "I am preparing the snippet" or "I will now create the page"). Describe only what is already done, and use completion language only after the tool call succeeded.', 'agent-mod');
+
+			// Manual approval: the agent gets a proper channel for the go-ahead
+			// it would otherwise ask for in plain text (see AbilityResolver).
+			if ($agent->interactive && 'manual' === $agent->approvalMode) {
+				$directive .= ' ' . sprintf(
+					/* translators: %s: request-approval ability name. */
+					__('If you want the user\'s go-ahead before acting — because you chose a different approach than the user literally asked for, the scope grew beyond the request, or a step cannot be undone — do not ask in plain text and do not stop: call the %s tool with a short summary of exactly what you will do, then carry it out in the same turn once it is approved. Otherwise call the write tools directly.', 'agent-mod'),
+					AskUserAbilityService::REQUEST_APPROVAL
+				);
+			}
 
 			$askUser = $agent->interactive
 				? __('Ask the user only when a missing detail would materially change the outcome and cannot be found with the tools or reasonably defaulted.', 'agent-mod') . ' ' . $askUser

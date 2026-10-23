@@ -63,7 +63,8 @@ class AbilityResolver
 	 * Offers the interactive chat tools exactly when somebody can use them.
 	 *
 	 * ask-user is offered on an interactive channel; present-plan only there
-	 * and in Plan mode. On such a channel they are added even when the agent
+	 * and in Plan mode; request-approval only there, in Execute mode with
+	 * manual approval. On such a channel they are added even when the agent
 	 * uses a "selected" ability list, because they are part of the chat itself
 	 * rather than site capabilities. Everywhere else (widgets, scheduled runs)
 	 * they are removed, even when "all" abilities were resolved: nobody would
@@ -77,7 +78,11 @@ class AbilityResolver
 	 */
 	private function applyInteractiveTools(array $abilities, AgentConfig $agent): array
 	{
-		$interactiveTools = [AskUserAbilityService::NAME, AskUserAbilityService::PRESENT_PLAN];
+		$interactiveTools = [
+			AskUserAbilityService::NAME,
+			AskUserAbilityService::PRESENT_PLAN,
+			AskUserAbilityService::REQUEST_APPROVAL,
+		];
 
 		$abilities = array_values(array_filter($abilities, static function ($ability) use ($interactiveTools): bool {
 			return ! ($ability instanceof WP_Ability && in_array($ability->get_name(), $interactiveTools, true));
@@ -87,9 +92,14 @@ class AbilityResolver
 			return $abilities;
 		}
 
-		$offered = 'plan' === $agent->mode
-			? $interactiveTools
-			: [AskUserAbilityService::NAME];
+		$offered = [AskUserAbilityService::NAME];
+
+		if ('plan' === $agent->mode) {
+			$offered[] = AskUserAbilityService::PRESENT_PLAN;
+		} elseif ('execute' === $agent->mode && 'manual' === $agent->approvalMode) {
+			// Auto mode means the user handed over control: no go-ahead stops.
+			$offered[] = AskUserAbilityService::REQUEST_APPROVAL;
+		}
 
 		foreach ($offered as $name) {
 			$ability = wp_get_ability($name);

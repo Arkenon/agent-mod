@@ -103,6 +103,14 @@ class Constants
 	public const AI_MAX_FULL_CONTENT_POSTS = 5;
 
 	/**
+	 * Maximum length (characters) of a free-text answer the user types in an
+	 * ask-user or request-approval dialog.
+	 *
+	 * @since x.x.x
+	 */
+	public const AI_MAX_ANSWER_LENGTH = 20000;
+
+	/**
 	 * Maximum decoded size (in bytes) allowed for a single chat attachment.
 	 *
 	 * @since 1.0.0

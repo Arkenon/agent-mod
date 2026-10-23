@@ -61,4 +61,17 @@ class BaseRepository
 
 		return $this->saveConfigurations($get_config, $config_name);
 	}
+
+	/**
+	 * Delete an option
+	 *
+	 * @param string $option_name Option name
+	 *
+	 * @return bool
+	 * @since 1.4.5
+	 */
+	public function deleteOption(string $option_name): bool
+	{
+		return delete_option($option_name);
+	}
 }

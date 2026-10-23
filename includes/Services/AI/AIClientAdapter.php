@@ -236,17 +236,20 @@ class AIClientAdapter
 
 		try {
 			if ('answer' === $decision) {
-				$responses  = $this->buildAnswerResponses($lastMessage, $answerPayload);
+				// The run paused on the first pausing call (ask-user or
+				// request-approval), exactly as the generation loop picked it.
+				$pausedName = (string) ($this->findAskUserCall($pendingCalls)['name'] ?? AskUserAbilityService::NAME);
+				$responses  = $this->buildAnswerResponses($lastMessage, $answerPayload, $pausedName);
 				$messages[] = $responses;
 
-				// Only the ask-user call goes into the chain's executed list; the
+				// Only the answered call goes into the chain's executed list; the
 				// calls returned unexecuted will be requested again.
-				$askCalls = array_values(array_filter($pendingCalls, function (array $call): bool {
-					return $this->isAskUserCall($call);
+				$askCalls = array_values(array_filter($pendingCalls, static function (array $call) use ($pausedName): bool {
+					return $pausedName === (string) ($call['name'] ?? '');
 				}));
 				$executedCalls = array_merge(
 					$executedCalls,
-					$this->attachResultDigests($askCalls, $this->onlyAskUserResponses($responses))
+					$this->attachResultDigests($askCalls, $this->onlyAskUserResponses($responses, $pausedName))
 				);
 			} elseif ('approve' === $decision) {
 				$this->reportProgress(
@@ -314,24 +317,26 @@ class AIClientAdapter
 	}
 
 	/**
-	 * Builds the function-response message for a paused ask-user call.
+	 * Builds the function-response message for a paused ask-user or
+	 * request-approval call.
 	 *
-	 * The ask-user call receives the user's answers. Any other call the model
+	 * The paused call receives the user's answers. Any other call the model
 	 * batched into the same message is answered as "not executed", because it
 	 * was planned before the answers were known.
 	 *
 	 * @param Message              $message       The paused model message.
-	 * @param array<string, mixed> $answerPayload The ask-user function response.
+	 * @param array<string, mixed> $answerPayload The paused call's function response.
+	 * @param string               $pausedName    Ability name of the paused call.
 	 *
 	 * @return Message
 	 * @since x.x.x
 	 */
-	private function buildAnswerResponses(Message $message, array $answerPayload): Message
+	private function buildAnswerResponses(Message $message, array $answerPayload, string $pausedName = AskUserAbilityService::NAME): Message
 	{
 		return $this->buildSyntheticResponses(
 			$message,
-			static function (string $abilityName) use ($answerPayload): array {
-				if (AskUserAbilityService::NAME === $abilityName) {
+			static function (string $abilityName) use ($answerPayload, $pausedName): array {
+				if ($pausedName === $abilityName) {
 					return $answerPayload;
 				}
 
@@ -385,24 +390,25 @@ class AIClientAdapter
 	}
 
 	/**
-	 * Keeps only the ask-user responses of a function-response message.
+	 * Keeps only the answered call's responses of a function-response message.
 	 *
-	 * Lets attachResultDigests() pair them by position with the ask-user calls.
+	 * Lets attachResultDigests() pair them by position with the answered calls.
 	 *
-	 * @param Message $responses The function-response message.
+	 * @param Message $responses  The function-response message.
+	 * @param string  $pausedName Ability name of the paused call.
 	 *
 	 * @return Message
 	 * @since x.x.x
 	 */
-	private function onlyAskUserResponses(Message $responses): Message
+	private function onlyAskUserResponses(Message $responses, string $pausedName = AskUserAbilityService::NAME): Message
 	{
 		$parts = array_values(array_filter(
 			$responses->getParts(),
-			static function (MessagePart $part): bool {
+			static function (MessagePart $part) use ($pausedName): bool {
 				$response = $part->getFunctionResponse();
 
 				return $response instanceof FunctionResponse
-					&& AskUserAbilityService::NAME === WP_AI_Client_Ability_Function_Resolver::function_name_to_ability_name((string) $response->getName());
+					&& $pausedName === WP_AI_Client_Ability_Function_Resolver::function_name_to_ability_name((string) $response->getName());
 			}
 		));
 
@@ -410,7 +416,10 @@ class AIClientAdapter
 	}
 
 	/**
-	 * Returns the first ask-user call among the requested calls, if any.
+	 * Returns the first call that pauses the run for the user, if any.
+	 *
+	 * Those are ask-user and request-approval (AskUserAbilityService::PAUSING_TOOLS);
+	 * the first one in the model's order is the one shown.
 	 *
 	 * @param array<int, array<string, mixed>> $calls Extracted tool calls.
 	 *
@@ -419,7 +428,13 @@ class AIClientAdapter
 	 */
 	private function findAskUserCall(array $calls): ?array
 	{
-		return $this->findCall($calls, AskUserAbilityService::NAME);
+		foreach ($calls as $call) {
+			if (in_array((string) ($call['name'] ?? ''), AskUserAbilityService::PAUSING_TOOLS, true)) {
+				return $call;
+			}
+		}
+
+		return null;
 	}
 
 	/**
@@ -499,19 +514,6 @@ class AIClientAdapter
 		$response->planReview = ['summary' => $summary];
 
 		return $response;
-	}
-
-	/**
-	 * Whether an extracted tool call is the ask-user call.
-	 *
-	 * @param array<string, mixed> $call Extracted tool call (name/args).
-	 *
-	 * @return bool
-	 * @since x.x.x
-	 */
-	private function isAskUserCall(array $call): bool
-	{
-		return AskUserAbilityService::NAME === (string) ($call['name'] ?? '');
 	}
 
 	/**
@@ -649,13 +651,18 @@ class AIClientAdapter
 
 			$requestedCalls = $this->extractToolCalls($message);
 
-			// Questions to the user pause the run before anything else, write
-			// confirmations included: the answers may change what gets written.
-			// Session auto-approval does not apply — a question is not a write.
+			// Questions and go-ahead requests pause the run before anything
+			// else, write confirmations included: the answers may change what
+			// gets written. Session auto-approval does not apply — neither is a
+			// write.
 			$askCall = $this->findAskUserCall($requestedCalls);
 
 			if (null !== $askCall) {
-				$questions = $this->askUser->normalizeQuestions((array) ($askCall['args'] ?? []));
+				$askName    = (string) $askCall['name'];
+				$isApproval = AskUserAbilityService::REQUEST_APPROVAL === $askName;
+				$questions  = $isApproval
+					? $this->askUser->normalizeApproval((array) ($askCall['args'] ?? []))
+					: $this->askUser->normalizeQuestions((array) ($askCall['args'] ?? []));
 
 				if (! empty($questions['questions'])) {
 					return AgentResponse::pendingQuestions(
@@ -672,10 +679,14 @@ class AIClientAdapter
 				// else from this message, and let it try again.
 				$history[] = $this->buildSyntheticResponses(
 					$message,
-					static function (string $abilityName): array {
-						return AskUserAbilityService::NAME === $abilityName
-							? ['error' => __('No valid question was provided. Each question needs an id, the question text and a type.', 'agent-mod')]
-							: ['not_executed' => true, 'error' => __('Not executed: it was requested together with an invalid ask-user call.', 'agent-mod')];
+					static function (string $abilityName) use ($askName, $isApproval): array {
+						if ($askName !== $abilityName) {
+							return ['not_executed' => true, 'error' => __('Not executed: it was requested together with an invalid question or approval request.', 'agent-mod')];
+						}
+
+						return $isApproval
+							? ['error' => __('No summary was provided. Pass "summary" with exactly what you will do once approved.', 'agent-mod')]
+							: ['error' => __('No valid question was provided. Each question needs an id, the question text and a type.', 'agent-mod')];
 					}
 				);
 
@@ -994,10 +1005,6 @@ class AIClientAdapter
 		 */
 		$digestLength = max(0, (int) apply_filters('agent_mod_tool_result_digest_length', Constants::AI_TOOL_RESULT_DIGEST_LENGTH));
 
-		if (0 === $digestLength) {
-			return $calls;
-		}
-
 		$responses = [];
 
 		foreach ($resultMessage->getParts() as $part) {
@@ -1009,13 +1016,18 @@ class AIClientAdapter
 		}
 
 		foreach ($calls as $index => $call) {
-			if (! isset($responses[$index])) {
+			// The answers to a pausing tool are what the user typed, not tool
+			// output: later turns need all of it, so it is kept whole (even when
+			// digests are turned off).
+			$isAnswer = in_array($call['name'] ?? '', AskUserAbilityService::PAUSING_TOOLS, true);
+
+			if (! isset($responses[$index]) || (0 === $digestLength && ! $isAnswer)) {
 				continue;
 			}
 
-			$digest = (string) wp_json_encode($responses[$index]->getResponse());
+			$digest = (string) wp_json_encode($responses[$index]->getResponse(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-			$calls[$index]['result'] = mb_substr($digest, 0, $digestLength);
+			$calls[$index]['result'] = $isAnswer ? $digest : mb_substr($digest, 0, $digestLength);
 		}
 
 		return $calls;

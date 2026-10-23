@@ -112,7 +112,7 @@ class FieldService
 
             // Added 1.0.5
             [
-                'label' => __('Create Option Pages', 'native-custom-fields'),
+                'label' => __('Option Pages', 'native-custom-fields'),
                 'description' => __('Create custom option pages for your site settings', 'native-custom-fields'),
                 'icon' => 'settings',
                 'page' => 'native-custom-fields-options-page-builder',

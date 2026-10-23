@@ -13,14 +13,52 @@
     height: 500px!important;
 }
 
+// The modal takes the full height WP allows it (the frame's own max-height)
+// and the conversation list absorbs whatever the fixed parts (presets,
+// composer, notice) leave, so only the list scrolls. The modal content keeps
+// WP's overflow: auto as a fallback for very short screens, where even the
+// list's min-height no longer fits.
 .agent-mod-chat__modal {
 	max-width: 640px;
 	width: 100%;
+	height: 100%;
 
 	.components-modal__content {
 		display: flex;
 		flex-direction: column;
+		min-height: 0;
 	}
+
+	// WP 6.8+ wraps the children in an extra container; it must stretch too,
+	// or the body keeps its content height and the composer floats mid-modal.
+	.components-modal__children-container {
+		flex: 1 1 auto;
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+	}
+
+	.agent-mod-chat__body {
+		flex: 1 1 auto;
+		min-height: 0;
+	}
+
+	.agent-mod-chat__messages {
+		max-height: none;
+		min-height: 120px;
+	}
+
+	.agent-mod-chat__body > :not(.agent-mod-chat__messages) {
+		flex-shrink: 0;
+	}
+}
+
+// Error notice, shown right above the composer. A long message scrolls on
+// its own instead of pushing the composer off screen.
+.agent-mod-chat__error {
+	margin: 0;
+	max-height: 25vh;
+	overflow-y: auto;
 }
 
 .agent-mod-chat__body {
@@ -34,10 +72,37 @@
 	flex: 1 1 auto;
 	overflow-y: auto;
 	max-height: 50vh;
-	padding: 8px 4px;
+	// Wider right padding keeps the messages clear of the scrollbar.
+	padding: 8px 12px 8px 4px;
 	display: flex;
 	flex-direction: column;
 	gap: 10px;
+
+	// Thin, light scrollbar; shared by the chat modal and the Pro Workspace,
+	// which loads these styles. Chromium/Safari use the ::-webkit-scrollbar
+	// rules (Chromium ignores them once scrollbar-color is set, so the
+	// standard properties are limited to Firefox, whose "thin" is its minimum).
+	&::-webkit-scrollbar {
+		width: 4px;
+	}
+
+	&::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	&::-webkit-scrollbar-thumb {
+		background: #dcdcde;
+		border-radius: 2px;
+
+		&:hover {
+			background: #c3c4c7;
+		}
+	}
+
+	@supports (-moz-appearance: none) {
+		scrollbar-width: thin;
+		scrollbar-color: #dcdcde transparent;
+	}
 }
 
 .agent-mod-chat__empty {
@@ -1154,6 +1219,17 @@
 
 .agent-mod-chat__question-intro {
 	color: #757575;
+}
+
+// Go-ahead dialog (request-approval).
+.agent-mod-chat__approval-summary {
+	margin: 0;
+	font-weight: 600;
+	white-space: pre-wrap;
+
+	+ .agent-mod-chat__bubble {
+		margin-top: 8px;
+	}
 }
 
 .agent-mod-chat__question {

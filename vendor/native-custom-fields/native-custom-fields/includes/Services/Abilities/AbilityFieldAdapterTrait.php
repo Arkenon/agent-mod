@@ -68,8 +68,8 @@ trait AbilityFieldAdapterTrait
                 'name'       => ['type' => 'string', 'description' => __('Unique meta key slug', 'native-custom-fields')],
                 'fieldLabel' => ['type' => 'string'],
                 'default'    => [
-                    'type'        => ['string', 'array'],
-                    'description' => __('Default value. Repeater and group fields take an array: a repeater default is a list of row objects keyed by sub-field name.', 'native-custom-fields'),
+                    'type'        => ['string', 'number', 'boolean', 'array'],
+                    'description' => __('Default value. Number fields take a number, toggle fields a boolean. Repeater and group fields take an array: a repeater default is a list of row objects keyed by sub-field name.', 'native-custom-fields'),
                 ],
                 'required'   => ['type' => 'boolean', 'default' => false],
                 'disabled'   => ['type' => 'boolean', 'default' => false],
@@ -108,15 +108,7 @@ trait AbilityFieldAdapterTrait
      */
     private function getDefaultFieldBaseInfo(): array
     {
-        return [
-            'fieldHelpText'           => '',
-            'className'               => '',
-            'fieldLabelPosition'      => 'top',
-            'fieldLabelTextTransform' => 'uppercase',
-            'required'                => false,
-            'disabled'                => false,
-            'hideLabelFromVision'     => false,
-        ];
+        return Helper::getDefaultBuilderFieldBaseInfo();
     }
 
     /**
@@ -127,7 +119,7 @@ trait AbilityFieldAdapterTrait
      */
     private function getDefaultDependencyInfo(): array
     {
-        return ['relation' => 'and', 'conditions' => []];
+        return Helper::getDefaultBuilderDependencyInfo();
     }
 
     /**

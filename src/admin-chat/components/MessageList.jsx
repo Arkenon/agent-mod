@@ -26,7 +26,6 @@ export default function MessageList() {
 	}, [] );
 
 	const containerRef = useRef( null );
-	const endRef = useRef( null );
 	const nearBottomRef = useRef( true );
 
 	// Whether the user is reading at the bottom of the transcript. Stored in a
@@ -44,9 +43,12 @@ export default function MessageList() {
 	// Follow new content only when the user is already near the bottom. progress
 	// changes on every ~1.2s poll during tool calls, so without this guard the
 	// view would be dragged down constantly while the user scrolls up to read.
+	// Scrolls the list itself; scrollIntoView() would also scroll every scrollable
+	// ancestor (the modal), shifting the whole panel.
 	useEffect( () => {
-		if ( nearBottomRef.current && endRef.current ) {
-			endRef.current.scrollIntoView( { behavior: 'smooth' } );
+		const el = containerRef.current;
+		if ( nearBottomRef.current && el ) {
+			el.scrollTo( { top: el.scrollHeight, behavior: 'smooth' } );
 		}
 	}, [ messages.length, loading, progress ] );
 
@@ -71,8 +73,6 @@ export default function MessageList() {
 					<ToolProgress progress={ progress } />
 				</div>
 			) }
-
-			<div ref={ endRef } />
 		</div>
 	);
 }

@@ -34,6 +34,7 @@ agent-mod/
     │   ├── AbilityRegistrarService.php     # Registers core and block design abilities
     │   ├── LibraryService.php              # Manages library assets/scripts
     │   ├── SiteManagementAbilityService.php# Main service for site management abilities
+    │   ├── NavigationAbilityService.php    # Navigation menu (wp_navigation) list/get/update abilities
     │   │
     │   ├── SiteManagement/                 # ⚙️ Site Management Managers
     │   │   ├── Guard.php                   # Capability and security checks
@@ -130,6 +131,7 @@ Array
             [max_tool_calls] => 10
             [max_search_results] => 20
             [max_full_content_posts] => 5
+            [max_answer_length] => 20000
         )
 
     [agent_mod_attachments] => Array

@@ -45,7 +45,7 @@ export function getPendingConfirmation( state ) {
  * Questions the agent asked and is waiting on, or null.
  *
  * @param {Object} state Store state.
- * @return {Object|null} { token, intro, questions, text, executedCalls }.
+ * @return {Object|null} { token, kind, intro, details, reason, questions, text, executedCalls }.
  */
 export function getPendingQuestions( state ) {
 	return state.pendingQuestions;

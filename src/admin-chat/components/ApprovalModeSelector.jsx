@@ -17,7 +17,7 @@ export const APPROVAL_MODES = [
 		id: 'manual',
 		icon: 'shield',
 		label: __( 'Manual', 'agent-mod' ),
-		description: __( 'Ask for confirmation before each change (default).', 'agent-mod' ),
+		description: __( 'Ask for confirmation before each change, and before the agent goes ahead with an approach of its own (default).', 'agent-mod' ),
 	},
 	{
 		id: 'auto',

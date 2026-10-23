@@ -276,6 +276,9 @@ final class AIChatRestController
 		// stored AgentConfig.
 		$agent->interactive = true;
 
+		$autoApproved        = $this->sanitizeAutoApprovedAbilities($request->get_param('autoApprovedAbilities'));
+		$agent->approvalMode = $this->resolveApprovalMode($autoApproved);
+
 		$conversationId = (int) $request->get_param('conversationId');
 
 		// Load history from DB when a conversationId is provided (pro); otherwise
@@ -295,7 +298,7 @@ final class AIChatRestController
 			$history,
 			$attachments,
 			$this->sanitizeRequestId($request),
-			$this->sanitizeAutoApprovedAbilities($request->get_param('autoApprovedAbilities'))
+			$autoApproved
 		);
 
 		do_action('agent_mod_after_chat', $agent, $response, $conversationId);
@@ -526,6 +529,10 @@ final class AIChatRestController
 			return new WP_Error('corrupt_state', __('The pending confirmation state is invalid.', 'agent-mod'), ['status' => 500]);
 		}
 
+		// The user may have switched Manual/Auto while the run was paused.
+		$autoApproved        = $this->sanitizeAutoApprovedAbilities($request->get_param('autoApprovedAbilities'));
+		$agent->approvalMode = $this->resolveApprovalMode($autoApproved);
+
 		$response = $this->orchestrator->resume(
 			$agent,
 			$wireHistory,
@@ -533,7 +540,7 @@ final class AIChatRestController
 			$message,
 			$attachments,
 			$this->sanitizeRequestId($request),
-			$this->sanitizeAutoApprovedAbilities($request->get_param('autoApprovedAbilities')),
+			$autoApproved,
 			$decision,
 			$answerPayload
 		);
@@ -632,6 +639,23 @@ final class AIChatRestController
 			(array) apply_filters('agent_mod_auto_approved_abilities', $names),
 			'is_string'
 		));
+	}
+
+	/**
+	 * Derives the chat's approval mode from the session allowlist.
+	 *
+	 * The Auto picker sends the '*' wildcard; anything else (including a list
+	 * of per-ability "don't ask again" names) is still Manual. Runs on the
+	 * filtered list, so a site owner who revokes '*' also gets Manual behavior.
+	 *
+	 * @param string[] $autoApproved Sanitized session-approved ability names.
+	 *
+	 * @return string 'manual' or 'auto'.
+	 * @since x.x.x
+	 */
+	private function resolveApprovalMode(array $autoApproved): string
+	{
+		return in_array('*', $autoApproved, true) ? 'auto' : 'manual';
 	}
 
 	/**

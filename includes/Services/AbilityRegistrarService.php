@@ -16,6 +16,7 @@
 namespace AgentMod\Services;
 
 use WP_Error;
+use WP_Post;
 use WP_Query;
 use WP_Block_Patterns_Registry;
 use WP_Theme_JSON;
@@ -301,7 +302,7 @@ class AbilityRegistrarService
 			'agent-mod/get-template-part',
 			[
 				'label'               => __('Get Template Part', 'agent-mod'),
-				'description'         => __('Returns a template part\'s raw block markup as html by slug (e.g. header, footer). Use list-template-parts first to get slugs. The returned html can be modified and passed straight back to add-or-update-template-part.', 'agent-mod'),
+				'description'         => __('Returns a template part\'s raw block markup as html by slug (e.g. header, footer). Use list-template-parts first to get slugs. The returned html can be modified and passed straight back to add-or-update-template-part. A wp:navigation block\'s "ref" attribute is the ID of its menu: edit the menu items with update-navigation, not by changing this markup.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeGetTemplatePart'],
 				'permission_callback' => static function (): bool {
@@ -473,7 +474,7 @@ class AbilityRegistrarService
 			'agent-mod/get-post',
 			[
 				'label'               => __('Get Post or Page', 'agent-mod'),
-				'description'         => __('Returns a post raw block markup as html by post_id, plus its status and custom fields (meta). Use list-posts to find post_id first. The returned html can be modified and passed straight back to update-post as the html parameter.', 'agent-mod'),
+				'description'         => __('Returns a post raw block markup as html by post_id, plus its status and custom fields (meta). Use list-posts to find post_id first. The returned html can be modified and passed straight back to update-post as the html parameter. Navigation menus (wp_navigation, referenced by {"ref":ID} in wp:navigation blocks) have dedicated abilities: list-navigations / get-navigation / update-navigation.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeGetPost'],
 				'permission_callback' => static function (): bool {
@@ -576,7 +577,7 @@ class AbilityRegistrarService
 			'agent-mod/update-post',
 			[
 				'label'               => __('Update Post or Page', 'agent-mod'),
-				'description'         => __('Updates a post. Provide post_id plus any of html, title, post_status and meta; fields left out stay unchanged. The html parameter must be complete, valid serialized block markup; it is parsed with parse_blocks() and re-serialized as-is — attribute/innerHTML consistency is NOT validated server-side.', 'agent-mod'),
+				'description'         => __('Updates a post. Provide post_id plus any of html, title, post_status and meta; fields left out stay unchanged. The html parameter must be complete, valid serialized block markup; it is parsed with parse_blocks() and re-serialized as-is — attribute/innerHTML consistency is NOT validated server-side. To edit a navigation menu (wp_navigation) use update-navigation instead.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeUpdatePost'],
 				'permission_callback' => static function (): bool {
@@ -1375,7 +1376,9 @@ class AbilityRegistrarService
 				$update['post_title'] = $title;
 			}
 
-			$result = wp_update_post($update, true);
+			// wp_update_post()/wp_insert_post() unslash their input; without
+			// wp_slash() the JSON escapes in block attributes would be stripped.
+			$result = wp_update_post(wp_slash($update), true);
 
 			if (is_wp_error($result)) {
 				return ['success' => false, 'error' => $result->get_error_message()];
@@ -1383,13 +1386,13 @@ class AbilityRegistrarService
 		} else {
 			$action = 'created';
 			$postId = wp_insert_post(
-				[
+				wp_slash([
 					'post_type'    => $postType,
 					'post_status'  => 'publish',
 					'post_name'    => $slug,
 					'post_title'   => '' !== $title ? $title : $slug,
 					'post_content' => $serializedContent,
-				],
+				]),
 				true
 			);
 
@@ -1628,15 +1631,29 @@ class AbilityRegistrarService
 	 */
 	public function executeGetPost($input = null): array
 	{
-		// Full-content reads are capped per request to control latency and token cost.
-		static $fullContentReads = 0;
+		// Full-content reads are capped per request to control latency and token
+		// cost. The cap counts distinct posts: re-reading one (e.g. after its
+		// result was elided from the history) must not lock the agent out of it.
+		static $readPostIds = [];
 
 		if (! is_array($input) || empty($input['post_id'])) {
 			return ['success' => false, 'error' => __('post_id is required.', 'agent-mod')];
 		}
 
+		$postId   = absint($input['post_id']);
+		$postType = ! empty($input['post_type']) ? sanitize_key((string) $input['post_type']) : 'post';
+		$post     = get_post($postId);
+
+		if (! $post || $post->post_type !== $postType) {
+			return ['success' => false, 'error' => $this->postTypeMismatchError($postId, $postType, $post, false)];
+		}
+
+		if (! current_user_can('edit_post', $postId)) {
+			return ['success' => false, 'error' => __('You are not allowed to edit this post.', 'agent-mod')];
+		}
+
 		$maxReads = $this->settings_service->getMaxFullContentPosts();
-		if ($fullContentReads >= $maxReads) {
+		if (! isset($readPostIds[$postId]) && count($readPostIds) >= $maxReads) {
 			return [
 				'success' => false,
 				'error'   => sprintf(
@@ -1647,27 +1664,7 @@ class AbilityRegistrarService
 			];
 		}
 
-		$postId   = absint($input['post_id']);
-		$postType = ! empty($input['post_type']) ? sanitize_key((string) $input['post_type']) : 'post';
-		$post     = get_post($postId);
-
-		if (! $post || $post->post_type !== $postType) {
-			return [
-				'success' => false,
-				'error'   => sprintf(
-					/* translators: 1: post ID, 2: expected post type */
-					__('Post with ID %1$d not found or is not of type "%2$s". For templates use get-template instead.', 'agent-mod'),
-					$postId,
-					$postType
-				),
-			];
-		}
-
-		if (! current_user_can('edit_post', $postId)) {
-			return ['success' => false, 'error' => __('You are not allowed to edit this post.', 'agent-mod')];
-		}
-
-		$fullContentReads++;
+		$readPostIds[$postId] = true;
 
 		return [
 			'success'   => true,
@@ -1736,13 +1733,15 @@ class AbilityRegistrarService
 		// effects, and publish-time hooks (SEO, sharing) see the final meta.
 		$hasMeta = ! empty($input['meta']);
 
+		// wp_insert_post() unslashes its input; without wp_slash() the JSON
+		// escapes in block attributes (", \\) would be stripped.
 		$result = wp_insert_post(
-			[
+			wp_slash([
 				'post_title'   => $title,
 				'post_content' => $serializedContent,
 				'post_type'    => $postType,
 				'post_status'  => $hasMeta ? 'draft' : $postStatus,
-			],
+			]),
 			true
 		);
 
@@ -1806,15 +1805,7 @@ class AbilityRegistrarService
 		$post     = get_post($postId);
 
 		if (! $post || $post->post_type !== $postType) {
-			return [
-				'success' => false,
-				'error'   => sprintf(
-					/* translators: 1: post ID, 2: expected post type */
-					__('Post with ID %1$d not found or is not of type "%2$s". For templates use add-or-update-template instead.', 'agent-mod'),
-					$postId,
-					$postType
-				),
-			];
+			return ['success' => false, 'error' => $this->postTypeMismatchError($postId, $postType, $post, true)];
 		}
 
 		if (! current_user_can('edit_post', $postId)) {
@@ -1865,7 +1856,8 @@ class AbilityRegistrarService
 		$this->applyMetaWrites($postId, $metaWrites);
 
 		if (count($updateArgs) > 1) {
-			$result = wp_update_post($updateArgs, true);
+			// wp_update_post() unslashes its input; keep the attribute JSON escapes.
+			$result = wp_update_post(wp_slash($updateArgs), true);
 
 			if (is_wp_error($result)) {
 				return ['success' => false, 'error' => $result->get_error_message()];
@@ -2036,6 +2028,62 @@ class AbilityRegistrarService
 			// update_post_meta() unslashes its value.
 			update_post_meta($postId, $write['key'], wp_slash($write['value']));
 		}
+	}
+
+	/**
+	 * Builds the get-post / update-post error for a missing post or a post_type mismatch.
+	 *
+	 * Names the post's actual type so the agent can retry with the right
+	 * post_type, and points navigation menus and templates to their dedicated
+	 * abilities instead of sending every mismatch to the template abilities.
+	 *
+	 * @param int          $postId   Requested post ID.
+	 * @param string       $postType Expected post type from the input.
+	 * @param WP_Post|null $post     The loaded post, or null when it does not exist.
+	 * @param bool         $write    Whether the caller is a write ability.
+	 *
+	 * @return string
+	 * @since x.x.x
+	 */
+	private function postTypeMismatchError(int $postId, string $postType, ?WP_Post $post, bool $write): string
+	{
+		if (! $post) {
+			return sprintf(
+				/* translators: %d: post ID */
+				__('Post with ID %d not found. Use list-posts to find a valid post_id.', 'agent-mod'),
+				$postId
+			);
+		}
+
+		$actualType = $post->post_type;
+
+		if ('wp_navigation' === $actualType) {
+			return sprintf(
+				/* translators: %d: post ID */
+				__('Post %d is a navigation menu (wp_navigation). Use get-navigation / update-navigation with navigation_id to read or edit it in place — do not create a new menu.', 'agent-mod'),
+				$postId
+			);
+		}
+
+		if (in_array($actualType, ['wp_template', 'wp_template_part'], true)) {
+			return sprintf(
+				/* translators: 1: post ID, 2: post type, 3: ability names */
+				__('Post %1$d is a "%2$s". Use %3$s instead.', 'agent-mod'),
+				$postId,
+				$actualType,
+				'wp_template' === $actualType
+					? ($write ? 'add-or-update-template' : 'get-template')
+					: ($write ? 'add-or-update-template-part' : 'get-template-part')
+			);
+		}
+
+		return sprintf(
+			/* translators: 1: post ID, 2: actual post type, 3: expected post type */
+			__('Post %1$d is of type "%2$s", not "%3$s". Retry with post_type "%2$s".', 'agent-mod'),
+			$postId,
+			$actualType,
+			$postType
+		);
 	}
 
 	/**
@@ -2292,7 +2340,8 @@ class AbilityRegistrarService
 			$updateArgs['post_title'] = sanitize_text_field((string) $input['title']);
 		}
 
-		$result = wp_update_post($updateArgs);
+		// wp_update_post() unslashes its input; keep the attribute JSON escapes.
+		$result = wp_update_post(wp_slash($updateArgs));
 
 		if (is_wp_error($result)) {
 			return ['success' => false, 'error' => $result->get_error_message()];
@@ -2343,12 +2392,13 @@ class AbilityRegistrarService
 		$syncStatus = (isset($input['sync_status']) && $input['sync_status'] === 'synced') ? 'synced' : 'unsynced';
 		$content    = $pattern['content'];
 
-		$postId = wp_insert_post([
+		// wp_insert_post() unslashes its input; keep the attribute JSON escapes.
+		$postId = wp_insert_post(wp_slash([
 			'post_type'    => 'wp_block',
 			'post_status'  => 'publish',
 			'post_title'   => $title,
 			'post_content' => $content,
-		]);
+		]));
 
 		if (is_wp_error($postId)) {
 			return ['success' => false, 'error' => $postId->get_error_message()];
@@ -2406,13 +2456,14 @@ class AbilityRegistrarService
 			return ['success' => false, 'error' => __('Block serialization failed. Check your block structure.', 'agent-mod')];
 		}
 
-		$postId = wp_insert_post([
+		// wp_insert_post() unslashes its input; keep the attribute JSON escapes.
+		$postId = wp_insert_post(wp_slash([
 			'post_type'    => 'wp_block',
 			'post_status'  => 'publish',
 			'post_title'   => $title,
 			'post_content' => $serializedContent,
 			'post_excerpt' => $description,
-		]);
+		]));
 
 		if (is_wp_error($postId)) {
 			return ['success' => false, 'error' => $postId->get_error_message()];

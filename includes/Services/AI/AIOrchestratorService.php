@@ -19,6 +19,7 @@
 namespace AgentMod\Services\AI;
 
 use WP_Error;
+use AgentMod\Services\AskUserAbilityService;
 use AgentMod\Services\AI\ConfirmationStore;
 use AgentMod\Services\AI\DTO\AgentConfig;
 use AgentMod\Services\AI\DTO\AgentResponse;
@@ -363,7 +364,8 @@ class AIOrchestratorService
 	 *    the next user message the model remembers what it already fetched and
 	 *    does not re-call the same read tools. Only the most recent turns are
 	 *    replayed this way (agent_mod_history_tool_digest_turns) so the digests
-	 *    themselves cannot re-grow the prompt.
+	 *    themselves cannot re-grow the prompt. Answers to ask-user and
+	 *    request-approval are the exception: they are replayed on every turn.
 	 *  - Binary attachment payloads are only needed on the CURRENT user message
 	 *    (appended by the caller); prior turns get a text placeholder naming the
 	 *    files instead of re-uploading base64 data every request.
@@ -404,12 +406,24 @@ class AIOrchestratorService
 			$text        = isset($turn['text']) ? (string) $turn['text'] : '';
 			$attachments = isset($turn['attachments']) && is_array($turn['attachments']) ? $turn['attachments'] : [];
 
-			if (isset($digestIndexes[$index])) {
-				$digest = $this->buildToolDigestBlock((array) $turn['toolCalls']);
+			$toolCalls = isset($turn['toolCalls']) && is_array($turn['toolCalls']) ? $turn['toolCalls'] : [];
 
-				if ('' !== $digest) {
-					$text = trim($text . "\n\n" . $digest);
-				}
+			// Older turns still replay what the user answered to ask-user /
+			// request-approval: that is the user's own input, not tool output,
+			// and the conversation may keep referring to it.
+			if (! isset($digestIndexes[$index])) {
+				$toolCalls = array_filter(
+					$toolCalls,
+					static function ($call): bool {
+						return is_array($call) && in_array($call['name'] ?? '', AskUserAbilityService::PAUSING_TOOLS, true);
+					}
+				);
+			}
+
+			$digest = $this->buildToolDigestBlock($toolCalls);
+
+			if ('' !== $digest) {
+				$text = trim($text . "\n\n" . $digest);
 			}
 
 			$placeholder = $this->attachmentPlaceholder($attachments);
@@ -458,7 +472,7 @@ class AIOrchestratorService
 				continue;
 			}
 
-			$line = '- ' . $name . '(' . wp_json_encode(is_array($call['args'] ?? null) ? $call['args'] : []) . ')';
+			$line = '- ' . $name . '(' . wp_json_encode(is_array($call['args'] ?? null) ? $call['args'] : [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ')';
 
 			$result = (string) ($call['result'] ?? '');
 

@@ -290,6 +290,89 @@ class TermMetaService implements BaseMetaServiceInterface, TermMetaServiceInterf
 	}
 
 	/**
+	 * Build taxonomy builder form values from a stored taxonomy configuration
+	 * Reverse of saveCustomTaxonomyConfig(), used when the builder state is missing (e.g. imported configurations)
+	 *
+	 * @param array $config Stored taxonomy configuration (taxonomy, object_type, args, created_by)
+	 *
+	 * @return array
+	 * @since 1.4.5
+	 */
+	public function buildTaxonomyBuilderValues(array $config): array
+	{
+		$args     = is_array($config['args'] ?? null) ? $config['args'] : [];
+		$taxonomy = (string) ($config['taxonomy'] ?? '');
+		$labels   = is_array($args['labels'] ?? null) ? $args['labels'] : [];
+
+		$bool = function (string $key, bool $default) use ($args): bool {
+			return array_key_exists($key, $args) ? rest_sanitize_boolean($args[$key]) : $default;
+		};
+
+		$label        = $labels['name'] ?? ($args['label'] ?? '');
+		$query_var    = $args['query_var'] ?? true;
+		$default_term = is_array($args['default_term'] ?? null) ? $args['default_term'] : [];
+		$rewrite      = $args['rewrite'] ?? true;
+		$rewrite      = is_array($rewrite) ? $rewrite : [];
+		$capabilities = is_array($args['capabilities'] ?? null) ? $args['capabilities'] : [];
+
+		$general = [
+			'taxonomy'              => $taxonomy,
+			'label'                 => $label,
+			'singular_name'         => $labels['singular_name'] ?? $label,
+			'object_type'           => array_values((array) ($config['object_type'] ?? [])),
+			'description'           => $args['description'] ?? '',
+			'query_var'             => is_string($query_var) ? true : rest_sanitize_boolean($query_var),
+		];
+
+		// saveCustomTaxonomyConfig() uses any set custom slug (even an empty one), so only set it when it differs
+		if (is_string($query_var) && $query_var !== $taxonomy) {
+			$general['query_var_custom_slug'] = $query_var;
+		}
+
+		return [
+			'native_custom_fields_create_taxonomy_general'      => array_merge($general, [
+				'default_term'          => ! empty($default_term),
+				'default_term_settings' => [
+					'default_term_name'        => $default_term['name'] ?? '',
+					'default_term_slug'        => $default_term['slug'] ?? '',
+					'default_term_description' => $default_term['description'] ?? '',
+				],
+			]),
+			'native_custom_fields_create_taxonomy_labels'       => $labels,
+			'native_custom_fields_create_taxonomy_visibility'   => [
+				'public'             => $bool('public', true),
+				'hierarchical'       => $bool('hierarchical', true),
+				'publicly_queryable' => $bool('publicly_queryable', true),
+				'show_ui'            => $bool('show_ui', true),
+				'show_in_menu'       => $bool('show_in_menu', true),
+				'show_in_nav_menus'  => $bool('show_in_nav_menus', true),
+				'show_tagcloud'      => $bool('show_tagcloud', true),
+				'show_in_quick_edit' => $bool('show_in_quick_edit', true),
+				'show_admin_column'  => $bool('show_admin_column', false),
+			],
+			'native_custom_fields_create_taxonomy_capabilities' => [
+				'capabilities' => array_values(array_intersect(['manage_terms', 'edit_terms', 'delete_terms', 'assign_terms'], array_keys($capabilities))),
+				'sort'         => $bool('sort', false),
+			],
+			'native_custom_fields_create_taxonomy_rest_api'     => [
+				'show_in_rest'          => $bool('show_in_rest', true),
+				'rest_base'             => $args['rest_base'] ?? '',
+				'rest_namespace'        => $args['rest_namespace'] ?? 'wp/v2',
+				'rest_controller_class' => $args['rest_controller_class'] ?? 'WP_REST_Terms_Controller',
+			],
+			'native_custom_fields_create_taxonomy_permalinks'   => [
+				'rewrite'          => ($args['rewrite'] ?? true) !== false,
+				'rewrite_settings' => [
+					'slug'         => $rewrite['slug'] ?? $taxonomy,
+					'with_front'   => rest_sanitize_boolean($rewrite['with_front'] ?? true),
+					'hierarchical' => rest_sanitize_boolean($rewrite['hierarchical'] ?? false),
+					'ep_mask'      => is_string($rewrite['ep_mask'] ?? null) && $rewrite['ep_mask'] !== '' ? $rewrite['ep_mask'] : 'EP_NONE',
+				],
+			],
+		];
+	}
+
+	/**
 	 * Delete taxonomy configuration by taxonomy slug
 	 *
 	 * @param string $taxonomy_slug
@@ -306,6 +389,12 @@ class TermMetaService implements BaseMetaServiceInterface, TermMetaServiceInterf
 		//Delete taxonomy configurations
 		$result->status  = $this->termMetaRepository->deleteConfigurations('native_custom_fields_taxonomies_config', $taxonomy_slug);
 		$result->message = $result->status ? __('Taxonomy deleted successfully.', 'native-custom-fields') : __('Taxonomy can not be deleted.', 'native-custom-fields');
+
+		// The term meta fields (and their builder state) are kept, so they come back when the taxonomy
+		// is created again. They are left out of exports while the taxonomy is not registered.
+		if ($result->status) {
+			$this->termMetaRepository->deleteOption('native_custom_fields_taxonomy_builder_' . $taxonomy_slug);
+		}
 
 		return $result;
 	}

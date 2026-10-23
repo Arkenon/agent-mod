@@ -348,6 +348,96 @@ class PostMetaService implements BaseMetaServiceInterface, PostMetaServiceInterf
 	}
 
 	/**
+	 * Build post type builder form values from a stored post type configuration
+	 * Reverse of savePostTypeConfig(), used when the builder state is missing (e.g. imported configurations)
+	 *
+	 * @param array $config Stored post type configuration (post_type, args, created_by)
+	 *
+	 * @return array
+	 * @since 1.4.5
+	 */
+	public function buildPostTypeBuilderValues(array $config): array
+	{
+		$args      = is_array($config['args'] ?? null) ? $config['args'] : [];
+		$post_type = (string) ($config['post_type'] ?? '');
+		$labels    = is_array($args['labels'] ?? null) ? $args['labels'] : [];
+
+		$bool = function (string $key, bool $default) use ($args): bool {
+			return array_key_exists($key, $args) ? rest_sanitize_boolean($args[$key]) : $default;
+		};
+
+		// Configurations saved before the empty-slug fix stored an enabled archive as an empty string
+		$has_archive = $args['has_archive'] ?? false;
+		$has_archive = $has_archive === '' ? true : $has_archive;
+		$query_var   = $args['query_var'] ?? true;
+		$rewrite     = $args['rewrite'] ?? true;
+		$rewrite     = is_array($rewrite) ? $rewrite : [];
+		$template    = $args['template'] ?? [];
+
+		$capability_type = $args['capability_type'] ?? 'post';
+
+		return [
+			'native_custom_fields_create_post_type_general'      => [
+				'post_type'               => $post_type,
+				'label'                   => $args['label'] ?? ($labels['name'] ?? ''),
+				'singular_name'           => $labels['singular_name'] ?? ($args['label'] ?? ''),
+				'description'             => $args['description'] ?? '',
+				'menu_position'           => $args['menu_position'] ?? null,
+				'menu_icon'               => $args['menu_icon'] ?? '',
+				'has_archive'             => is_string($has_archive) ? true : rest_sanitize_boolean($has_archive),
+				'has_archive_custom_slug' => is_string($has_archive) ? $has_archive : '',
+				'query_var'               => is_string($query_var) ? true : rest_sanitize_boolean($query_var),
+				'query_var_custom_slug'   => (is_string($query_var) && $query_var !== $post_type) ? $query_var : '',
+				'supports'                => is_array($args['supports'] ?? null) ? array_values($args['supports']) : [],
+				'taxonomies'              => is_array($args['taxonomies'] ?? null) ? array_values($args['taxonomies']) : [],
+				'map_meta_cap'            => $bool('map_meta_cap', true),
+			],
+			'native_custom_fields_create_post_type_labels'       => $labels,
+			'native_custom_fields_create_post_type_visibility'   => [
+				'public'              => $bool('public', true),
+				'hierarchical'        => $bool('hierarchical', false),
+				'exclude_from_search' => $bool('exclude_from_search', false),
+				'publicly_queryable'  => $bool('publicly_queryable', true),
+				'show_ui'             => $bool('show_ui', true),
+				'show_in_menu'        => $bool('show_in_menu', true),
+				'show_in_nav_menus'   => $bool('show_in_nav_menus', true),
+				'show_in_admin_bar'   => $bool('show_in_admin_bar', true),
+			],
+			'native_custom_fields_create_post_type_capabilities' => [
+				'capability_type'  => array_values((array) $capability_type),
+				'can_export'       => $bool('can_export', true),
+				'delete_with_user' => $bool('delete_with_user', false),
+			],
+			'native_custom_fields_create_post_type_rest_api'     => [
+				'show_in_rest'                    => $bool('show_in_rest', true),
+				'rest_base'                       => $args['rest_base'] ?? '',
+				'rest_namespace'                  => $args['rest_namespace'] ?? 'wp/v2',
+				'rest_controller_class'           => $args['rest_controller_class'] ?? 'WP_REST_Posts_Controller',
+				'autosave_rest_controller_class'  => $args['autosave_rest_controller_class'] ?? 'WP_REST_Autosaves_Controller',
+				'revisions_rest_controller_class' => $args['revisions_rest_controller_class'] ?? 'WP_REST_Revisions_Controller',
+			],
+			'native_custom_fields_create_post_type_permalinks'   => [
+				'rewrite'          => ($args['rewrite'] ?? true) !== false,
+				'rewrite_settings' => [
+					'slug'       => $rewrite['slug'] ?? $post_type,
+					'with_front' => rest_sanitize_boolean($rewrite['with_front'] ?? true),
+					'feeds'      => rest_sanitize_boolean($rewrite['feeds'] ?? false),
+					'pages'      => rest_sanitize_boolean($rewrite['pages'] ?? true),
+					'ep_mask'    => is_string($rewrite['ep_mask'] ?? null) && $rewrite['ep_mask'] !== '' ? $rewrite['ep_mask'] : 'EP_PERMALINK',
+				],
+			],
+			'native_custom_fields_create_post_type_template'     => [
+				'template'        => ! empty($template),
+				'template_config' => [
+					// The builder edits the blocks as JSON text, savePostTypeConfig() decodes it back
+					'template_blocks' => ! empty($template) ? wp_json_encode($template, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '',
+					'template_lock'   => rest_sanitize_boolean($args['template_lock'] ?? false),
+				],
+			],
+		];
+	}
+
+	/**
 	 * Delete post type configuration by post type slug,
 	 * To delete post type configurations created via admin post type builder form
 	 *
@@ -366,6 +456,12 @@ class PostMetaService implements BaseMetaServiceInterface, PostMetaServiceInterf
 		//Delete post type configurations
 		$result->status  = $this->postMetaRepository->deleteConfigurations('native_custom_fields_post_types_config', $post_type_slug);
 		$result->message = $result->status ? __('Post type deleted successfully.', 'native-custom-fields') : __('Post type can not be deleted.', 'native-custom-fields');
+
+		// The post meta fields (and their builder state) are kept, so they come back when the post type
+		// is created again. They are left out of exports while the post type is not registered.
+		if ($result->status) {
+			$this->postMetaRepository->deleteOption('native_custom_fields_post_type_builder_' . $post_type_slug);
+		}
 
 		return $result;
 	}

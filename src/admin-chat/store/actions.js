@@ -178,7 +178,11 @@ function openPendingModal( dispatch, data ) {
 	if ( data?.pendingQuestions ) {
 		dispatch.setPendingQuestions( {
 			token:     data.confirmationToken,
+			// 'approval' for request-approval (Continue / Cancel), else questions.
+			kind:      data.pendingQuestions.kind || 'questions',
 			intro:     data.pendingQuestions.intro || '',
+			details:   data.pendingQuestions.details || '',
+			reason:    data.pendingQuestions.reason || '',
 			questions: Array.isArray( data.pendingQuestions.questions )
 				? data.pendingQuestions.questions
 				: [],

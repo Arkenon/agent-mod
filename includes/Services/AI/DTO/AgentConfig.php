@@ -192,6 +192,18 @@ final class AgentConfig
 	public bool $interactive = false;
 
 	/**
+	 * Write-action approval mode chosen in the chat: 'manual' or 'auto'.
+	 *
+	 * Set server-side by the admin chat endpoint from the session allowlist
+	 * ('*' means auto), never read from agent data. In manual mode an
+	 * interactive Execute run gets the request-approval tool.
+	 *
+	 * @var string
+	 * @since x.x.x
+	 */
+	public string $approvalMode = 'manual';
+
+	/**
 	 * Constructor.
 	 *
 	 * @param string|null $name                   Agent name.

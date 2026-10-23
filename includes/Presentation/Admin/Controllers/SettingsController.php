@@ -293,6 +293,13 @@ final class SettingsController
 						'fieldHelpText'       => __('Maximum posts whose full body the agent may read in a single turn. Default: 5.', 'agent-mod'),
 						'default'    => Constants::AI_MAX_FULL_CONTENT_POSTS,
 					],
+					[
+						'fieldType'  => 'number',
+						'name'       => 'max_answer_length',
+						'fieldLabel' => __('Max Answer Length (characters)', 'agent-mod'),
+						'fieldHelpText'       => __('Maximum length of a free-text answer the user types when the agent asks questions or requests approval. Longer answers are cut off. Default: 20000.', 'agent-mod'),
+						'default'    => Constants::AI_MAX_ANSWER_LENGTH,
+					],
 				],
 			],
 			[

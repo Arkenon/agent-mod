@@ -4,7 +4,7 @@ Tags: custom fields, fields, meta, repeater, ncf
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.4.1
+Stable tag: 1.4.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -136,6 +136,28 @@ Yes. The free version has Repeater and Group fields. These are custom components
 
 
 == Changelog ==
+
+= 1.4.6 =
+* Updated: Development files (CLAUDE.md) are no longer included in the package Composer installs.
+
+= 1.4.5 =
+* Added: The `Includes` (`includes`) and `Not Includes` (`not_includes`) operators for field dependency conditions. They check whether the field value contains a text, like SQL `LIKE '%value%'` (case-insensitive). With multiple select and token fields, one of the selected values has to contain it, so conditions can now be built on fields with multiple values.
+* Added: The `native_custom_fields_block_bindings_date_formats` filter to change the date formats used by the block bindings source.
+* Fixed: Deleting an options page left its fields and builder states in the database, and they were still exported and imported to other sites. Deleting an options page now also removes its fields and builder states; its saved settings are kept.
+* Fixed: The fields of a deleted post type or taxonomy were still exported. They are kept in the database, so they come back when the post type or taxonomy is created again, but the export now includes only the fields of options pages, post types and taxonomies that exist on the site. Deleting a post type or taxonomy also removes its builder state. Importing a file exported with an earlier version skips the fields of options pages that do not exist.
+* Fixed: The export left out all post meta, term meta or options page fields when no post type, taxonomy or options page had been created with the plugin, so fields added to post types and taxonomies of other plugins were lost.
+* Fixed: Date and time values bound to a block through the `native-custom-fields/post-meta` block bindings source were shown as stored (`2026-10-22T12:00`). Text and input fields with the `date`, `datetime-local` or `time` type, and the date picker, date time picker and time picker fields, are now shown in the Date Format and Time Format of Settings → General, in the editor preview too. The stored meta value is not changed.
+* Fixed: After importing a configuration into another site, the post types, taxonomies, fields and options pages worked, but their builder screens opened empty or partly empty (for example, the slug, label and labels of a post type, or every meta box of a post type). The builder screens load their form values from a separate builder state that was not exported. The export file now includes the builder states (`builder_states`). On import, the builder state is restored from the file, or rebuilt from the imported configuration when the file has none, so files exported with earlier versions work too. Re-import such a file to repair a site that was imported before.
+* Fixed: Importing options page fields read the options pages configuration instead of the fields configuration as its base, so options page settings could be copied into the stored fields configuration.
+* Updated: The dashboard card "Create Option Pages" is now "Option Pages".
+
+= 1.4.3 =
+* Added: A `native-custom-fields/post-meta` block bindings source. Post meta fields can be bound to block attributes (paragraph, heading, button, image ...) from the block sidebar, including `token_field`, multiple `select`, `repeater`, `group`, `file_upload` and `media_library` fields, which the core Post Meta source does not list because they are stored as arrays. Values are shown as text: option labels, comma separated lists, one line per repeater row.
+* Added: The `native_custom_fields_block_bindings_value` filter (and the `nativeCustomFields.blockBindingsValue` JS filter for the editor preview) to change how a bound value is rendered.
+
+= 1.4.2 =
+* Fixed: The field schema of the abilities accepted only a string or an array as `default`, so an AI agent giving a `number` field a numeric default (`10`) or a `toggle` field a boolean default (`true`) had the call rejected by schema validation. `default` now also accepts numbers and booleans. The value is still sanitized according to the field type, and string defaults keep working.
+* Updated: The field schema documentation lists the accepted `default` types.
 
 = 1.4.1 =
 * Added: Read-only abilities to inspect the current configuration: `list-post-types`, `get-post-type`, `list-taxonomies`, `get-taxonomy`, `list-post-meta-fields`, `get-post-meta-fields`, `list-term-meta-fields`, `get-term-meta-fields`, `get-user-meta-fields`, `list-options-pages` and `get-options-page`. The `get-*` abilities return the configuration in the same shape the matching `update-*` / `save-*` abilities accept, so an AI agent can read a configuration, change it and save it back. Each result also reports `builder_state`, which shows whether the builder screens have data to load.

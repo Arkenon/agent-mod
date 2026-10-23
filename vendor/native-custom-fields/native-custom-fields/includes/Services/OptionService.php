@@ -266,6 +266,25 @@ class OptionService implements OptionServiceInterface
 	}
 
 	/**
+	 * Build options page builder form values from a stored options page configuration
+	 * Reverse of saveOptionsPageConfig(), used when the builder state is missing (e.g. imported configurations)
+	 *
+	 * @param string $menu_slug Options page menu slug
+	 * @param array $config Stored options page configuration
+	 *
+	 * @return array
+	 * @since 1.4.5
+	 */
+	public function buildOptionsPageBuilderValues(string $menu_slug, array $config): array
+	{
+		unset($config['created_by']);
+
+		return [
+			'native_custom_fields_create_options_page' => array_merge(['menu_slug' => $menu_slug], $config),
+		];
+	}
+
+	/**
 	 * Delete options pages configurations
 	 *
 	 * @param string $menu_slug
@@ -282,6 +301,14 @@ class OptionService implements OptionServiceInterface
 		//Delete options page configurations
 		$result->status  = $this->optionRepository->deleteConfigurations('native_custom_fields_options_pages_config', $menu_slug);
 		$result->message = $result->status ? __('Options page deleted successfully.', 'native-custom-fields') : __('Options page can not be deleted.', 'native-custom-fields');
+
+		// Fields of a deleted page can not be reached any more, so remove them with its builder states.
+		// The saved settings of the page (the menu slug option) are kept.
+		if ($result->status) {
+			$this->optionRepository->deleteConfigurations('native_custom_fields_options_pages_fields_config', $menu_slug);
+			$this->optionRepository->deleteOption('native_custom_fields_options_page_builder_' . $menu_slug);
+			$this->optionRepository->deleteOption('native_custom_fields_options_page_fields_builder_' . $menu_slug);
+		}
 
 		return $result;
 	}

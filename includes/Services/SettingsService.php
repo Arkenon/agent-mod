@@ -149,6 +149,19 @@ final class SettingsService
 	}
 
 	/**
+	 * Maximum length (characters) of a free-text answer to an ask-user or
+	 * request-approval dialog.
+	 *
+	 * @return int
+	 * @since x.x.x
+	 */
+	public function getMaxAnswerLength(): int
+	{
+		$saved = (int) ($this->getSettings()['agent_mod_ai_limits']['max_answer_length'] ?? 0);
+		return $saved > 0 ? $saved : Constants::AI_MAX_ANSWER_LENGTH;
+	}
+
+	/**
 	 * @return int
 	 * @since 1.0.0
 	 */

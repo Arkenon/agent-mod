@@ -6,6 +6,9 @@
  * checkboxes for several, a text area for free text — plus an "Other" field
  * when the agent allowed one. Submit resumes the run with the answers; Skip
  * resumes it too, telling the agent to continue with sensible defaults.
+ *
+ * A request-approval pause (kind 'approval') travels the same path but shows
+ * Continue / Request changes / Cancel instead of a question form.
  */
 import {
 	Button,
@@ -20,6 +23,7 @@ import { useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 
 import { STORE_NAME } from '../store';
+import MessageContent from './MessageContent';
 
 /**
  * Radio value standing for "Other". Client-side only: an "Other" answer is
@@ -283,6 +287,93 @@ function QuestionForm( { pending, conversationId } ) {
 	);
 }
 
+/**
+ * The go-ahead dialog for one pending request-approval token.
+ *
+ * Continue approves, Cancel declines (so does closing the dialog), and
+ * "Request changes" sends the typed text back so the agent reworks its
+ * approach instead of acting.
+ *
+ * @param {Object} props                Component props.
+ * @param {Object} props.pending        Pending approval from the store.
+ * @param {number} props.conversationId Current conversation ID.
+ */
+function ApprovalForm( { pending, conversationId } ) {
+	const { answerQuestions } = useDispatch( STORE_NAME );
+	const { token, intro, details, reason, text } = pending;
+
+	const [ changesOn, setChangesOn ] = useState( false );
+	const [ changes, setChanges ] = useState( '' );
+
+	const answer = ( selected, other = '' ) =>
+		answerQuestions( token, conversationId, {
+			approval: { selected, other },
+		} );
+
+	return (
+		<Modal
+			title={ __( 'The agent is waiting for your approval', 'agent-mod' ) }
+			onRequestClose={ () => answer( [ 'cancel' ] ) }
+			className="agent-mod-chat__question-modal agent-mod-chat__approval-modal"
+			isDismissible={ false }
+		>
+			{ '' !== text.trim() && (
+				<p className="agent-mod-chat__question-text">{ text }</p>
+			) }
+			{ '' !== reason.trim() && (
+				<p className="agent-mod-chat__question-intro">{ reason }</p>
+			) }
+
+			<div className="agent-mod-chat__question">
+				<p className="agent-mod-chat__approval-summary">{ intro }</p>
+				{ '' !== details.trim() && (
+					<MessageContent message={ { role: 'assistant', text: details } } />
+				) }
+			</div>
+
+			{ changesOn && (
+				<TextareaControl
+					__nextHasNoMarginBottom
+					label={ __( 'What should the agent do differently?', 'agent-mod' ) }
+					rows={ 3 }
+					value={ changes }
+					onChange={ setChanges }
+				/>
+			) }
+
+			<div className="agent-mod-chat__confirm-buttons">
+				{ changesOn ? (
+					<>
+						<Button
+							variant="primary"
+							onClick={ () => answer( [], changes.trim() ) }
+							disabled={ '' === changes.trim() }
+							accessibleWhenDisabled
+						>
+							{ __( 'Send changes', 'agent-mod' ) }
+						</Button>
+						<Button variant="secondary" onClick={ () => setChangesOn( false ) }>
+							{ __( 'Back', 'agent-mod' ) }
+						</Button>
+					</>
+				) : (
+					<>
+						<Button variant="primary" onClick={ () => answer( [ 'continue' ] ) }>
+							{ __( 'Continue', 'agent-mod' ) }
+						</Button>
+						<Button variant="secondary" onClick={ () => setChangesOn( true ) }>
+							{ __( 'Request changes', 'agent-mod' ) }
+						</Button>
+						<Button variant="tertiary" onClick={ () => answer( [ 'cancel' ] ) }>
+							{ __( 'Cancel', 'agent-mod' ) }
+						</Button>
+					</>
+				) }
+			</div>
+		</Modal>
+	);
+}
+
 export default function QuestionModal() {
 	const { pendingQuestions, conversationId } = useSelect( ( select ) => {
 		const storeSelect = select( STORE_NAME );
@@ -297,6 +388,16 @@ export default function QuestionModal() {
 	}
 
 	// Keyed by token: a chained question round starts with a fresh form.
+	if ( 'approval' === pendingQuestions.kind ) {
+		return (
+			<ApprovalForm
+				key={ pendingQuestions.token }
+				pending={ pendingQuestions }
+				conversationId={ conversationId }
+			/>
+		);
+	}
+
 	return (
 		<QuestionForm
 			key={ pendingQuestions.token }

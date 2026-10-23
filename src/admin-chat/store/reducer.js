@@ -14,7 +14,7 @@ const DEFAULT_STATE = {
 	agents: [],
 	selectedAgentId: null,
 	pendingConfirmation: null, // { token, actionName, args, pendingToolCalls, executedCalls }
-	pendingQuestions: null, // { token, intro, questions, text, executedCalls }
+	pendingQuestions: null, // { token, kind, intro, details, reason, questions, text, executedCalls }
 	// A plan the agent delivered in Plan mode, waiting for approve / review /
 	// changes. The turn itself is finished, so this never locks the composer.
 	pendingPlanReview: null, // { summary, text }

@@ -46,6 +46,30 @@ class AskUserAbilityService
 	public const PRESENT_PLAN = 'agent-mod/present-plan';
 
 	/**
+	 * Go-ahead ability name (Execute mode with manual approval only).
+	 *
+	 * @var string
+	 * @since x.x.x
+	 */
+	public const REQUEST_APPROVAL = 'agent-mod/request-approval';
+
+	/**
+	 * Abilities that pause the run until the user answers in a modal.
+	 *
+	 * @var string[]
+	 * @since x.x.x
+	 */
+	public const PAUSING_TOOLS = [self::NAME, self::REQUEST_APPROVAL];
+
+	/**
+	 * Answer values of a request-approval call.
+	 *
+	 * @var string[]
+	 * @since x.x.x
+	 */
+	public const APPROVAL_OPTIONS = ['continue', 'cancel'];
+
+	/**
 	 * Ability category slug.
 	 *
 	 * @var string
@@ -78,25 +102,30 @@ class AskUserAbilityService
 	private const MAX_OPTIONS = 8;
 
 	/**
-	 * Longest free-text answer kept, in characters.
+	 * Settings service; supplies the longest free-text answer kept.
 	 *
-	 * @var int
+	 * @var SettingsService
 	 * @since x.x.x
 	 */
-	private const MAX_TEXT_LENGTH = 2000;
+	private SettingsService $settings;
 
 	/**
 	 * Constructor. Binds the abilities API hook.
 	 *
+	 * @param SettingsService $settings Settings service.
+	 *
 	 * @since x.x.x
 	 */
-	public function __construct()
+	public function __construct(SettingsService $settings)
 	{
+		$this->settings = $settings;
+
 		add_action('wp_abilities_api_init', [$this, 'registerAbilities']);
 	}
 
 	/**
-	 * Registers the interactive chat abilities: ask-user and present-plan.
+	 * Registers the interactive chat abilities: ask-user, present-plan and
+	 * request-approval.
 	 *
 	 * Annotated read-only: it changes nothing on the site, so it is available
 	 * in Ask and Plan modes too and never reaches the write-confirmation gate.
@@ -120,7 +149,7 @@ class AskUserAbilityService
 								// Deliberately says nothing about how often to ask: that bar differs
 				// per mode (low in Plan, high in Execute) and is set by the mode
 				// directive in PromptBuilder.
-				'description'         => __('Asks the user one or more questions in an interactive form and waits for the answers; your run continues as soon as they are answered. When to ask is set by the instructions of the current mode. Ask everything you need in this single call (at most 5 questions) and offer concrete options where you can, with your own proposal marked as recommended: type "single" for one choice, "multiple" for several, "text" for a free-text answer. The user can always add their own answer instead of the options. Do not call other tools in the same turn, and do not use this to ask permission for an action — write actions already pass through their own approval step.', 'agent-mod'),
+				'description'         => __('Asks the user one or more questions in an interactive form and waits for the answers; your run continues as soon as they are answered. When to ask is set by the instructions of the current mode. Ask everything you need in this single call (at most 5 questions) and offer concrete options where you can, with your own proposal marked as recommended: type "single" for one choice, "multiple" for several, "text" for a free-text answer. The user can always add their own answer instead of the options. Do not call other tools in the same turn. To ask for the go-ahead on an action, use agent-mod/request-approval instead when it is available.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				// Reached only through the chat loop, which intercepts the call
 				// before anything executes.
@@ -224,6 +253,84 @@ class AskUserAbilityService
 				],
 			]
 		);
+
+		// Like ask-user, intercepted by the chat loop and never executed: the
+		// chat shows Continue / Cancel / Request changes and the choice comes
+		// back as the call's function response.
+		wp_register_ability(
+			self::REQUEST_APPROVAL,
+			[
+				'label'               => __('Request Approval', 'agent-mod'),
+				'description'         => __('Asks the user for the go-ahead before you carry out an action and waits for the decision; your run continues as soon as they answer. Use it whenever you would otherwise stop and tell the user what you are going to do — for example when you chose a different approach than the user literally asked for, the scope grew, or a step cannot be undone. State exactly what you will do in "summary". The user picks Continue, Cancel or requests changes; on Continue carry the action out with the tools right away. Do not call other tools in the same turn.', 'agent-mod'),
+				'category'            => self::CATEGORY,
+				'execute_callback'    => static function () {
+					return new WP_Error(
+						'request_approval_not_interactive',
+						__('Approval can only be requested in the interactive chat. Proceed as the user asked instead.', 'agent-mod')
+					);
+				},
+				'permission_callback' => static function (): bool {
+					return current_user_can('read');
+				},
+				'input_schema'        => [
+					'type'       => 'object',
+					'properties' => [
+						'summary' => [
+							'type'        => 'string',
+							'description' => __('What you will do once approved, in one or two sentences, as the user should read it.', 'agent-mod'),
+						],
+						'details' => [
+							'type'        => 'string',
+							'description' => __('Optional Markdown: the steps, files or items that will be affected.', 'agent-mod'),
+						],
+						'reason'  => [
+							'type'        => 'string',
+							'description' => __('Optional: why you are asking, e.g. that you chose a different approach than requested.', 'agent-mod'),
+						],
+					],
+					'required'   => ['summary'],
+				],
+				'meta'                => [
+					'annotations'  => ['readonly' => true, 'destructive' => false, 'idempotent' => true],
+					'show_in_rest' => false,
+				],
+			]
+		);
+	}
+
+	/**
+	 * Normalizes a request-approval call into the pending-questions shape.
+	 *
+	 * Reusing that shape lets the approval travel the same pause / answer /
+	 * resume path as ask-user; 'kind' tells the chat to show the approval
+	 * buttons instead of a question form. Returns no questions when the call
+	 * has no summary, so the caller can send the model an error instead.
+	 *
+	 * @param array<string, mixed> $args The request-approval call arguments.
+	 *
+	 * @return array{kind: string, intro: string, details: string, reason: string, questions: array<int, array<string, mixed>>}
+	 * @since x.x.x
+	 */
+	public function normalizeApproval(array $args): array
+	{
+		$summary = mb_substr(sanitize_textarea_field((string) ($args['summary'] ?? '')), 0, 1000);
+
+		return [
+			'kind'      => 'approval',
+			'intro'     => $summary,
+			'details'   => mb_substr(sanitize_textarea_field((string) ($args['details'] ?? '')), 0, 4000),
+			'reason'    => mb_substr(sanitize_text_field((string) ($args['reason'] ?? '')), 0, 300),
+			'questions' => '' === trim($summary) ? [] : [
+				[
+					'id'          => 'approval',
+					'question'    => $summary,
+					'type'        => 'single',
+					'options'     => self::APPROVAL_OPTIONS,
+					'recommended' => 'continue',
+					'allowOther'  => true,
+				],
+			],
+		];
 	}
 
 	/**
@@ -318,6 +425,11 @@ class AskUserAbilityService
 	 */
 	public function buildAnswerPayload(array $asked, $answers, bool $skipped): array
 	{
+		// Dismissing the approval dialog is a Cancel, never a silent go-ahead.
+		if ($skipped && 'approval' === ($asked['kind'] ?? '')) {
+			return $this->buildApprovalPayload(['approval' => ['selected' => ['cancel']]]);
+		}
+
 		if ($skipped) {
 			return [
 				'skipped' => true,
@@ -326,7 +438,13 @@ class AskUserAbilityService
 		}
 
 		$answers = is_array($answers) ? $answers : [];
-		$result  = [];
+
+		if ('approval' === ($asked['kind'] ?? '')) {
+			return $this->buildApprovalPayload($answers);
+		}
+
+		$result    = [];
+		$maxLength = $this->settings->getMaxAnswerLength();
 
 		foreach ((array) ($asked['questions'] ?? []) as $question) {
 			$raw = isset($answers[$question['id']]) && is_array($answers[$question['id']])
@@ -348,9 +466,11 @@ class AskUserAbilityService
 				$selected = array_slice($selected, 0, 1);
 			}
 
-			$other = $question['allowOther'] && is_scalar($raw['other'] ?? null)
-				? mb_substr(sanitize_textarea_field((string) $raw['other']), 0, self::MAX_TEXT_LENGTH)
+			$other     = $question['allowOther'] && is_scalar($raw['other'] ?? null)
+				? sanitize_textarea_field((string) $raw['other'])
 				: '';
+			$truncated = mb_strlen($other) > $maxLength;
+			$other     = mb_substr($other, 0, $maxLength);
 
 			$entry = [
 				'id'       => $question['id'],
@@ -362,6 +482,12 @@ class AskUserAbilityService
 				$entry['other'] = $other;
 			}
 
+			// Tells the model it is not seeing the whole answer, so it does
+			// not answer from a partial list as if it were complete.
+			if ($truncated) {
+				$entry['truncated'] = true;
+			}
+
 			if (empty($selected) && '' === $other) {
 				$entry['unanswered'] = true;
 			}
@@ -370,5 +496,51 @@ class AskUserAbilityService
 		}
 
 		return ['answers' => $result];
+	}
+
+	/**
+	 * Builds the function response for a request-approval call.
+	 *
+	 * Requested changes win over a selected option: the user typed them on
+	 * purpose. Only an explicit "continue" approves; anything else, including
+	 * an empty answer, is treated as not approved.
+	 *
+	 * @param array<string, mixed> $answers Raw answers; reads answers['approval'] as {selected: string[], other: string}.
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	private function buildApprovalPayload(array $answers): array
+	{
+		$raw      = isset($answers['approval']) && is_array($answers['approval']) ? $answers['approval'] : [];
+		$selected = is_array($raw['selected'] ?? null) ? $raw['selected'] : [];
+		$changes  = is_scalar($raw['other'] ?? null) ? trim(sanitize_textarea_field((string) $raw['other'])) : '';
+
+		if ('' !== $changes) {
+			$maxLength = $this->settings->getMaxAnswerLength();
+			$payload   = [
+				'approved'          => false,
+				'changes_requested' => mb_substr($changes, 0, $maxLength),
+				'note'              => __('The user did not approve as proposed and asked for changes. Rework the approach accordingly; request approval again before acting if it still needs a go-ahead.', 'agent-mod'),
+			];
+
+			if (mb_strlen($changes) > $maxLength) {
+				$payload['truncated'] = true;
+			}
+
+			return $payload;
+		}
+
+		if (in_array('continue', $selected, true)) {
+			return [
+				'approved' => true,
+				'note'     => __('The user approved. Carry the action out with the tools now, in this turn.', 'agent-mod'),
+			];
+		}
+
+		return [
+			'approved' => false,
+			'note'     => __('The user cancelled. Do not carry the action out; end the turn with a short note.', 'agent-mod'),
+		];
 	}
 }

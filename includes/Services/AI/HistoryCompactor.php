@@ -24,6 +24,7 @@ namespace AgentMod\Services\AI;
 defined('ABSPATH') || exit;
 
 use AgentMod\Common\Constants;
+use AgentMod\Services\AskUserAbilityService;
 use WordPress\AiClient\Messages\DTO\Message;
 use WordPress\AiClient\Messages\DTO\MessagePart;
 use WordPress\AiClient\Tools\DTO\FunctionResponse;
@@ -106,7 +107,8 @@ class HistoryCompactor
      * Determines which function-response parts of old tool-result messages are
      * exempt from elision ("sticky").
      *
-     * For each sticky tool (by default the Pro skill fetcher) only the most
+     * For each sticky tool (by default the Pro skill fetcher and the
+     * ask-user / request-approval answers) only the most
      * recent response per distinct argument identity is kept in full, so a
      * fetched skill body survives compaction while duplicate fetches of the
      * same skill are still elided.
@@ -127,7 +129,12 @@ class HistoryCompactor
          *
          * @since 1.1.5
          */
-        $stickyTools = (array) apply_filters('agent_mod_history_sticky_tools', ['agent-mod-pro/get-skill-by-slug']);
+        // The user's answers to ask-user / request-approval are their own input,
+        // so they are never elided either.
+        $stickyTools = (array) apply_filters(
+            'agent_mod_history_sticky_tools',
+            array_merge(['agent-mod-pro/get-skill-by-slug'], AskUserAbilityService::PAUSING_TOOLS)
+        );
 
         if (empty($stickyTools)) {
             return [];

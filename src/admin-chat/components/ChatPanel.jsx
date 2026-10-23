@@ -32,12 +32,6 @@ export default function ChatPanel({ className = '' }) {
 			<div className={`agent-mod-chat__body ${className}`.trim()}>
 				<Slot name="AgentModChatHeader" />
 
-				{error && (
-					<Notice status="error" isDismissible onRemove={clearError}>
-						{error}
-					</Notice>
-				)}
-
 				<ConfirmationModal />
 				<QuestionModal />
 				<PlanReviewModal />
@@ -59,9 +53,20 @@ export default function ChatPanel({ className = '' }) {
 						)}
 					</div>
 				)}
-				<Composer />
 
-				
+				{/* Right above the composer, where the user is looking when a run stops. */}
+				{error && (
+					<Notice
+						className="agent-mod-chat__error"
+						status="error"
+						isDismissible
+						onRemove={clearError}
+					>
+						{error}
+					</Notice>
+				)}
+
+				<Composer />
 
 				<Slot name="AgentModComposerToolbar" />
 			</div>

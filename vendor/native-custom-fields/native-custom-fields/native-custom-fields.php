@@ -7,7 +7,7 @@ declare(strict_types=1);
  * Description: A WordPress plugin for creating custom fields using Gutenberg components
  * Requires at least: 7.0
  * Requires PHP: 7.4
- * Version: 1.4.1
+ * Version: 1.4.6
  * Author: Kadim Gültekin
  * Author URI: https://profiles.wordpress.org/arkenon/
  * Text Domain: native-custom-fields

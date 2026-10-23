@@ -15,6 +15,7 @@ use Exception;
 use NativeCustomFields\Common\DI;
 use NativeCustomFields\Presentation\Admin\Controllers\AbilityController;
 use NativeCustomFields\Presentation\Admin\Controllers\AdminController;
+use NativeCustomFields\Presentation\Admin\Controllers\BlockBindingsController;
 use NativeCustomFields\Presentation\Admin\Controllers\ImportExportController;
 use NativeCustomFields\Presentation\Admin\Controllers\OptionsController;
 use NativeCustomFields\Presentation\Admin\Controllers\PostMetaController;
@@ -35,7 +36,8 @@ final class ControllerInit {
 		TermMetaController::class,
 		UserMetaController::class,
 		ImportExportController::class,
-		AbilityController::class
+		AbilityController::class,
+		BlockBindingsController::class
 	];
 
 	/**

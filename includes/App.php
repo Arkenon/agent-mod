@@ -17,6 +17,7 @@ use AgentMod\Services\AskUserAbilityService;
 use AgentMod\Common\DI;
 use AgentMod\Presentation\ControllerInit;
 use AgentMod\Services\LibraryService;
+use AgentMod\Services\NavigationAbilityService;
 use AgentMod\Services\SettingsService;
 use AgentMod\Services\SiteManagementAbilityService;
 use AgentMod\Services\TaxonomyAbilityService;
@@ -35,6 +36,7 @@ final class App
 		AbilityRegistrarService::class,
 		SiteManagementAbilityService::class,
 		TaxonomyAbilityService::class,
+		NavigationAbilityService::class,
 		AskUserAbilityService::class,
 		LibraryService::class,
 		SettingsService::class,

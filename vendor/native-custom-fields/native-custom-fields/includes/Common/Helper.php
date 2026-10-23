@@ -769,4 +769,159 @@ class Helper
 
         echo wp_kses_post($html);
     }
+
+    /**
+     * Base info defaults as the builder UI stores them (field_base_info)
+     *
+     * @return array
+     * @since 1.4.5
+     */
+    public static function getDefaultBuilderFieldBaseInfo(): array
+    {
+        return [
+            'fieldHelpText'           => '',
+            'className'               => '',
+            'fieldLabelPosition'      => 'top',
+            'fieldLabelTextTransform' => 'uppercase',
+            'required'                => false,
+            'disabled'                => false,
+            'hideLabelFromVision'     => false,
+        ];
+    }
+
+    /**
+     * Empty dependency structure as the builder UI stores it (field_dependency_info)
+     *
+     * @return array
+     * @since 1.4.5
+     */
+    public static function getDefaultBuilderDependencyInfo(): array
+    {
+        return ['relation' => 'and', 'conditions' => []];
+    }
+
+    /**
+     * Reverse of prepareFieldList(): converts stored (runtime) field configs back into the
+     * builder tree shape (field_base_info, field_custom_info_{type}, field_dependency_info, fields)
+     * so the builder screens can load configurations that have no builder state (e.g. imported ones).
+     *
+     * @param array $fields Stored field configs as produced by prepareFieldList()
+     *
+     * @return array
+     * @since 1.4.5
+     */
+    public static function fieldsToBuilderFields(array $fields): array
+    {
+        $core_keys = ['fieldType', 'name', 'fieldLabel', 'default', 'dependencies', 'fields'];
+        $base_keys = array_keys(self::getDefaultBuilderFieldBaseInfo());
+        // Added by prepareFieldList() for table repeaters, not user input
+        $derived_keys = ['hideRepeaterItemTag', 'hideLabel'];
+
+        $builder_fields = [];
+        foreach ($fields as $field) {
+            if (! is_array($field) || empty($field['fieldType'])) {
+                continue;
+            }
+
+            $type = $field['fieldType'];
+
+            $base_info = [];
+            foreach ($base_keys as $key) {
+                if (array_key_exists($key, $field)) {
+                    $base_info[$key] = $field[$key];
+                }
+            }
+
+            $custom_info  = array_diff_key($field, array_flip(array_merge($core_keys, $base_keys, $derived_keys)));
+            $dependencies = $field['dependencies'] ?? [];
+
+            $builder_field = [
+                'fieldType'                  => $type,
+                'name'                       => $field['name'] ?? '',
+                'fieldLabel'                 => $field['fieldLabel'] ?? '',
+                'default'                    => $field['default'] ?? null,
+                'field_base_info'            => ! empty($base_info) ? $base_info : self::getDefaultBuilderFieldBaseInfo(),
+                'field_custom_info_' . $type => $custom_info,
+                'field_dependency_info'      => ! empty($dependencies) && is_array($dependencies) ? $dependencies : self::getDefaultBuilderDependencyInfo(),
+            ];
+
+            // Sub-fields of group/repeater live in the sibling 'fields' key in the builder tree
+            if (($type === 'group' || $type === 'repeater') && ! empty($field['fields']) && is_array($field['fields'])) {
+                $builder_field['fields'] = self::fieldsToBuilderFields($field['fields']);
+            }
+
+            $builder_fields[] = $builder_field;
+        }
+
+        return $builder_fields;
+    }
+
+    /**
+     * Converts stored sections (meta boxes for post meta, sections for others) back into the
+     * builder tree root items (sections_or_meta_boxes)
+     *
+     * @param array $sections Stored sections
+     * @param string $section_type 'meta_box' for post meta, 'section' for term/user meta and options pages
+     *
+     * @return array
+     * @since 1.4.5
+     */
+    public static function sectionsToBuilderSections(array $sections, string $section_type = 'section'): array
+    {
+        $builder_sections = [];
+        foreach ($sections as $section) {
+            if (! is_array($section)) {
+                continue;
+            }
+
+            if ($section_type === 'meta_box') {
+                $builder_section = [
+                    'fieldType'                  => 'meta_box',
+                    'name'                       => $section['meta_box_id'] ?? '',
+                    'fieldLabel'                 => $section['meta_box_title'] ?? '',
+                    'field_custom_info_meta_box' => [
+                        'meta_box_context'  => $section['meta_box_context'] ?? 'advanced',
+                        'meta_box_priority' => $section['meta_box_priority'] ?? 'default',
+                    ],
+                ];
+            } else {
+                $builder_section = [
+                    'fieldType'                 => 'section',
+                    'name'                      => $section['section_name'] ?? '',
+                    'fieldLabel'                => $section['section_title'] ?? '',
+                    'field_custom_info_section' => ['section_icon' => $section['section_icon'] ?? ''],
+                ];
+            }
+
+            $builder_section['field_base_info']       = self::getDefaultBuilderFieldBaseInfo();
+            $builder_section['field_dependency_info'] = self::getDefaultBuilderDependencyInfo();
+            $builder_section['fields']                = self::fieldsToBuilderFields($section['fields'] ?? []);
+
+            $builder_sections[] = $builder_section;
+        }
+
+        return $builder_sections;
+    }
+
+    /**
+     * Sanitize builder state values the same way the save-options REST route does for builder forms
+     *
+     * @param array $values Builder state values
+     *
+     * @return array
+     * @since 1.4.5
+     */
+    public static function sanitizeBuilderState(array $values): array
+    {
+        $sanitized = [];
+        foreach ($values as $key => $value) {
+            $sanitized_key = is_string($key) ? sanitize_text_field($key) : $key;
+
+            $sanitized[$sanitized_key] = is_array($value)
+                ? self::sanitizeFieldsByConfig($value, [])
+                : self::sanitizeFieldValue($value, 'text');
+        }
+
+        return $sanitized;
+    }
 }
