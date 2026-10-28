@@ -18,7 +18,7 @@
  *
  * @package AgentMod
  * @subpackage Services
- * @since x.x.x
+ * @since 1.3.1
  */
 
 namespace AgentMod\Services;
@@ -33,7 +33,7 @@ class AskUserAbilityService
 	 * Ability name.
 	 *
 	 * @var string
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	public const NAME = 'agent-mod/ask-user';
 
@@ -41,7 +41,7 @@ class AskUserAbilityService
 	 * Plan-delivery ability name (Plan mode only).
 	 *
 	 * @var string
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	public const PRESENT_PLAN = 'agent-mod/present-plan';
 
@@ -49,7 +49,7 @@ class AskUserAbilityService
 	 * Go-ahead ability name (Execute mode with manual approval only).
 	 *
 	 * @var string
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	public const REQUEST_APPROVAL = 'agent-mod/request-approval';
 
@@ -57,7 +57,7 @@ class AskUserAbilityService
 	 * Abilities that pause the run until the user answers in a modal.
 	 *
 	 * @var string[]
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	public const PAUSING_TOOLS = [self::NAME, self::REQUEST_APPROVAL];
 
@@ -65,7 +65,7 @@ class AskUserAbilityService
 	 * Answer values of a request-approval call.
 	 *
 	 * @var string[]
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	public const APPROVAL_OPTIONS = ['continue', 'cancel'];
 
@@ -73,7 +73,7 @@ class AskUserAbilityService
 	 * Ability category slug.
 	 *
 	 * @var string
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private const CATEGORY = 'agent-mod';
 
@@ -81,7 +81,7 @@ class AskUserAbilityService
 	 * Supported question types.
 	 *
 	 * @var string[]
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private const TYPES = ['single', 'multiple', 'text'];
 
@@ -89,7 +89,7 @@ class AskUserAbilityService
 	 * Most questions shown in one modal.
 	 *
 	 * @var int
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private const MAX_QUESTIONS = 5;
 
@@ -97,7 +97,7 @@ class AskUserAbilityService
 	 * Most options offered for one question.
 	 *
 	 * @var int
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private const MAX_OPTIONS = 8;
 
@@ -105,7 +105,7 @@ class AskUserAbilityService
 	 * Settings service; supplies the longest free-text answer kept.
 	 *
 	 * @var SettingsService
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private SettingsService $settings;
 
@@ -114,7 +114,7 @@ class AskUserAbilityService
 	 *
 	 * @param SettingsService $settings Settings service.
 	 *
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	public function __construct(SettingsService $settings)
 	{
@@ -134,7 +134,7 @@ class AskUserAbilityService
 	 * the descriptions and enforced by normalizeQuestions().
 	 *
 	 * @return void
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	public function registerAbilities(): void
 	{
@@ -309,7 +309,7 @@ class AskUserAbilityService
 	 * @param array<string, mixed> $args The request-approval call arguments.
 	 *
 	 * @return array{kind: string, intro: string, details: string, reason: string, questions: array<int, array<string, mixed>>}
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	public function normalizeApproval(array $args): array
 	{
@@ -345,7 +345,7 @@ class AskUserAbilityService
 	 * @param array<string, mixed> $args The ask-user call arguments.
 	 *
 	 * @return array{intro: string, questions: array<int, array<string, mixed>>}
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	public function normalizeQuestions(array $args): array
 	{
@@ -421,7 +421,7 @@ class AskUserAbilityService
 	 * @param bool                                                                 $skipped Whether the user skipped the questions.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	public function buildAnswerPayload(array $asked, $answers, bool $skipped): array
 	{
@@ -508,7 +508,7 @@ class AskUserAbilityService
 	 * @param array<string, mixed> $answers Raw answers; reads answers['approval'] as {selected: string[], other: string}.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function buildApprovalPayload(array $answers): array
 	{

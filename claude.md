@@ -220,6 +220,7 @@ and it enforces a layered, maintainable structure.
 - Optimize performance by minimizing database queries, using transients for caching, and loading assets conditionally.
 - Follow WordPress coding standards and PSR-4 autoloading.
 - If a new function, method or class generated, update documentation (class PhpDoc must include @package, @subpackage, @since tags). always set @since tag to "x.x.x"
+- `@since x.x.x` is only a placeholder for the version that is not decided yet. It must NOT stay in a release: when the release version is set, replace every `@since x.x.x` in the plugin sources (`includes/`, `src/`, root PHP files) with that version (e.g. `@since 1.3.3`) BEFORE the release commit, in the same commit as the version bump. After a release, `git grep "x\.x\.x" -- includes src agent-mod.php uninstall.php` must return nothing. Never conclude from older commits that still contain `x.x.x` that the placeholder is meant to stay.
 
 🛠 Development workflow:
 1. Install composer dependencies: `composer update`
@@ -229,6 +230,13 @@ and it enforces a layered, maintainable structure.
 5. Follow **GPL v2 or later** license compatibility
 
 Your task: When I describe a feature, requirement, or entity, implement it strictly within this boilerplate’s architecture, ensuring clean code, separation of concerns, and WordPress best practices.
+
+## Git release
+
+1. Bump the version in all three places: `Version:` header in `agent-mod.php`, `version` in `package.json`, and `Stable tag:` in `readme.txt`.
+2. Add a `= x.y.z =` entry at the top of the `== Changelog ==` section of `readme.txt`.
+3. Replace every `@since x.x.x` in `includes/`, `src/` and the root PHP files with the new version (see the rule above), and check with `git grep "x\.x\.x" -- includes src agent-mod.php uninstall.php`. If JS sources changed, rebuild `build/`.
+4. Commit (one commit: version bump + changelog + `@since` versions) and push to `main`.
 
 ## WordPress.org SVN release
 

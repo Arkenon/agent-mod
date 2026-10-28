@@ -42,7 +42,7 @@ class AIClientAdapter
 	 * single run before further repeats are answered with an error.
 	 *
 	 * @var int
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private const MAX_IDENTICAL_READS = 2;
 
@@ -82,7 +82,7 @@ class AIClientAdapter
 	 * Ask-user ability service (question normalization).
 	 *
 	 * @var AskUserAbilityService
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private AskUserAbilityService $askUser;
 
@@ -338,7 +338,7 @@ class AIClientAdapter
 	 * @param string               $pausedName    Ability name of the paused call.
 	 *
 	 * @return Message
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private function buildAnswerResponses(Message $message, array $answerPayload, string $pausedName = AskUserAbilityService::NAME): Message
 	{
@@ -368,7 +368,7 @@ class AIClientAdapter
 	 * @param callable $payloadFor Receives the ability name, returns the response payload.
 	 *
 	 * @return Message
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private function buildSyntheticResponses(Message $message, callable $payloadFor): Message
 	{
@@ -407,7 +407,7 @@ class AIClientAdapter
 	 * @param string  $pausedName Ability name of the paused call.
 	 *
 	 * @return Message
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private function onlyAskUserResponses(Message $responses, string $pausedName = AskUserAbilityService::NAME): Message
 	{
@@ -433,7 +433,7 @@ class AIClientAdapter
 	 * @param array<int, array<string, mixed>> $calls Extracted tool calls.
 	 *
 	 * @return array<string, mixed>|null
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private function findAskUserCall(array $calls): ?array
 	{
@@ -453,7 +453,7 @@ class AIClientAdapter
 	 * @param string                           $abilityName Ability name.
 	 *
 	 * @return array<string, mixed>|null
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private function findCall(array $calls, string $abilityName): ?array
 	{
@@ -483,7 +483,7 @@ class AIClientAdapter
 	 * @param GenerativeAiResult               $result     The model result.
 	 *
 	 * @return AgentResponse
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private function presentedPlanResponse(
 		string $plan,
@@ -939,7 +939,7 @@ class AIClientAdapter
 	 * @param string $text Answer text.
 	 *
 	 * @return string
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private function stripCitationMarkers(string $text): string
 	{
@@ -1125,7 +1125,7 @@ class AIClientAdapter
 	 * @param array<string, int>                     $callCounts   Per-run counts of read-only call signatures.
 	 *
 	 * @return FunctionResponse
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function executeGuarded(WP_AI_Client_Ability_Function_Resolver $resolver, FunctionCall $functionCall, array &$callCounts): FunctionResponse
 	{
@@ -1174,7 +1174,7 @@ class AIClientAdapter
 	 * @param mixed $args Call arguments.
 	 *
 	 * @return mixed
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function normalizeArgs($args)
 	{

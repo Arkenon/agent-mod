@@ -72,7 +72,7 @@ final class AIChatRestController
 	 * Ask-user ability service (answer normalization).
 	 *
 	 * @var AskUserAbilityService
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private AskUserAbilityService $askUser;
 
@@ -437,7 +437,7 @@ final class AIChatRestController
 	 * @param WP_REST_Request $request The REST request.
 	 *
 	 * @return WP_REST_Response|WP_Error
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	public function handleAnswerQuestions(WP_REST_Request $request)
 	{
@@ -473,7 +473,7 @@ final class AIChatRestController
 	 * @param string          $kind    'confirmation' or 'questions'.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private function consumePendingState(WP_REST_Request $request, string $kind)
 	{
@@ -513,7 +513,7 @@ final class AIChatRestController
 	 * @param array<string, mixed> $answerPayload Ask-user function response ('answer' only).
 	 *
 	 * @return WP_REST_Response|WP_Error
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private function resumePendingRun(WP_REST_Request $request, array $state, string $decision, array $answerPayload = [])
 	{
@@ -651,7 +651,7 @@ final class AIChatRestController
 	 * @param string[] $autoApproved Sanitized session-approved ability names.
 	 *
 	 * @return string 'manual' or 'auto'.
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function resolveApprovalMode(array $autoApproved): string
 	{

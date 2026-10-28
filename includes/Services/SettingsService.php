@@ -97,7 +97,7 @@ final class SettingsService
 	 * Short schema hint telling the model how many items a list ability returns per call.
 	 *
 	 * @return string
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	public function getSearchLimitHint(): string
 	{
@@ -118,7 +118,7 @@ final class SettingsService
 	 * @param bool $paginated Whether the ability can page past the cap.
 	 *
 	 * @return string
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	public function getSearchLimitNotice(int $limit, bool $paginated = false): string
 	{
@@ -153,7 +153,7 @@ final class SettingsService
 	 * request-approval dialog.
 	 *
 	 * @return int
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	public function getMaxAnswerLength(): int
 	{

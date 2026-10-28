@@ -187,7 +187,7 @@ final class AgentConfig
 	 * unattended channels (front-end widgets, scheduled tasks) keep false.
 	 *
 	 * @var bool
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	public bool $interactive = false;
 
@@ -199,7 +199,7 @@ final class AgentConfig
 	 * interactive Execute run gets the request-approval tool.
 	 *
 	 * @var string
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	public string $approvalMode = 'manual';
 

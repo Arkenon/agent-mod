@@ -74,7 +74,7 @@ class AbilityResolver
 	 * @param AgentConfig  $agent     The agent configuration.
 	 *
 	 * @return WP_Ability[]
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private function applyInteractiveTools(array $abilities, AgentConfig $agent): array
 	{

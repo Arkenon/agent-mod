@@ -36,7 +36,7 @@ class HistoryCompactor
      * Item keys that mark a tool result value as a list of addressable items.
      *
      * @var string[]
-     * @since x.x.x
+     * @since 1.3.3
      */
     private const LIST_ID_KEYS = ['post_id', 'post_ids', 'id', 'ID', 'term_id', 'user_id', 'navigation_id'];
 
@@ -44,7 +44,7 @@ class HistoryCompactor
      * Item keys kept in the compact summary of a list result.
      *
      * @var string[]
-     * @since x.x.x
+     * @since 1.3.3
      */
     private const LIST_ITEM_KEYS = ['post_id', 'post_ids', 'id', 'ID', 'term_id', 'user_id', 'navigation_id', 'title', 'name', 'slug', 'status', 'post_type', 'matches'];
 
@@ -276,7 +276,7 @@ class HistoryCompactor
      * @param mixed $payload Tool result.
      *
      * @return string|null JSON summary capped at AI_LIST_RESULT_SUMMARY_LENGTH, or null when the result is not a list.
-     * @since x.x.x
+     * @since 1.3.3
      */
     public function summarizeListResult($payload): ?string
     {
@@ -309,7 +309,7 @@ class HistoryCompactor
          * @param array<string, mixed> $summary Compact summary.
          * @param array<string, mixed> $payload Full tool result.
          *
-         * @since x.x.x
+         * @since 1.3.3
          */
         $summary = (array) apply_filters('agent_mod_compact_list_result', $summary, $payload);
 
@@ -326,7 +326,7 @@ class HistoryCompactor
      * @param mixed $value Candidate value.
      *
      * @return bool
-     * @since x.x.x
+     * @since 1.3.3
      */
     private function isIdList($value): bool
     {

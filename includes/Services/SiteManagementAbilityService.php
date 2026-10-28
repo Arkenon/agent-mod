@@ -106,7 +106,7 @@ class SiteManagementAbilityService
 	 * Settings service.
 	 *
 	 * @var SettingsService
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private SettingsService $settings;
 

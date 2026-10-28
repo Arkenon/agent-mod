@@ -70,7 +70,7 @@ class AbilityRegistrarService
 	 * Post columns list-posts lets "s" search.
 	 *
 	 * @var string[]
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private const SEARCH_COLUMNS = ['post_title', 'post_excerpt', 'post_content'];
 
@@ -78,7 +78,7 @@ class AbilityRegistrarService
 	 * Comparison operators accepted in a list-posts meta_query condition.
 	 *
 	 * @var string[]
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private const META_COMPARE = ['=', '!=', '>', '>=', '<', '<=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN', 'EXISTS', 'NOT EXISTS'];
 
@@ -86,7 +86,7 @@ class AbilityRegistrarService
 	 * Value types accepted in a list-posts meta_query condition.
 	 *
 	 * @var string[]
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private const META_TYPES = ['CHAR', 'NUMERIC', 'DECIMAL', 'DATE', 'DATETIME'];
 
@@ -94,7 +94,7 @@ class AbilityRegistrarService
 	 * Longest plain-text preview list-posts returns per post (characters).
 	 *
 	 * @var int
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private const MAX_CONTENT_PREVIEW = 500;
 
@@ -102,7 +102,7 @@ class AbilityRegistrarService
 	 * Most conditions accepted in one list-posts meta_query or tax_query.
 	 *
 	 * @var int
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private const MAX_QUERY_CONDITIONS = 10;
 
@@ -111,7 +111,7 @@ class AbilityRegistrarService
 	 * this before the change, six times this in the whole snippet.
 	 *
 	 * @var int
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private const SNIPPET_CONTEXT = 60;
 
@@ -1836,7 +1836,7 @@ class AbilityRegistrarService
 	 * @param array<int, array<string, mixed>>|null  $titleMatches Title lookup result, when titles were given.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function runListPostsQuery(array $queryArgs, array $input, int $paged, int $postsPerPage, int $requested, int $maxResults, ?array $titleMatches): array
 	{
@@ -1938,7 +1938,7 @@ class AbilityRegistrarService
 	 * @param array<int, array<string, mixed>>|null $titleMatches Title lookup result, or null when no titles were given.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function withTitleMatches(array $result, ?array $titleMatches): array
 	{
@@ -1966,7 +1966,7 @@ class AbilityRegistrarService
 	 * @param string            $postStatus Status filter from list-posts.
 	 *
 	 * @return array<int, array{title: string, post_ids: int[], match: string}>
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function matchPostTitles(array $titles, string $postType, string $postStatus): array
 	{
@@ -2033,7 +2033,7 @@ class AbilityRegistrarService
 	 * @param array<int, array<string, mixed>> $titleMatches Title lookup result.
 	 *
 	 * @return string[]
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function unmatchedTitles(array $titleMatches): array
 	{
@@ -2054,7 +2054,7 @@ class AbilityRegistrarService
 	 * @param string $title Raw title.
 	 *
 	 * @return string
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function normalizeTitle(string $title): string
 	{
@@ -2071,7 +2071,7 @@ class AbilityRegistrarService
 	 * @param mixed $ids Raw input.
 	 *
 	 * @return int[]
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function sanitizeIdList($ids): array
 	{
@@ -2088,7 +2088,7 @@ class AbilityRegistrarService
 	 * @param array<string, mixed> $input The ability input.
 	 *
 	 * @return array<int|string, mixed> Empty when no condition was given.
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function buildMetaQuery(array $input): array
 	{
@@ -2148,7 +2148,7 @@ class AbilityRegistrarService
 	 * @param mixed $conditions Raw tax_query input.
 	 *
 	 * @return array<int|string, mixed> Empty when no valid condition was given.
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function buildTaxQuery($conditions): array
 	{
@@ -2196,7 +2196,7 @@ class AbilityRegistrarService
 	 * @param array<string, mixed> $input The ability input.
 	 *
 	 * @return array<int, array<string, mixed>> Empty when neither date is valid.
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function buildDateQuery(array $input): array
 	{
@@ -2225,7 +2225,7 @@ class AbilityRegistrarService
 	 * @param array<string, mixed> $input The ability input.
 	 *
 	 * @return array<string, string> Map of "contains" / "not_contains" => text.
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function buildContentFilters(array $input): array
 	{
@@ -2254,7 +2254,7 @@ class AbilityRegistrarService
 	 * @param WP_Query $query The query.
 	 *
 	 * @return string
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	public function filterContentWhere(string $where, WP_Query $query): string
 	{
@@ -2284,7 +2284,7 @@ class AbilityRegistrarService
 	 * @param int    $length  Maximum characters.
 	 *
 	 * @return string
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function plainTextPreview(string $content, int $length): string
 	{
@@ -2551,7 +2551,7 @@ class AbilityRegistrarService
 	 * Input schema shared by preview-bulk-replace and bulk-replace-content.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function bulkReplaceInputSchema(): array
 	{
@@ -2605,7 +2605,7 @@ class AbilityRegistrarService
 	 * Output schema shared by preview-bulk-replace and bulk-replace-content.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function bulkReplaceOutputSchema(): array
 	{
@@ -2628,7 +2628,7 @@ class AbilityRegistrarService
 	 * @param mixed $input Input data (see bulkReplaceInputSchema()).
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	public function executePreviewBulkReplace($input = null): array
 	{
@@ -2641,7 +2641,7 @@ class AbilityRegistrarService
 	 * @param mixed $input Input data (see bulkReplaceInputSchema()).
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	public function executeBulkReplaceContent($input = null): array
 	{
@@ -2660,7 +2660,7 @@ class AbilityRegistrarService
 	 * @param bool                 $dryRun Whether to only report what would change.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function runBulkReplace(array $input, bool $dryRun): array
 	{
@@ -2737,7 +2737,7 @@ class AbilityRegistrarService
 	 * @param bool   $caseSensitive Whether matching is case-sensitive.
 	 *
 	 * @return string|WP_Error
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function buildReplacePattern(string $find, bool $isRegex, bool $caseSensitive)
 	{
@@ -2788,7 +2788,7 @@ class AbilityRegistrarService
 	 * @param string $pattern Pattern body without delimiters.
 	 *
 	 * @return string
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function foldTurkishI(string $pattern): string
 	{
@@ -2915,7 +2915,7 @@ class AbilityRegistrarService
 	 * @param bool   $dryRun   Whether to skip saving.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function bulkReplaceOne(int $postId, string $postType, string $pattern, string $replace, bool $isRegex, int $limit, bool $textOnly, bool $dryRun): array
 	{
@@ -2980,7 +2980,7 @@ class AbilityRegistrarService
 	 * @param int    $matches  Receives the number of replacements made.
 	 *
 	 * @return string|null Null when PCRE failed.
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function replaceInContent(string $content, string $pattern, string $replace, bool $isRegex, int $limit, bool $textOnly, int &$matches): ?string
 	{
@@ -3031,7 +3031,7 @@ class AbilityRegistrarService
 	 * @param string $new Changed content.
 	 *
 	 * @return array{before_snippet: string, after_snippet: string}
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function changeSnippets(string $old, string $new): array
 	{
@@ -3052,7 +3052,7 @@ class AbilityRegistrarService
 	 * @param string $content Serialized block content.
 	 *
 	 * @return string[]
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	private function blockNames(string $content): array
 	{
@@ -3081,7 +3081,7 @@ class AbilityRegistrarService
 	 * disagree on additionalProperties support, a fixed item shape works everywhere.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private function metaWriteSchema(): array
 	{
@@ -3120,7 +3120,7 @@ class AbilityRegistrarService
 	 * @param mixed $keys   Requested meta keys, or null for all public keys.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private function readPostMeta(int $postId, $keys): array
 	{
@@ -3165,7 +3165,7 @@ class AbilityRegistrarService
 	 * @param mixed $items  The 'meta' ability input.
 	 *
 	 * @return array<int, array{key: string, value: string, delete: bool}>|WP_Error
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private function prepareMetaWrites(int $postId, $items)
 	{
@@ -3216,7 +3216,7 @@ class AbilityRegistrarService
 	 * @param array<int, array{key: string, value: string, delete: bool}> $writes Validated writes.
 	 *
 	 * @return void
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private function applyMetaWrites(int $postId, array $writes): void
 	{
@@ -3244,7 +3244,7 @@ class AbilityRegistrarService
 	 * @param bool         $write    Whether the caller is a write ability.
 	 *
 	 * @return string
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function postTypeMismatchError(int $postId, string $postType, ?WP_Post $post, bool $write): string
 	{
@@ -3297,7 +3297,7 @@ class AbilityRegistrarService
 	 * @param string $postStatus Requested status.
 	 *
 	 * @return true|WP_Error
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	private function checkPostStatus(string $postType, string $postStatus)
 	{

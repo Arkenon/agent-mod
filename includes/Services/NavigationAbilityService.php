@@ -17,7 +17,7 @@
  *
  * @package AgentMod
  * @subpackage Services
- * @since x.x.x
+ * @since 1.3.2
  */
 
 namespace AgentMod\Services;
@@ -33,7 +33,7 @@ class NavigationAbilityService
 	 * Ability category slug. Shared with the block design abilities.
 	 *
 	 * @var string
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private const CATEGORY = 'agent-mod';
 
@@ -41,7 +41,7 @@ class NavigationAbilityService
 	 * Navigation post type.
 	 *
 	 * @var string
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private const POST_TYPE = 'wp_navigation';
 
@@ -49,7 +49,7 @@ class NavigationAbilityService
 	 * Blocks whose link attributes can be edited and which can hold children.
 	 *
 	 * @var string[]
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private const LINK_BLOCKS = ['core/navigation-link', 'core/navigation-submenu'];
 
@@ -57,7 +57,7 @@ class NavigationAbilityService
 	 * Maximum menus returned by list-navigations.
 	 *
 	 * @var int
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private const MAX_MENUS = 100;
 
@@ -65,7 +65,7 @@ class NavigationAbilityService
 	 * Block markup validator, shared with the post/template write abilities.
 	 *
 	 * @var BlockMarkupValidator
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private BlockMarkupValidator $blockMarkupValidator;
 
@@ -74,7 +74,7 @@ class NavigationAbilityService
 	 *
 	 * @param BlockMarkupValidator $blockMarkupValidator Block markup validator.
 	 *
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	public function __construct(BlockMarkupValidator $blockMarkupValidator)
 	{
@@ -87,7 +87,7 @@ class NavigationAbilityService
 	 * Registers the navigation abilities.
 	 *
 	 * @return void
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	public function registerAbilities(): void
 	{
@@ -278,7 +278,7 @@ class NavigationAbilityService
 	 * @param mixed $input Input data (optional 's').
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	public function executeListNavigations($input = null): array
 	{
@@ -323,7 +323,7 @@ class NavigationAbilityService
 	 * @param mixed $input Input data (expects 'navigation_id', optional 'include_html').
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	public function executeGetNavigation($input = null): array
 	{
@@ -354,7 +354,7 @@ class NavigationAbilityService
 	 * @param mixed $input Input data (expects 'navigation_id' plus 'operations' or 'html', optional 'title').
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	public function executeUpdateNavigation($input = null): array
 	{
@@ -444,7 +444,7 @@ class NavigationAbilityService
 	 * @param mixed $input Ability input.
 	 *
 	 * @return WP_Post|WP_Error
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function resolveNavigation($input)
 	{
@@ -477,7 +477,7 @@ class NavigationAbilityService
 	 * Maps navigation IDs to the templates / template parts that reference them.
 	 *
 	 * @return array<int, string[]> Navigation ID => list of "template-part:footer" style labels.
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function collectNavigationUsage(): array
 	{
@@ -510,7 +510,7 @@ class NavigationAbilityService
 	 * @param array<int, array<string, mixed>> $blocks Parsed blocks.
 	 *
 	 * @return int[]
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function findNavigationRefs(array $blocks): array
 	{
@@ -535,7 +535,7 @@ class NavigationAbilityService
 	 * @param string $content Serialized block markup.
 	 *
 	 * @return array<int, array<string, mixed>>
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function parseItems(string $content): array
 	{
@@ -553,7 +553,7 @@ class NavigationAbilityService
 	 * @param array<string, mixed> $input The ability input.
 	 *
 	 * @return array<int, array<string, mixed>>|WP_Error
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function parseHtmlInput(string $html, array $input)
 	{
@@ -618,7 +618,7 @@ class NavigationAbilityService
 	 * @param array<int, array<string, mixed>> $items Blocks.
 	 *
 	 * @return string
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function serializeItems(array $items): string
 	{
@@ -632,7 +632,7 @@ class NavigationAbilityService
 	 * @param string                           $prefix Path of the parent item.
 	 *
 	 * @return array<int, array<string, mixed>>
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function describeItems(array $blocks, string $prefix = ''): array
 	{
@@ -676,7 +676,7 @@ class NavigationAbilityService
 	 * @param array<string, mixed>             $operation Operation input.
 	 *
 	 * @return array<int, array<string, mixed>>|WP_Error
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function applyOperation(array $items, array $operation)
 	{
@@ -787,7 +787,7 @@ class NavigationAbilityService
 	 * @param array<string, mixed> $attrs     Existing attributes.
 	 *
 	 * @return array<string, mixed>|WP_Error
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function buildLinkAttributes(array $operation, array $attrs)
 	{
@@ -877,7 +877,7 @@ class NavigationAbilityService
 	 * @param mixed $label Raw label.
 	 *
 	 * @return string
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function sanitizeLabel($label): string
 	{
@@ -890,7 +890,7 @@ class NavigationAbilityService
 	 * @param mixed $path Raw path; '' is the top level.
 	 *
 	 * @return int[]|WP_Error
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function parsePath($path)
 	{
@@ -915,7 +915,7 @@ class NavigationAbilityService
 	 * @param array<string, mixed>             $operation Operation input.
 	 *
 	 * @return int[]|WP_Error
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function requirePath(array $items, array $operation)
 	{
@@ -942,7 +942,7 @@ class NavigationAbilityService
 	 * @param int[] $path Item path.
 	 *
 	 * @return WP_Error
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function pathNotFound(array $path): WP_Error
 	{
@@ -957,7 +957,7 @@ class NavigationAbilityService
 	 * @param int[]                            $path  Item path.
 	 *
 	 * @return array<string, mixed>|null
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function getBlock(array $items, array $path): ?array
 	{
@@ -982,7 +982,7 @@ class NavigationAbilityService
 	 * @param array<string, mixed>             $block Replacement block.
 	 *
 	 * @return array<int, array<string, mixed>>
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function setBlock(array $items, array $path, array $block): array
 	{
@@ -1007,7 +1007,7 @@ class NavigationAbilityService
 	 * @param int[]                            $path  Item path.
 	 *
 	 * @return array<int, array<string, mixed>>
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function removeBlock(array $items, array $path): array
 	{
@@ -1034,7 +1034,7 @@ class NavigationAbilityService
 	 * @param array<string, mixed>             $block      Block to insert.
 	 *
 	 * @return array<int, array<string, mixed>>|WP_Error
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function insertBlock(array $items, $parentPath, $position, array $block)
 	{
@@ -1082,7 +1082,7 @@ class NavigationAbilityService
 	 * @param array<string, mixed>             $block    Block to insert.
 	 *
 	 * @return array<int, array<string, mixed>>|WP_Error
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function spliceAt(array $siblings, $position, array $block)
 	{
@@ -1115,7 +1115,7 @@ class NavigationAbilityService
 	 * @param array<string, mixed> $block Link or submenu block.
 	 *
 	 * @return array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	private function normalizeContainer(array $block): array
 	{

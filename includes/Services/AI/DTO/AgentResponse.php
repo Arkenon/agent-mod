@@ -105,7 +105,7 @@ final class AgentResponse
 	 * to know "the run is paused for the user" keeps working unchanged.
 	 *
 	 * @var string
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	public string $pendingKind = '';
 
@@ -113,7 +113,7 @@ final class AgentResponse
 	 * The questions the agent asked, as {intro: string, questions: array}.
 	 *
 	 * @var array<string, mixed>
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	public array $pendingQuestions = [];
 
@@ -123,7 +123,7 @@ final class AgentResponse
 	 * opens the plan review modal for the next step.
 	 *
 	 * @var array<string, string>
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	public array $planReview = [];
 
@@ -208,7 +208,7 @@ final class AgentResponse
 	 * @param array<int, array<string, mixed>> $toolCalls Tool calls already executed in this run.
 	 *
 	 * @return self
-	 * @since x.x.x
+	 * @since 1.3.1
 	 */
 	public static function pendingQuestions(
 		string $token,

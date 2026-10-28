@@ -106,7 +106,7 @@ class Constants
 	 * Maximum posts a single bulk call accepts: titles / include in list-posts
 	 * and post_ids in preview-bulk-replace / bulk-replace-content.
 	 *
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	public const AI_MAX_BULK_POSTS = 100;
 
@@ -116,7 +116,7 @@ class Constants
 	 * as a digest. Larger than the plain stub / digest so the IDs survive and
 	 * the agent does not list the same posts again.
 	 *
-	 * @since x.x.x
+	 * @since 1.3.3
 	 */
 	public const AI_LIST_RESULT_SUMMARY_LENGTH = 6000;
 
@@ -124,7 +124,7 @@ class Constants
 	 * Maximum length (characters) of a free-text answer the user types in an
 	 * ask-user or request-approval dialog.
 	 *
-	 * @since x.x.x
+	 * @since 1.3.2
 	 */
 	public const AI_MAX_ANSWER_LENGTH = 20000;
 
