@@ -38,6 +38,15 @@ defined('ABSPATH') || exit;
 class AIClientAdapter
 {
 	/**
+	 * How many times one read-only call may run with identical arguments in a
+	 * single run before further repeats are answered with an error.
+	 *
+	 * @var int
+	 * @since x.x.x
+	 */
+	private const MAX_IDENTICAL_READS = 2;
+
+	/**
 	 * Provider tool-call repair manager.
 	 *
 	 * @var ToolCallRepairManager
@@ -575,6 +584,7 @@ class AIClientAdapter
 		$history    = $messages;
 		$toolCalls  = $initialToolCalls;
 		$tokenUsage = [];
+		$callCounts = [];
 
 		for ($i = 0; $i < $maxToolCalls; $i++) {
 			// The user may press Stop at any time; the flag is written by the
@@ -747,7 +757,7 @@ class AIClientAdapter
 				$requestedCalls
 			);
 
-			$resultMessage = $this->executeAbilities($resolver, $message);
+			$resultMessage = $this->executeAbilities($resolver, $message, $callCounts);
 			$history[]     = $resultMessage;
 
 			$this->logToolFailures($resultMessage);
@@ -1025,6 +1035,15 @@ class AIClientAdapter
 				continue;
 			}
 
+			// A list keeps every ID and title instead of being cut after a few
+			// items, so a "continue" in the next message needs no re-listing.
+			$listSummary = $isAnswer ? null : $this->historyCompactor->summarizeListResult($responses[$index]->getResponse());
+
+			if (null !== $listSummary) {
+				$calls[$index]['result'] = $listSummary;
+				continue;
+			}
+
 			$digest = (string) wp_json_encode($responses[$index]->getResponse(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 			$calls[$index]['result'] = $isAnswer ? $digest : mb_substr($digest, 0, $digestLength);
@@ -1047,13 +1066,20 @@ class AIClientAdapter
 	 * in a finally block, so an exception inside an ability cannot leave the
 	 * request authenticated as somebody else.
 	 *
-	 * @param WP_AI_Client_Ability_Function_Resolver $resolver The ability resolver.
-	 * @param Message                                $message  The model message holding the calls.
+	 * With $callCounts, read-only calls repeated with identical arguments in the
+	 * same run are counted: a repeat still runs but carries a notice, and from
+	 * the MAX_IDENTICAL_READS + 1-th time on it is answered with an error
+	 * instead, so a model stuck re-listing the same posts cannot burn the whole
+	 * tool-call budget. Write calls are never short-circuited.
+	 *
+	 * @param WP_AI_Client_Ability_Function_Resolver $resolver   The ability resolver.
+	 * @param Message                                $message    The model message holding the calls.
+	 * @param array<string, int>|null                $callCounts Per-run counts of read-only call signatures; null disables the repeat guard.
 	 *
 	 * @return Message The function-response message.
 	 * @since 1.1.8
 	 */
-	private function executeAbilities(WP_AI_Client_Ability_Function_Resolver $resolver, Message $message): Message
+	private function executeAbilities(WP_AI_Client_Ability_Function_Resolver $resolver, Message $message, ?array &$callCounts = null): Message
 	{
 		/**
 		 * Fires immediately before requested abilities are executed.
@@ -1063,7 +1089,24 @@ class AIClientAdapter
 		do_action('agent_mod_before_ability_execution');
 
 		try {
-			return $resolver->execute_abilities($message);
+			if (null === $callCounts) {
+				return $resolver->execute_abilities($message);
+			}
+
+			$parts = [];
+
+			// Same order and filtering as the resolver's execute_abilities().
+			foreach ($message->getParts() as $part) {
+				$functionCall = $part->getType()->isFunctionCall() ? $part->getFunctionCall() : null;
+
+				if (! $functionCall instanceof FunctionCall || ! $resolver->is_ability_call($functionCall)) {
+					continue;
+				}
+
+				$parts[] = new MessagePart($this->executeGuarded($resolver, $functionCall, $callCounts));
+			}
+
+			return new UserMessage($parts);
 		} finally {
 			/**
 			 * Fires after ability execution, including when one threw.
@@ -1072,6 +1115,80 @@ class AIClientAdapter
 			 */
 			do_action('agent_mod_after_ability_execution');
 		}
+	}
+
+	/**
+	 * Executes one ability call under the identical-read repeat guard.
+	 *
+	 * @param WP_AI_Client_Ability_Function_Resolver $resolver     The ability resolver.
+	 * @param FunctionCall                           $functionCall The call.
+	 * @param array<string, int>                     $callCounts   Per-run counts of read-only call signatures.
+	 *
+	 * @return FunctionResponse
+	 * @since x.x.x
+	 */
+	private function executeGuarded(WP_AI_Client_Ability_Function_Resolver $resolver, FunctionCall $functionCall, array &$callCounts): FunctionResponse
+	{
+		$abilityName = WP_AI_Client_Ability_Function_Resolver::function_name_to_ability_name((string) $functionCall->getName());
+
+		if ($this->isWriteAbility($abilityName)) {
+			return $resolver->execute_ability($functionCall);
+		}
+
+		$signature = $abilityName . '|' . md5((string) wp_json_encode($this->normalizeArgs($functionCall->getArgs() ?? [])));
+		$seen      = $callCounts[$signature] ?? 0;
+
+		$callCounts[$signature] = $seen + 1;
+
+		if ($seen >= self::MAX_IDENTICAL_READS) {
+			return new FunctionResponse(
+				$functionCall->getId(),
+				$functionCall->getName(),
+				[
+					'not_executed' => true,
+					'error'        => sprintf(
+						/* translators: 1: ability name, 2: number of earlier identical calls. */
+						__('Not executed: %1$s was already called %2$d times with exactly these arguments in this run. Use the IDs and data you already have (older results are kept as ID / title summaries), change the arguments (e.g. the next page), or answer the user with what you have.', 'agent-mod'),
+						$abilityName,
+						$seen
+					),
+				]
+			);
+		}
+
+		$response = $resolver->execute_ability($functionCall);
+		$payload  = $response->getResponse();
+
+		if ($seen > 0 && is_array($payload)) {
+			$payload['repeat_notice'] = __('You already made this exact call earlier in this run. Keep and reuse its result instead of calling it again.', 'agent-mod');
+
+			return new FunctionResponse($response->getId(), $response->getName(), $payload);
+		}
+
+		return $response;
+	}
+
+	/**
+	 * Normalizes call arguments for signature comparison (recursively sorted keys).
+	 *
+	 * @param mixed $args Call arguments.
+	 *
+	 * @return mixed
+	 * @since x.x.x
+	 */
+	private function normalizeArgs($args)
+	{
+		if (! is_array($args)) {
+			return $args;
+		}
+
+		$args = array_map([$this, 'normalizeArgs'], $args);
+
+		if (array_keys($args) !== range(0, count($args) - 1)) {
+			ksort($args);
+		}
+
+		return $args;
 	}
 
 	/**

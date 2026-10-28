@@ -33,6 +33,22 @@ use WP_AI_Client_Ability_Function_Resolver;
 class HistoryCompactor
 {
     /**
+     * Item keys that mark a tool result value as a list of addressable items.
+     *
+     * @var string[]
+     * @since x.x.x
+     */
+    private const LIST_ID_KEYS = ['post_id', 'post_ids', 'id', 'ID', 'term_id', 'user_id', 'navigation_id'];
+
+    /**
+     * Item keys kept in the compact summary of a list result.
+     *
+     * @var string[]
+     * @since x.x.x
+     */
+    private const LIST_ITEM_KEYS = ['post_id', 'post_ids', 'id', 'ID', 'term_id', 'user_id', 'navigation_id', 'title', 'name', 'slug', 'status', 'post_type', 'matches'];
+
+    /**
      * Compacts a history for sending to the provider.
      *
      * @param Message[] $history Conversation history (never mutated).
@@ -216,26 +232,111 @@ class HistoryCompactor
                 continue;
             }
 
-            $summary = mb_substr(
-                (string) wp_json_encode($response->getResponse()),
-                0,
-                Constants::AI_TOOL_RESULT_STUB_LENGTH
-            );
+            // A list keeps its IDs and titles: losing them is what sent the
+            // agent back to list the same posts again and again.
+            $listSummary = $this->summarizeListResult($response->getResponse());
+
+            $payload = null !== $listSummary
+                ? [
+                    'elided'       => true,
+                    'list_summary' => $listSummary,
+                    'note'         => __('Older list result reduced to IDs and titles to save context. Reuse these IDs; do not list the same items again.', 'agent-mod'),
+                ]
+                : [
+                    'elided'  => true,
+                    'summary' => mb_substr(
+                        (string) wp_json_encode($response->getResponse(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                        0,
+                        Constants::AI_TOOL_RESULT_STUB_LENGTH
+                    ) . '… ' . __('(older tool result elided to save context; re-call the tool only if you truly need the full data again)', 'agent-mod'),
+                ];
 
             $parts[] = new MessagePart(
                 new FunctionResponse(
                     (string) $response->getId(),
                     (string) $response->getName(),
-                    [
-                        'elided'  => true,
-                        'summary' => $summary . '… ' . __('(older tool result elided to save context; re-call the tool only if you truly need the full data again)', 'agent-mod'),
-                    ]
+                    $payload
                 ),
                 $part->getChannel()
             );
         }
 
         return new Message($message->getRole(), $parts);
+    }
+
+    /**
+     * Reduces a list-shaped tool result to the IDs and titles of its items.
+     *
+     * A result counts as a list when one of its top-level values is a list of
+     * items carrying an ID (post_id, term_id …), e.g. list-posts' "posts" or
+     * bulk-replace's "results". Scalars and small bookkeeping values
+     * (pagination, summary, unmatched titles) are kept; everything else per
+     * item (URLs, dates, previews) is dropped.
+     *
+     * @param mixed $payload Tool result.
+     *
+     * @return string|null JSON summary capped at AI_LIST_RESULT_SUMMARY_LENGTH, or null when the result is not a list.
+     * @since x.x.x
+     */
+    public function summarizeListResult($payload): ?string
+    {
+        if (! is_array($payload)) {
+            return null;
+        }
+
+        $summary = [];
+        $isList  = false;
+        $keep    = array_flip(self::LIST_ITEM_KEYS);
+
+        foreach ($payload as $key => $value) {
+            if ($this->isIdList($value)) {
+                $summary[$key] = array_map(static function ($item) use ($keep) {
+                    return is_array($item) ? array_intersect_key($item, $keep) : $item;
+                }, $value);
+                $isList = true;
+            } elseif (is_scalar($value) || in_array($key, ['pagination', 'summary', 'unmatched_titles'], true)) {
+                $summary[$key] = $value;
+            }
+        }
+
+        if (! $isList) {
+            return null;
+        }
+
+        /**
+         * Filters the compact summary kept for an elided or persisted list result.
+         *
+         * @param array<string, mixed> $summary Compact summary.
+         * @param array<string, mixed> $payload Full tool result.
+         *
+         * @since x.x.x
+         */
+        $summary = (array) apply_filters('agent_mod_compact_list_result', $summary, $payload);
+
+        return mb_substr(
+            (string) wp_json_encode($summary, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            0,
+            Constants::AI_LIST_RESULT_SUMMARY_LENGTH
+        );
+    }
+
+    /**
+     * Whether a value is a non-empty list of items that carry an ID.
+     *
+     * @param mixed $value Candidate value.
+     *
+     * @return bool
+     * @since x.x.x
+     */
+    private function isIdList($value): bool
+    {
+        if (! is_array($value) || empty($value) || array_keys($value) !== range(0, count($value) - 1)) {
+            return false;
+        }
+
+        $first = reset($value);
+
+        return is_array($first) && ! empty(array_intersect_key($first, array_flip(self::LIST_ID_KEYS)));
     }
 
     /**

@@ -15,6 +15,7 @@
 
 namespace AgentMod\Services;
 
+use AgentMod\Common\Constants;
 use WP_Error;
 use WP_Post;
 use WP_Query;
@@ -64,6 +65,55 @@ class AbilityRegistrarService
 	 * @since 1.1.5
 	 */
 	private const PRESET_ORIGINS = ['default', 'theme', 'custom'];
+
+	/**
+	 * Post columns list-posts lets "s" search.
+	 *
+	 * @var string[]
+	 * @since x.x.x
+	 */
+	private const SEARCH_COLUMNS = ['post_title', 'post_excerpt', 'post_content'];
+
+	/**
+	 * Comparison operators accepted in a list-posts meta_query condition.
+	 *
+	 * @var string[]
+	 * @since x.x.x
+	 */
+	private const META_COMPARE = ['=', '!=', '>', '>=', '<', '<=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN', 'EXISTS', 'NOT EXISTS'];
+
+	/**
+	 * Value types accepted in a list-posts meta_query condition.
+	 *
+	 * @var string[]
+	 * @since x.x.x
+	 */
+	private const META_TYPES = ['CHAR', 'NUMERIC', 'DECIMAL', 'DATE', 'DATETIME'];
+
+	/**
+	 * Longest plain-text preview list-posts returns per post (characters).
+	 *
+	 * @var int
+	 * @since x.x.x
+	 */
+	private const MAX_CONTENT_PREVIEW = 500;
+
+	/**
+	 * Most conditions accepted in one list-posts meta_query or tax_query.
+	 *
+	 * @var int
+	 * @since x.x.x
+	 */
+	private const MAX_QUERY_CONDITIONS = 10;
+
+	/**
+	 * Unit (bytes) of context around a change in a bulk-replace snippet: twice
+	 * this before the change, six times this in the whole snippet.
+	 *
+	 * @var int
+	 * @since x.x.x
+	 */
+	private const SNIPPET_CONTEXT = 60;
 
 	/**
 	 * Inject Setting Service
@@ -399,7 +449,7 @@ class AbilityRegistrarService
 			'agent-mod/list-posts',
 			[
 				'label'               => __('List Posts and Pages', 'agent-mod'),
-				'description'         => __('Returns a paginated list of posts/pages in any status (drafts included). Use "s" to search by title instead of browsing; for the latest posts use orderby "date" with order "DESC". Returns post_id for use with get-post.', 'agent-mod') . ' ' . $this->settings_service->getSearchLimitHint(),
+				'description'         => __('Returns a paginated list of posts/pages in any status (drafts included), with flexible filters. When the user names the posts (e.g. a list of titles or names), pass them all at once in "titles" instead of searching one by one or browsing. Narrow with include / exclude IDs, "s" + search_columns, content_contains / content_not_contains, meta_query, tax_query, author and date range. Set content_preview to see the start of each post\'s text without calling get-post. For the latest posts use orderby "date" with order "DESC". Keep the returned post_id list and reuse it; do not list the same posts again. To change the same text in many posts use preview-bulk-replace / bulk-replace-content instead of get-post + update-post per post.', 'agent-mod') . ' ' . $this->settings_service->getSearchLimitHint(),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeListPosts'],
 				'permission_callback' => static function (): bool {
@@ -408,16 +458,16 @@ class AbilityRegistrarService
 				'input_schema'        => [
 					'type'       => 'object',
 					'properties' => [
-						'post_type'      => [
+						'post_type'            => [
 							'type'        => 'string',
 							'description' => __('Any registered post type slug (e.g. "post", "page", or a custom post type), or "any" for all public post types. Default "post".', 'agent-mod'),
 						],
-						'post_status'    => [
+						'post_status'          => [
 							'type'        => 'string',
 							'enum'        => ['any', 'publish', 'draft', 'pending', 'private', 'future'],
 							'description' => __('Filter by status. Default "any" (every status except trash).', 'agent-mod'),
 						],
-						'posts_per_page' => [
+						'posts_per_page'       => [
 							'type'        => 'integer',
 							'description' => sprintf(
 								/* translators: %d: Max Search Results setting value. */
@@ -425,28 +475,143 @@ class AbilityRegistrarService
 								$this->settings_service->getMaxSearchResults()
 							),
 						],
-						'paged'          => [
+						'paged'                => [
 							'type'        => 'integer',
 							'description' => __('Page number. Default 1. A page past pagination.total_pages returns no posts.', 'agent-mod'),
 						],
-						's'              => [
+						's'                    => [
 							'type'        => 'string',
-							'description' => __('Keyword search in title and content.', 'agent-mod'),
+							'description' => __('Keyword search. Searches title, excerpt and content unless search_columns narrows it.', 'agent-mod'),
 						],
-						'meta_key'       => [
+						'search_columns'       => [
+							'type'        => 'array',
+							'items'       => [
+								'type' => 'string',
+								'enum' => self::SEARCH_COLUMNS,
+							],
+							'description' => __('Optional. Columns "s" searches, e.g. ["post_title"] to search titles only.', 'agent-mod'),
+						],
+						'titles'               => [
+							'type'        => 'array',
+							'items'       => ['type' => 'string'],
+							'description' => sprintf(
+								/* translators: %d: maximum number of titles. */
+								__('Optional. Find posts by title in one call (up to %d titles). Matching ignores case, extra spaces and accents (e.g. Turkish letters); a title with no exact match falls back to posts whose title contains it. The result lists title_matches and unmatched_titles.', 'agent-mod'),
+								Constants::AI_MAX_BULK_POSTS
+							),
+						],
+						'include'              => [
+							'type'        => 'array',
+							'items'       => ['type' => 'integer'],
+							'description' => __('Optional. Only these post IDs. Results keep this order unless orderby is given.', 'agent-mod'),
+						],
+						'exclude'              => [
+							'type'        => 'array',
+							'items'       => ['type' => 'integer'],
+							'description' => __('Optional. Leave these post IDs out.', 'agent-mod'),
+						],
+						'content_contains'     => [
 							'type'        => 'string',
-							'description' => __('Optional. Only return posts that have this custom field.', 'agent-mod'),
+							'description' => __('Optional. Only posts whose raw content (block markup) contains this text.', 'agent-mod'),
 						],
-						'meta_value'     => [
+						'content_not_contains' => [
+							'type'        => 'string',
+							'description' => __('Optional. Only posts whose raw content does NOT contain this text.', 'agent-mod'),
+						],
+						'meta_key'             => [
+							'type'        => 'string',
+							'description' => __('Optional. Only return posts that have this custom field. For other comparisons use meta_query.', 'agent-mod'),
+						],
+						'meta_value'           => [
 							'type'        => 'string',
 							'description' => __('Optional, used with meta_key. Only return posts whose meta_key equals this value.', 'agent-mod'),
 						],
-						'orderby'        => [
-							'type'        => 'string',
-							'enum'        => ['title', 'date', 'modified', 'ID'],
-							'description' => __('Sort field. Default "title".', 'agent-mod'),
+						'meta_query'           => [
+							'type'        => 'array',
+							'description' => __('Optional. Custom field conditions, combined with meta_relation.', 'agent-mod'),
+							'items'       => [
+								'type'       => 'object',
+								'required'   => ['key'],
+								'properties' => [
+									'key'     => ['type' => 'string'],
+									'value'   => [
+										'type'        => 'string',
+										'description' => __('Value to compare. For IN / NOT IN a comma-separated list. Not used with EXISTS / NOT EXISTS.', 'agent-mod'),
+									],
+									'compare' => [
+										'type'        => 'string',
+										'enum'        => self::META_COMPARE,
+										'description' => __('Default "=".', 'agent-mod'),
+									],
+									'type'    => [
+										'type'        => 'string',
+										'enum'        => self::META_TYPES,
+										'description' => __('Value type for the comparison. Default "CHAR"; use "NUMERIC" for numbers.', 'agent-mod'),
+									],
+								],
+							],
 						],
-						'order'          => [
+						'meta_relation'        => [
+							'type'        => 'string',
+							'enum'        => ['AND', 'OR'],
+							'description' => __('How meta_query conditions combine. Default "AND".', 'agent-mod'),
+						],
+						'tax_query'            => [
+							'type'        => 'array',
+							'description' => __('Optional. Taxonomy term conditions (categories, tags, custom taxonomies), all of which must match.', 'agent-mod'),
+							'items'       => [
+								'type'       => 'object',
+								'required'   => ['taxonomy', 'terms'],
+								'properties' => [
+									'taxonomy' => ['type' => 'string'],
+									'terms'    => [
+										'type'  => 'array',
+										'items' => ['type' => 'string'],
+									],
+									'field'    => [
+										'type'        => 'string',
+										'enum'        => ['slug', 'term_id', 'name'],
+										'description' => __('What terms holds. Default "slug".', 'agent-mod'),
+									],
+									'operator' => [
+										'type'        => 'string',
+										'enum'        => ['IN', 'NOT IN', 'AND'],
+										'description' => __('Default "IN".', 'agent-mod'),
+									],
+								],
+							],
+						],
+						'author'               => [
+							'type'        => 'integer',
+							'description' => __('Optional. Only posts by this author (user ID).', 'agent-mod'),
+						],
+						'date_after'           => [
+							'type'        => 'string',
+							'description' => __('Optional. Only posts published on or after this date (YYYY-MM-DD).', 'agent-mod'),
+						],
+						'date_before'          => [
+							'type'        => 'string',
+							'description' => __('Optional. Only posts published on or before this date (YYYY-MM-DD).', 'agent-mod'),
+						],
+						'content_preview'      => [
+							'type'        => 'integer',
+							'description' => sprintf(
+								/* translators: %d: maximum preview length. */
+								__('Optional. Adds the first N characters (max %d) of each post\'s plain text, without markup. Does not count against the get-post full-content limit. Default 0 (no preview).', 'agent-mod'),
+								self::MAX_CONTENT_PREVIEW
+							),
+						],
+						'fields'               => [
+							'type'        => 'string',
+							'enum'        => ['full', 'ids'],
+							'description' => __('"ids" returns only post_id and title per post (smallest output). Default "full".', 'agent-mod'),
+						],
+						'orderby'              => [
+							'type'        => 'string',
+							'enum'        => ['title', 'date', 'modified', 'ID', 'post__in'],
+							'description' => __('Sort field. Default "title", or the include / titles order when those are given.', 'agent-mod'),
+						],
+						'order'                => [
 							'type'        => 'string',
 							'enum'        => ['ASC', 'DESC'],
 							'description' => __('Sort direction. Default "ASC".', 'agent-mod'),
@@ -456,11 +621,13 @@ class AbilityRegistrarService
 				'output_schema'       => [
 					'type'       => 'object',
 					'properties' => [
-						'success'      => ['type' => 'boolean'],
-						'posts'        => ['type' => 'array'],
-						'pagination'   => ['type' => 'object'],
-						'limit_notice' => ['type' => 'string'],
-						'error'        => ['type' => 'string'],
+						'success'          => ['type' => 'boolean'],
+						'posts'            => ['type' => 'array'],
+						'pagination'       => ['type' => 'object'],
+						'title_matches'    => ['type' => 'array'],
+						'unmatched_titles' => ['type' => 'array'],
+						'limit_notice'     => ['type' => 'string'],
+						'error'            => ['type' => 'string'],
 					],
 				],
 				'meta'                => [
@@ -474,7 +641,7 @@ class AbilityRegistrarService
 			'agent-mod/get-post',
 			[
 				'label'               => __('Get Post or Page', 'agent-mod'),
-				'description'         => __('Returns a post raw block markup as html by post_id, plus its status and custom fields (meta). Use list-posts to find post_id first. The returned html can be modified and passed straight back to update-post as the html parameter. Navigation menus (wp_navigation, referenced by {"ref":ID} in wp:navigation blocks) have dedicated abilities: list-navigations / get-navigation / update-navigation.', 'agent-mod'),
+				'description'         => __('Returns a post raw block markup as html by post_id, plus its status and custom fields (meta). Use list-posts to find post_id first. For the same text change across many posts use preview-bulk-replace / bulk-replace-content instead of reading each post. The returned html can be modified and passed straight back to update-post as the html parameter. Navigation menus (wp_navigation, referenced by {"ref":ID} in wp:navigation blocks) have dedicated abilities: list-navigations / get-navigation / update-navigation.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeGetPost'],
 				'permission_callback' => static function (): bool {
@@ -622,6 +789,44 @@ class AbilityRegistrarService
 						'error'     => ['type' => 'string'],
 					],
 				],
+				'meta'                => [
+					'annotations'  => ['readonly' => false],
+					'show_in_rest' => true,
+				],
+			]
+		);
+
+		wp_register_ability(
+			'agent-mod/preview-bulk-replace',
+			[
+				'label'               => __('Preview Bulk Replace in Posts', 'agent-mod'),
+				'description'         => __('Read-only dry run of bulk-replace-content: finds the text in the content of many posts at once and returns, per post, the number of matches and a before / after snippet. Nothing is saved. Use it for any change that repeats across posts (remove a prefix, fix a word, replace a link), then call bulk-replace-content with the same arguments. Get the post IDs once with list-posts (e.g. its titles filter); never read each post with get-post for this.', 'agent-mod'),
+				'category'            => self::CATEGORY,
+				'execute_callback'    => [$this, 'executePreviewBulkReplace'],
+				'permission_callback' => static function (): bool {
+					return current_user_can('edit_posts');
+				},
+				'input_schema'        => $this->bulkReplaceInputSchema(),
+				'output_schema'       => $this->bulkReplaceOutputSchema(),
+				'meta'                => [
+					'annotations'  => ['readonly' => true],
+					'show_in_rest' => true,
+				],
+			]
+		);
+
+		wp_register_ability(
+			'agent-mod/bulk-replace-content',
+			[
+				'label'               => __('Bulk Replace in Posts', 'agent-mod'),
+				'description'         => __('Finds and replaces text in the content of many posts in one call, on the server: the content is not sent back and forth. Run preview-bulk-replace with the same arguments first and check its snippets. Changed posts get a revision when their post type supports revisions; otherwise the change cannot be undone from the editor, so say so before applying it. Posts with no match are left untouched.', 'agent-mod'),
+				'category'            => self::CATEGORY,
+				'execute_callback'    => [$this, 'executeBulkReplaceContent'],
+				'permission_callback' => static function (): bool {
+					return current_user_can('edit_posts');
+				},
+				'input_schema'        => $this->bulkReplaceInputSchema(),
+				'output_schema'       => $this->bulkReplaceOutputSchema(),
 				'meta'                => [
 					'annotations'  => ['readonly' => false],
 					'show_in_rest' => true,
@@ -1516,8 +1721,10 @@ class AbilityRegistrarService
 		$postsPerPage = max(1, min($requested, $maxResults));
 		$paged        = isset($input['paged']) ? max(absint($input['paged']), 1) : 1;
 		$search       = isset($input['s']) ? sanitize_text_field((string) $input['s']) : '';
-		$orderby      = isset($input['orderby']) ? $input['orderby'] : 'title';
-		$order        = isset($input['order']) ? strtoupper((string) $input['order']) : 'ASC';
+		$orderby      = isset($input['orderby']) && in_array($input['orderby'], ['title', 'date', 'modified', 'ID', 'post__in'], true)
+			? $input['orderby']
+			: 'title';
+		$order        = isset($input['order']) && 'DESC' === strtoupper((string) $input['order']) ? 'DESC' : 'ASC';
 		$postStatus   = isset($input['post_status']) && in_array($input['post_status'], ['any', 'publish', 'draft', 'pending', 'private', 'future'], true)
 			? $input['post_status']
 			: 'any';
@@ -1535,16 +1742,104 @@ class AbilityRegistrarService
 
 		if (! empty($search)) {
 			$queryArgs['s'] = $search;
-		}
 
-		if (! empty($input['meta_key'])) {
-			$queryArgs['meta_key'] = sanitize_text_field((string) $input['meta_key']);
-
-			if (isset($input['meta_value']) && '' !== (string) $input['meta_value']) {
-				$queryArgs['meta_value'] = sanitize_text_field((string) $input['meta_value']);
+			$columns = array_values(array_intersect(self::SEARCH_COLUMNS, (array) ($input['search_columns'] ?? [])));
+			if (! empty($columns)) {
+				$queryArgs['search_columns'] = $columns;
 			}
 		}
 
+		$include      = $this->sanitizeIdList($input['include'] ?? []);
+		$titleMatches = null;
+
+		if (! empty($input['titles']) && is_array($input['titles'])) {
+			$titleMatches = $this->matchPostTitles($input['titles'], $postType, $postStatus);
+			$titleIds     = array_unique(array_merge([], ...array_column($titleMatches, 'post_ids')));
+			$include      = empty($include) ? $titleIds : array_intersect($include, $titleIds);
+			$include      = array_slice(array_values($include), 0, Constants::AI_MAX_BULK_POSTS);
+
+			// None of the titles exist: an empty post__in would match every post.
+			if (empty($include)) {
+				return [
+					'success'          => true,
+					'posts'            => [],
+					'pagination'       => [
+						'total_posts'    => 0,
+						'total_pages'    => 0,
+						'current_page'   => $paged,
+						'posts_per_page' => $postsPerPage,
+						'has_more'       => false,
+					],
+					'title_matches'    => $titleMatches,
+					'unmatched_titles' => $this->unmatchedTitles($titleMatches),
+				];
+			}
+		}
+
+		if (! empty($include)) {
+			$queryArgs['post__in'] = array_values(array_unique($include));
+
+			if (! isset($input['orderby'])) {
+				$queryArgs['orderby'] = 'post__in';
+			}
+		} elseif ('post__in' === $orderby) {
+			$queryArgs['orderby'] = 'title';
+		}
+
+		$exclude = $this->sanitizeIdList($input['exclude'] ?? []);
+		if (! empty($exclude)) {
+			$queryArgs['post__not_in'] = $exclude;
+		}
+
+		$metaQuery = $this->buildMetaQuery($input);
+		if (! empty($metaQuery)) {
+			$queryArgs['meta_query'] = $metaQuery;
+		}
+
+		$taxQuery = $this->buildTaxQuery($input['tax_query'] ?? []);
+		if (! empty($taxQuery)) {
+			$queryArgs['tax_query'] = $taxQuery;
+		}
+
+		if (! empty($input['author'])) {
+			$queryArgs['author'] = absint($input['author']);
+		}
+
+		$dateQuery = $this->buildDateQuery($input);
+		if (! empty($dateQuery)) {
+			$queryArgs['date_query'] = $dateQuery;
+		}
+
+		$contentFilters = $this->buildContentFilters($input);
+		if (! empty($contentFilters)) {
+			// Read by filterContentWhere(), which is hooked only around these queries.
+			$queryArgs['agent_mod_content_filters'] = $contentFilters;
+			add_filter('posts_where', [$this, 'filterContentWhere'], 10, 2);
+		}
+
+		try {
+			return $this->runListPostsQuery($queryArgs, $input, $paged, $postsPerPage, $requested, $maxResults, $titleMatches);
+		} finally {
+			remove_filter('posts_where', [$this, 'filterContentWhere'], 10);
+		}
+	}
+
+	/**
+	 * Runs the list-posts query and shapes its result.
+	 *
+	 * @param array<string, mixed>                   $queryArgs    WP_Query arguments.
+	 * @param array<string, mixed>                   $input        The ability input.
+	 * @param int                                    $paged        Requested page.
+	 * @param int                                    $postsPerPage Effective page size.
+	 * @param int                                    $requested    Page size the agent asked for.
+	 * @param int                                    $maxResults   Max Search Results setting.
+	 * @param array<int, array<string, mixed>>|null  $titleMatches Title lookup result, when titles were given.
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	private function runListPostsQuery(array $queryArgs, array $input, int $paged, int $postsPerPage, int $requested, int $maxResults, ?array $titleMatches): array
+	{
 		$query = new WP_Query($queryArgs);
 
 		if (! $query->have_posts()) {
@@ -1580,24 +1875,39 @@ class AbilityRegistrarService
 				);
 			}
 
-			return [
+			return $this->withTitleMatches([
 				'success'    => true,
 				'posts'      => [],
 				'pagination' => $pagination,
-			];
+			], $titleMatches);
 		}
 
-		$posts = array_map(static function ($post) {
-			return [
-				'post_id'   => $post->ID,
-				'post_name' => $post->post_name,
-				'title'     => $post->post_title,
-				'post_type' => $post->post_type,
-				'status'    => $post->post_status,
-				'date'      => $post->post_date,
-				'modified'  => $post->post_modified,
-				'url'       => get_permalink($post->ID),
-			];
+		$idsOnly       = 'ids' === ($input['fields'] ?? '');
+		$previewLength = min(absint($input['content_preview'] ?? 0), self::MAX_CONTENT_PREVIEW);
+
+		$posts = array_map(function ($post) use ($idsOnly, $previewLength) {
+			$item = $idsOnly
+				? [
+					'post_id' => $post->ID,
+					'title'   => $post->post_title,
+				]
+				: [
+					'post_id'   => $post->ID,
+					'post_name' => $post->post_name,
+					'title'     => $post->post_title,
+					'post_type' => $post->post_type,
+					'status'    => $post->post_status,
+					'date'      => $post->post_date,
+					'modified'  => $post->post_modified,
+					'url'       => get_permalink($post->ID),
+				];
+
+			// The preview shows post content, so it follows get-post's capability.
+			if ($previewLength > 0 && current_user_can('edit_post', $post->ID)) {
+				$item['content_preview'] = $this->plainTextPreview((string) $post->post_content, $previewLength);
+			}
+
+			return $item;
 		}, $query->posts);
 
 		$hasMore = $paged < $query->max_num_pages;
@@ -1618,7 +1928,371 @@ class AbilityRegistrarService
 			$result['limit_notice'] = $this->settings_service->getSearchLimitNotice($maxResults, true);
 		}
 
+		return $this->withTitleMatches($result, $titleMatches);
+	}
+
+	/**
+	 * Adds the title lookup outcome to a list-posts result.
+	 *
+	 * @param array<string, mixed>                  $result       The list-posts result.
+	 * @param array<int, array<string, mixed>>|null $titleMatches Title lookup result, or null when no titles were given.
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	private function withTitleMatches(array $result, ?array $titleMatches): array
+	{
+		if (null === $titleMatches) {
+			return $result;
+		}
+
+		$result['title_matches']    = $titleMatches;
+		$result['unmatched_titles'] = $this->unmatchedTitles($titleMatches);
+
 		return $result;
+	}
+
+	/**
+	 * Finds post IDs for a list of titles in one lookup.
+	 *
+	 * Titles are compared after normalization (case, whitespace, accents and the
+	 * Turkish dotted / dotless i), because the agent usually copies names from a
+	 * screenshot or from text typed by the user: "ANIL BAYER" must find "Anıl
+	 * Bayer". A title with no exact match falls back to the posts whose title
+	 * contains it. Only ID and title are read, so a large post type stays cheap.
+	 *
+	 * @param array<int, mixed> $titles     Requested titles.
+	 * @param string            $postType   Post type slug, or "any".
+	 * @param string            $postStatus Status filter from list-posts.
+	 *
+	 * @return array<int, array{title: string, post_ids: int[], match: string}>
+	 * @since x.x.x
+	 */
+	private function matchPostTitles(array $titles, string $postType, string $postStatus): array
+	{
+		global $wpdb;
+
+		$titles = array_slice(
+			array_values(array_unique(array_filter(array_map(static function ($title): string {
+				return is_scalar($title) ? trim(sanitize_text_field((string) $title)) : '';
+			}, $titles), 'strlen'))),
+			0,
+			Constants::AI_MAX_BULK_POSTS
+		);
+
+		if (empty($titles)) {
+			return [];
+		}
+
+		$types = 'any' === $postType
+			? array_values(get_post_types(['exclude_from_search' => false]))
+			: [$postType];
+
+		$statuses = 'any' === $postStatus
+			? ['publish', 'draft', 'pending', 'private', 'future']
+			: [$postStatus];
+
+		$typePlaceholders   = implode(',', array_fill(0, count($types), '%s'));
+		$statusPlaceholders = implode(',', array_fill(0, count($statuses), '%s'));
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- placeholders are built above; one cheap read per call.
+		$rows = (array) $wpdb->get_results($wpdb->prepare("SELECT ID, post_title FROM {$wpdb->posts} WHERE post_type IN ($typePlaceholders) AND post_status IN ($statusPlaceholders)", array_merge($types, $statuses)));
+
+		$normalized = [];
+		foreach ($rows as $row) {
+			$normalized[(int) $row->ID] = $this->normalizeTitle((string) $row->post_title);
+		}
+
+		$matches = [];
+
+		foreach ($titles as $title) {
+			$needle = $this->normalizeTitle($title);
+			$ids    = array_keys($normalized, $needle, true);
+			$match  = 'exact';
+
+			if (empty($ids) && '' !== $needle) {
+				$ids   = array_keys(array_filter($normalized, static function (string $candidate) use ($needle): bool {
+					return false !== strpos($candidate, $needle);
+				}));
+				$match = empty($ids) ? 'none' : 'contains';
+			}
+
+			$matches[] = [
+				'title'    => $title,
+				'post_ids' => array_map('intval', $ids),
+				'match'    => empty($ids) ? 'none' : $match,
+			];
+		}
+
+		return $matches;
+	}
+
+	/**
+	 * Lists the requested titles that matched no post.
+	 *
+	 * @param array<int, array<string, mixed>> $titleMatches Title lookup result.
+	 *
+	 * @return string[]
+	 * @since x.x.x
+	 */
+	private function unmatchedTitles(array $titleMatches): array
+	{
+		return array_values(array_map(static function (array $match): string {
+			return (string) $match['title'];
+		}, array_filter($titleMatches, static function (array $match): bool {
+			return empty($match['post_ids']);
+		})));
+	}
+
+	/**
+	 * Normalizes a title for matching: lowercase, no accents, single spaces.
+	 *
+	 * The Turkish İ / I / ı are folded to "i" before lowercasing, as
+	 * mb_strtolower('İ') yields "i" plus a combining dot and 'I' would
+	 * otherwise never meet "ı".
+	 *
+	 * @param string $title Raw title.
+	 *
+	 * @return string
+	 * @since x.x.x
+	 */
+	private function normalizeTitle(string $title): string
+	{
+		$title = html_entity_decode(wp_strip_all_tags($title), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+		$title = strtr($title, ['İ' => 'i', 'I' => 'i', 'ı' => 'i']);
+		$title = remove_accents(mb_strtolower($title, 'UTF-8'));
+
+		return trim((string) preg_replace('/\s+/u', ' ', $title));
+	}
+
+	/**
+	 * Sanitizes a list of post IDs, capped at the bulk limit.
+	 *
+	 * @param mixed $ids Raw input.
+	 *
+	 * @return int[]
+	 * @since x.x.x
+	 */
+	private function sanitizeIdList($ids): array
+	{
+		if (! is_array($ids)) {
+			return [];
+		}
+
+		return array_slice(array_values(array_unique(array_filter(array_map('absint', $ids)))), 0, Constants::AI_MAX_BULK_POSTS);
+	}
+
+	/**
+	 * Builds the list-posts meta_query from meta_query conditions and the legacy meta_key / meta_value pair.
+	 *
+	 * @param array<string, mixed> $input The ability input.
+	 *
+	 * @return array<int|string, mixed> Empty when no condition was given.
+	 * @since x.x.x
+	 */
+	private function buildMetaQuery(array $input): array
+	{
+		$clauses = [];
+
+		if (! empty($input['meta_key'])) {
+			$clause = ['key' => sanitize_text_field((string) $input['meta_key'])];
+
+			if (isset($input['meta_value']) && '' !== (string) $input['meta_value']) {
+				$clause['value'] = sanitize_text_field((string) $input['meta_value']);
+			} else {
+				$clause['compare'] = 'EXISTS';
+			}
+
+			$clauses[] = $clause;
+		}
+
+		foreach (array_slice((array) ($input['meta_query'] ?? []), 0, self::MAX_QUERY_CONDITIONS) as $condition) {
+			if (! is_array($condition) || empty($condition['key'])) {
+				continue;
+			}
+
+			$compare = strtoupper(trim((string) ($condition['compare'] ?? '=')));
+			$compare = in_array($compare, self::META_COMPARE, true) ? $compare : '=';
+			$clause  = [
+				'key'     => sanitize_text_field((string) $condition['key']),
+				'compare' => $compare,
+			];
+
+			if (! in_array($compare, ['EXISTS', 'NOT EXISTS'], true)) {
+				$value = $condition['value'] ?? '';
+				$value = is_array($value) ? implode(',', array_filter($value, 'is_scalar')) : (is_scalar($value) ? (string) $value : '');
+
+				$clause['value'] = in_array($compare, ['IN', 'NOT IN'], true)
+					? array_values(array_filter(array_map('trim', array_map('sanitize_text_field', explode(',', $value))), 'strlen'))
+					: sanitize_text_field($value);
+
+				$type = strtoupper((string) ($condition['type'] ?? ''));
+				if (in_array($type, self::META_TYPES, true)) {
+					$clause['type'] = $type;
+				}
+			}
+
+			$clauses[] = $clause;
+		}
+
+		if (count($clauses) > 1) {
+			$clauses['relation'] = 'OR' === strtoupper((string) ($input['meta_relation'] ?? '')) ? 'OR' : 'AND';
+		}
+
+		return $clauses;
+	}
+
+	/**
+	 * Builds the list-posts tax_query; conditions on unknown taxonomies are dropped.
+	 *
+	 * @param mixed $conditions Raw tax_query input.
+	 *
+	 * @return array<int|string, mixed> Empty when no valid condition was given.
+	 * @since x.x.x
+	 */
+	private function buildTaxQuery($conditions): array
+	{
+		$clauses = [];
+
+		foreach (array_slice(is_array($conditions) ? $conditions : [], 0, self::MAX_QUERY_CONDITIONS) as $condition) {
+			if (! is_array($condition) || empty($condition['taxonomy']) || empty($condition['terms'])) {
+				continue;
+			}
+
+			$taxonomy = sanitize_key((string) $condition['taxonomy']);
+			if (! taxonomy_exists($taxonomy)) {
+				continue;
+			}
+
+			$field    = in_array($condition['field'] ?? '', ['slug', 'term_id', 'name'], true) ? $condition['field'] : 'slug';
+			$operator = strtoupper((string) ($condition['operator'] ?? 'IN'));
+			$terms    = array_filter((array) $condition['terms'], 'is_scalar');
+			$terms    = 'term_id' === $field
+				? array_values(array_filter(array_map('absint', $terms)))
+				: array_values(array_filter(array_map('sanitize_text_field', $terms), 'strlen'));
+
+			if (empty($terms)) {
+				continue;
+			}
+
+			$clauses[] = [
+				'taxonomy' => $taxonomy,
+				'field'    => $field,
+				'terms'    => $terms,
+				'operator' => in_array($operator, ['IN', 'NOT IN', 'AND'], true) ? $operator : 'IN',
+			];
+		}
+
+		if (count($clauses) > 1) {
+			$clauses['relation'] = 'AND';
+		}
+
+		return $clauses;
+	}
+
+	/**
+	 * Builds the list-posts date_query from date_after / date_before (inclusive).
+	 *
+	 * @param array<string, mixed> $input The ability input.
+	 *
+	 * @return array<int, array<string, mixed>> Empty when neither date is valid.
+	 * @since x.x.x
+	 */
+	private function buildDateQuery(array $input): array
+	{
+		$range = [];
+
+		foreach (['date_after' => 'after', 'date_before' => 'before'] as $key => $bound) {
+			$date = isset($input[$key]) ? trim((string) $input[$key]) : '';
+
+			if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) && wp_checkdate((int) substr($date, 5, 2), (int) substr($date, 8, 2), (int) substr($date, 0, 4), $date)) {
+				$range[$bound] = $date;
+			}
+		}
+
+		if (empty($range)) {
+			return [];
+		}
+
+		$range['inclusive'] = true;
+
+		return [$range];
+	}
+
+	/**
+	 * Collects the content_contains / content_not_contains filters of list-posts.
+	 *
+	 * @param array<string, mixed> $input The ability input.
+	 *
+	 * @return array<string, string> Map of "contains" / "not_contains" => text.
+	 * @since x.x.x
+	 */
+	private function buildContentFilters(array $input): array
+	{
+		$filters = [];
+
+		foreach (['content_contains' => 'contains', 'content_not_contains' => 'not_contains'] as $key => $mode) {
+			// Not sanitize_text_field(): the text may be markup. It only ever
+			// reaches SQL through $wpdb->prepare() + esc_like().
+			$text = isset($input[$key]) && is_scalar($input[$key]) ? wp_check_invalid_utf8((string) $input[$key]) : '';
+
+			if ('' !== trim($text)) {
+				$filters[$mode] = mb_substr($text, 0, 500);
+			}
+		}
+
+		return $filters;
+	}
+
+	/**
+	 * posts_where filter applying the list-posts content filters.
+	 *
+	 * Hooked only while list-posts runs its queries, and acts only on a query
+	 * carrying the agent_mod_content_filters var.
+	 *
+	 * @param string   $where The WHERE clause.
+	 * @param WP_Query $query The query.
+	 *
+	 * @return string
+	 * @since x.x.x
+	 */
+	public function filterContentWhere(string $where, WP_Query $query): string
+	{
+		global $wpdb;
+
+		$filters = $query->get('agent_mod_content_filters');
+
+		if (! is_array($filters)) {
+			return $where;
+		}
+
+		if (isset($filters['contains'])) {
+			$where .= $wpdb->prepare(" AND {$wpdb->posts}.post_content LIKE %s", '%' . $wpdb->esc_like($filters['contains']) . '%');
+		}
+
+		if (isset($filters['not_contains'])) {
+			$where .= $wpdb->prepare(" AND {$wpdb->posts}.post_content NOT LIKE %s", '%' . $wpdb->esc_like($filters['not_contains']) . '%');
+		}
+
+		return $where;
+	}
+
+	/**
+	 * Plain-text start of a post's content: no block comments, tags or entities.
+	 *
+	 * @param string $content Raw post content.
+	 * @param int    $length  Maximum characters.
+	 *
+	 * @return string
+	 * @since x.x.x
+	 */
+	private function plainTextPreview(string $content, int $length): string
+	{
+		$text = (string) preg_replace('/<!--.*?-->/s', ' ', $content);
+		$text = html_entity_decode(wp_strip_all_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+		$text = trim((string) preg_replace('/\s+/u', ' ', $text));
+
+		return mb_strlen($text) > $length ? mb_substr($text, 0, $length) . '…' : $text;
 	}
 
 	/**
@@ -1658,7 +2332,7 @@ class AbilityRegistrarService
 				'success' => false,
 				'error'   => sprintf(
 					/* translators: %d: maximum number of full-content post reads per message. */
-					__('Full-content read limit reached: at most %d posts can be read in full per message. Summarize what you already have, or ask the user to narrow the request.', 'agent-mod'),
+					__('Full-content read limit reached: at most %d posts can be read in full per message. To change the same text in many posts use preview-bulk-replace / bulk-replace-content, and to look at the start of many posts use list-posts with content_preview; neither counts against this limit. Otherwise summarize what you already have, or ask the user to narrow the request.', 'agent-mod'),
 					$maxReads
 				),
 			];
@@ -1871,6 +2545,533 @@ class AbilityRegistrarService
 			'status'    => (string) get_post_status($postId),
 			'url'       => (string) get_permalink($postId),
 		];
+	}
+
+	/**
+	 * Input schema shared by preview-bulk-replace and bulk-replace-content.
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	private function bulkReplaceInputSchema(): array
+	{
+		return [
+			'type'       => 'object',
+			'required'   => ['post_ids', 'find'],
+			'properties' => [
+				'post_ids'       => [
+					'type'        => 'array',
+					'items'       => ['type' => 'integer'],
+					'description' => sprintf(
+						/* translators: %d: maximum number of posts. */
+						__('IDs of the posts to change (up to %d), e.g. from list-posts.', 'agent-mod'),
+						Constants::AI_MAX_BULK_POSTS
+					),
+				],
+				'post_type'      => [
+					'type'        => 'string',
+					'description' => __('The expected post type of the posts (e.g. "post", "page", or a custom post type). Default "post".', 'agent-mod'),
+				],
+				'find'           => [
+					'type'        => 'string',
+					'description' => __('Text to find, or a PCRE pattern without delimiters when match is "regex" (e.g. "^\\s*Short bio\\s*:\\s*" to remove a leading label). In text_only mode the text is HTML-encoded as stored (e.g. &amp;).', 'agent-mod'),
+				],
+				'replace'        => [
+					'type'        => 'string',
+					'description' => __('Replacement text. Default "" (removes the match). In regex mode $1, $2 … insert captured groups.', 'agent-mod'),
+				],
+				'match'          => [
+					'type'        => 'string',
+					'enum'        => ['literal', 'regex'],
+					'description' => __('"literal" (default) finds the exact text; "regex" treats find as a PCRE pattern (Unicode).', 'agent-mod'),
+				],
+				'case_sensitive' => [
+					'type'        => 'boolean',
+					'description' => __('Default false: "BIO", "Bio" and "bio" all match, Turkish letters included.', 'agent-mod'),
+				],
+				'limit_per_post' => [
+					'type'        => 'integer',
+					'description' => __('Most replacements per post. Default 0 (all matches); use 1 to change only the first occurrence, e.g. a leading label.', 'agent-mod'),
+				],
+				'text_only'      => [
+					'type'        => 'boolean',
+					'description' => __('Default true: only the visible text between tags is searched, never block comments, tags or attributes, so the block markup cannot break. A "^" anchor then matches the start of each text run (e.g. the start of a paragraph). Text split by inline tags (e.g. <strong>Bio</strong>:) is not matched as one piece; set false to search the raw markup instead.', 'agent-mod'),
+				],
+			],
+		];
+	}
+
+	/**
+	 * Output schema shared by preview-bulk-replace and bulk-replace-content.
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	private function bulkReplaceOutputSchema(): array
+	{
+		return [
+			'type'       => 'object',
+			'properties' => [
+				'success'   => ['type' => 'boolean'],
+				'dry_run'   => ['type' => 'boolean'],
+				'summary'   => ['type' => 'object'],
+				'results'   => ['type' => 'array'],
+				'next_step' => ['type' => 'string'],
+				'error'     => ['type' => 'string'],
+			],
+		];
+	}
+
+	/**
+	 * Execute callback for agent-mod/preview-bulk-replace.
+	 *
+	 * @param mixed $input Input data (see bulkReplaceInputSchema()).
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	public function executePreviewBulkReplace($input = null): array
+	{
+		return $this->runBulkReplace(is_array($input) ? $input : [], true);
+	}
+
+	/**
+	 * Execute callback for agent-mod/bulk-replace-content.
+	 *
+	 * @param mixed $input Input data (see bulkReplaceInputSchema()).
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	public function executeBulkReplaceContent($input = null): array
+	{
+		return $this->runBulkReplace(is_array($input) ? $input : [], false);
+	}
+
+	/**
+	 * Finds and replaces text in the content of many posts.
+	 *
+	 * Every post is checked on its own: a missing post, a type mismatch, a
+	 * missing capability or a replacement that would change the block
+	 * structure only skips that post. Changed posts are saved through
+	 * wp_update_post(), so each gets a revision.
+	 *
+	 * @param array<string, mixed> $input  The ability input.
+	 * @param bool                 $dryRun Whether to only report what would change.
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	private function runBulkReplace(array $input, bool $dryRun): array
+	{
+		$postIds = $this->sanitizeIdList($input['post_ids'] ?? []);
+		$find    = isset($input['find']) && is_scalar($input['find']) ? wp_check_invalid_utf8((string) $input['find']) : '';
+
+		if (empty($postIds)) {
+			return ['success' => false, 'error' => __('post_ids is required. Get the IDs with list-posts first.', 'agent-mod')];
+		}
+
+		if ('' === $find) {
+			return ['success' => false, 'error' => __('find is required and must not be empty.', 'agent-mod')];
+		}
+
+		$isRegex = 'regex' === ($input['match'] ?? 'literal');
+		$pattern = $this->buildReplacePattern($find, $isRegex, ! empty($input['case_sensitive']));
+
+		if (is_wp_error($pattern)) {
+			return ['success' => false, 'error' => $pattern->get_error_message()];
+		}
+
+		$replace  = isset($input['replace']) && is_scalar($input['replace']) ? wp_check_invalid_utf8((string) $input['replace']) : '';
+		$limit    = absint($input['limit_per_post'] ?? 0);
+		$textOnly = ! isset($input['text_only']) || false !== $input['text_only'];
+		$postType = ! empty($input['post_type']) ? sanitize_key((string) $input['post_type']) : 'post';
+
+		$results = [];
+		$summary = [
+			'posts_checked' => count($postIds),
+			'posts_matched' => 0,
+			'total_matches' => 0,
+			'posts_updated' => 0,
+			'posts_skipped' => 0,
+		];
+
+		foreach ($postIds as $postId) {
+			$item = $this->bulkReplaceOne($postId, $postType, $pattern, $replace, $isRegex, $limit, $textOnly, $dryRun);
+
+			if ($item['matches'] > 0) {
+				$summary['posts_matched']++;
+				$summary['total_matches'] += $item['matches'];
+			}
+
+			if ('changed' === $item['status'] && ! $dryRun) {
+				$summary['posts_updated']++;
+			} elseif (in_array($item['status'], ['skipped', 'error'], true)) {
+				$summary['posts_skipped']++;
+			}
+
+			$results[] = $item;
+		}
+
+		$result = [
+			'success' => true,
+			'dry_run' => $dryRun,
+			'summary' => $summary,
+			'results' => $results,
+		];
+
+		if ($dryRun) {
+			$result['next_step'] = 0 === $summary['posts_matched']
+				? __('Nothing matched. Check the snippets with list-posts content_preview and adjust find (e.g. regex mode, case_sensitive false, or text_only false when the text is split by inline tags).', 'agent-mod')
+				: __('Nothing was saved. If the after snippets are right, call bulk-replace-content with exactly the same arguments to apply the change.', 'agent-mod');
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Builds the PCRE pattern for a bulk replace and checks that it compiles.
+	 *
+	 * @param string $find          Text or pattern from the input.
+	 * @param bool   $isRegex       Whether find is a pattern.
+	 * @param bool   $caseSensitive Whether matching is case-sensitive.
+	 *
+	 * @return string|WP_Error
+	 * @since x.x.x
+	 */
+	private function buildReplacePattern(string $find, bool $isRegex, bool $caseSensitive)
+	{
+		$body = $isRegex
+			// Escape the delimiter unless the agent already escaped it.
+			? (string) preg_replace('/(?<!\\\\)#/', '\\#', $find)
+			: preg_quote($find, '#');
+
+		$pattern = '#' . ($caseSensitive ? $body : $this->foldTurkishI($body)) . '#u' . ($caseSensitive ? '' : 'i');
+
+		// preg_last_error_msg() only says "Internal error" for a pattern that
+		// does not compile; the warning carries the actual reason.
+		$compileError = '';
+		set_error_handler(static function (int $errno, string $message) use (&$compileError): bool {
+			$compileError = (string) preg_replace('/^preg_match\(\):\s*/', '', $message);
+			return true;
+		});
+
+		try {
+			$compiled = preg_match($pattern, '');
+		} finally {
+			restore_error_handler();
+		}
+
+		if (false === $compiled) {
+			return new WP_Error(
+				'agent_mod_invalid_pattern',
+				sprintf(
+					/* translators: %s: PCRE error message. */
+					__('The find pattern is not a valid regular expression: %s', 'agent-mod'),
+					'' !== $compileError ? $compileError : preg_last_error_msg()
+				)
+			);
+		}
+
+		return $pattern;
+	}
+
+	/**
+	 * Makes the letters i, ı, I and İ match each other in a pattern.
+	 *
+	 * PCRE's caseless Unicode matching pairs I with i only, so "KISA" never
+	 * matches "Kısa" and "ÖZGEÇMİŞ" never matches "Özgeçmiş". Each of these
+	 * letters becomes a class of all four. Escapes (\p{…} included), group
+	 * syntax such as (?<name>…) and inline flags are copied unchanged; inside a
+	 * character class the letters are added to that class.
+	 *
+	 * @param string $pattern Pattern body without delimiters.
+	 *
+	 * @return string
+	 * @since x.x.x
+	 */
+	private function foldTurkishI(string $pattern): string
+	{
+		$chars   = mb_str_split($pattern, 1, 'UTF-8');
+		$count   = count($chars);
+		$letters = ['i', 'ı', 'I', 'İ'];
+		$out     = '';
+		$inClass = false;
+
+		for ($i = 0; $i < $count; $i++) {
+			$char = $chars[$i];
+
+			if ('\\' === $char) {
+				$out .= $char . ($chars[$i + 1] ?? '');
+				$i++;
+
+				// \p{…}, \x{…}, \N{…}, \g{…}, \k{…}: copy the braces whole.
+				if (isset($chars[$i + 1]) && '{' === $chars[$i + 1]) {
+					while (++$i < $count) {
+						$out .= $chars[$i];
+
+						if ('}' === $chars[$i]) {
+							break;
+						}
+					}
+				}
+
+				continue;
+			}
+
+			if ($inClass) {
+				// POSIX class such as [:digit:]: copy it whole.
+				if ('[' === $char && ':' === ($chars[$i + 1] ?? '')) {
+					$out .= '[:';
+					$i++;
+
+					while (++$i < $count) {
+						$out .= $chars[$i];
+
+						if (':' === $chars[$i] && ']' === ($chars[$i + 1] ?? '')) {
+							$out .= $chars[++$i];
+							break;
+						}
+					}
+
+					continue;
+				}
+
+				$inClass = ']' !== $char;
+				$out    .= in_array($char, $letters, true) ? implode('', $letters) : $char;
+				continue;
+			}
+
+			if ('[' === $char) {
+				$inClass = true;
+				$out    .= $char;
+
+				// A "]" (after an optional "^") right after "[" is a literal.
+				if (isset($chars[$i + 1]) && '^' === $chars[$i + 1]) {
+					$out .= $chars[++$i];
+				}
+
+				if (isset($chars[$i + 1]) && ']' === $chars[$i + 1]) {
+					$out .= $chars[++$i];
+				}
+
+				continue;
+			}
+
+			if ('(' === $char && '?' === ($chars[$i + 1] ?? '')) {
+				$out .= '(?';
+				$i++;
+				$next = $chars[$i + 1] ?? '';
+
+				if ('<' === $next && in_array($chars[$i + 2] ?? '', ['=', '!'], true)) {
+					// Lookbehind: the assertion body is a normal pattern.
+					$out .= $next . $chars[$i + 2];
+					$i   += 2;
+				} elseif ('<' === $next || "'" === $next || 'P' === $next) {
+					// Named group or reference: copy the name. (?P<name> ends
+					// at ">", (?P=name) and (?P>name) at ")".
+					if ('P' === $next) {
+						$close = '<' === ($chars[$i + 2] ?? '') ? '>' : ')';
+					} else {
+						$close = "'" === $next ? "'" : '>';
+					}
+
+					$i++;
+					$out .= $next;
+
+					while (++$i < $count) {
+						$out .= $chars[$i];
+
+						if ($close === $chars[$i]) {
+							break;
+						}
+					}
+				} else {
+					// Inline flags such as (?i) or (?i-m:…).
+					while (isset($chars[$i + 1]) && preg_match('/^[a-zA-Z\-\^]$/', $chars[$i + 1])) {
+						$out .= $chars[++$i];
+					}
+				}
+
+				continue;
+			}
+
+			$out .= in_array($char, $letters, true) ? '[' . implode('', $letters) . ']' : $char;
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Applies a bulk replace to one post.
+	 *
+	 * @param int    $postId   Post ID.
+	 * @param string $postType Expected post type.
+	 * @param string $pattern  Compiled PCRE pattern.
+	 * @param string $replace  Replacement.
+	 * @param bool   $isRegex  Whether $replace may use backreferences.
+	 * @param int    $limit    Most replacements, 0 for all.
+	 * @param bool   $textOnly Whether only text between tags is searched.
+	 * @param bool   $dryRun   Whether to skip saving.
+	 *
+	 * @return array<string, mixed>
+	 * @since x.x.x
+	 */
+	private function bulkReplaceOne(int $postId, string $postType, string $pattern, string $replace, bool $isRegex, int $limit, bool $textOnly, bool $dryRun): array
+	{
+		$post = get_post($postId);
+		$item = [
+			'post_id' => $postId,
+			'title'   => $post ? $post->post_title : '',
+			'matches' => 0,
+		];
+
+		if (! $post || $post->post_type !== $postType) {
+			return $item + ['status' => 'error', 'error' => $this->postTypeMismatchError($postId, $postType, $post, true)];
+		}
+
+		if (! current_user_can('edit_post', $postId)) {
+			return $item + ['status' => 'skipped', 'error' => __('You are not allowed to edit this post.', 'agent-mod')];
+		}
+
+		$old     = (string) $post->post_content;
+		$matches = 0;
+		$new     = $this->replaceInContent($old, $pattern, $replace, $isRegex, $limit, $textOnly, $matches);
+
+		if (null === $new) {
+			return $item + ['status' => 'error', 'error' => preg_last_error_msg()];
+		}
+
+		$item['matches'] = $matches;
+
+		if (0 === $matches || $new === $old) {
+			return $item + ['status' => 'no_match'];
+		}
+
+		$item += $this->changeSnippets($old, $new);
+
+		if (has_blocks($old) && $this->blockNames($old) !== $this->blockNames($new)) {
+			return $item + ['status' => 'skipped', 'error' => __('The replacement would change the block structure (block comments), so this post was left untouched. Use text_only true or a narrower find.', 'agent-mod')];
+		}
+
+		if ($dryRun) {
+			return $item + ['status' => 'changed'];
+		}
+
+		// wp_update_post() unslashes its input; keep the attribute JSON escapes.
+		$saved = wp_update_post(wp_slash(['ID' => $postId, 'post_content' => $new]), true);
+
+		if (is_wp_error($saved)) {
+			return $item + ['status' => 'error', 'error' => $saved->get_error_message()];
+		}
+
+		return $item + ['status' => 'changed'];
+	}
+
+	/**
+	 * Replaces matches in post content, optionally in text runs only.
+	 *
+	 * @param string $content  Raw post content.
+	 * @param string $pattern  Compiled PCRE pattern.
+	 * @param string $replace  Replacement.
+	 * @param bool   $isRegex  Whether $replace may use backreferences.
+	 * @param int    $limit    Most replacements, 0 for all.
+	 * @param bool   $textOnly Whether block comments and tags are skipped.
+	 * @param int    $matches  Receives the number of replacements made.
+	 *
+	 * @return string|null Null when PCRE failed.
+	 * @since x.x.x
+	 */
+	private function replaceInContent(string $content, string $pattern, string $replace, bool $isRegex, int $limit, bool $textOnly, int &$matches): ?string
+	{
+		$matches  = 0;
+		$segments = $textOnly
+			// Odd indexes hold the captured comments / tags, even ones the text between them.
+			? preg_split('/(<!--.*?-->|<[^>]*>)/s', $content, -1, PREG_SPLIT_DELIM_CAPTURE)
+			: [$content];
+
+		if (false === $segments) {
+			return null;
+		}
+
+		foreach ($segments as $index => $segment) {
+			if (($textOnly && 1 === $index % 2) || '' === $segment) {
+				continue;
+			}
+
+			$remaining = $limit > 0 ? $limit - $matches : -1;
+
+			if (0 === $remaining) {
+				break;
+			}
+
+			$count    = 0;
+			$replaced = $isRegex
+				? preg_replace($pattern, $replace, $segment, $remaining, $count)
+				// A literal replacement must not interpret $1 or backslashes.
+				: preg_replace_callback($pattern, static function () use ($replace): string {
+					return $replace;
+				}, $segment, $remaining, $count);
+
+			if (null === $replaced) {
+				return null;
+			}
+
+			$segments[$index] = $replaced;
+			$matches         += $count;
+		}
+
+		return implode('', $segments);
+	}
+
+	/**
+	 * Before / after snippets around the first change.
+	 *
+	 * @param string $old Original content.
+	 * @param string $new Changed content.
+	 *
+	 * @return array{before_snippet: string, after_snippet: string}
+	 * @since x.x.x
+	 */
+	private function changeSnippets(string $old, string $new): array
+	{
+		// Length of the common byte prefix: XOR is "\0" wherever the bytes agree.
+		$offset = strspn($old ^ $new, "\0");
+		$start  = max(0, $offset - self::SNIPPET_CONTEXT * 2);
+		$length = self::SNIPPET_CONTEXT * 6;
+
+		return [
+			'before_snippet' => mb_strcut($old, $start, $length, 'UTF-8'),
+			'after_snippet'  => mb_strcut($new, $start, $length, 'UTF-8'),
+		];
+	}
+
+	/**
+	 * Flat, ordered list of block names in some content.
+	 *
+	 * @param string $content Serialized block content.
+	 *
+	 * @return string[]
+	 * @since x.x.x
+	 */
+	private function blockNames(string $content): array
+	{
+		$names = [];
+		$walk  = static function (array $blocks) use (&$walk, &$names): void {
+			foreach ($blocks as $block) {
+				// Unnamed chunks are the free text between blocks; editing that
+				// text may legitimately empty one, so only real blocks count.
+				if (! empty($block['blockName'])) {
+					$names[] = (string) $block['blockName'];
+				}
+
+				$walk($block['innerBlocks'] ?? []);
+			}
+		};
+
+		$walk(parse_blocks($content));
+
+		return $names;
 	}
 
 	/**

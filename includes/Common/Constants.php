@@ -103,6 +103,24 @@ class Constants
 	public const AI_MAX_FULL_CONTENT_POSTS = 5;
 
 	/**
+	 * Maximum posts a single bulk call accepts: titles / include in list-posts
+	 * and post_ids in preview-bulk-replace / bulk-replace-content.
+	 *
+	 * @since x.x.x
+	 */
+	public const AI_MAX_BULK_POSTS = 100;
+
+	/**
+	 * Length (characters) of the compact summary kept for a list result (post
+	 * IDs and titles) when it is elided from the in-loop history or persisted
+	 * as a digest. Larger than the plain stub / digest so the IDs survive and
+	 * the agent does not list the same posts again.
+	 *
+	 * @since x.x.x
+	 */
+	public const AI_LIST_RESULT_SUMMARY_LENGTH = 6000;
+
+	/**
 	 * Maximum length (characters) of a free-text answer the user types in an
 	 * ask-user or request-approval dialog.
 	 *

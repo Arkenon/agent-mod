@@ -4,7 +4,7 @@ Tags: ai, agent, chatbot, assistant, abilities
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.3.2
+Stable tag: 1.3.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -122,6 +122,13 @@ Under the AgentMod menu in your WordPress admin, there is a dedicated **Abilitie
 If you ask the agent to create a post, it will show you a confirmation modal summarizing the action before anything is written to the database. You must explicitly approve the action for it to proceed.
 
 == Changelog ==
+= 1.3.3 =
+* Added: Bulk text replace in posts. `preview-bulk-replace` (read-only) shows, for up to 100 posts at once, how many matches each post has with a before / after snippet, without saving anything. `bulk-replace-content` then applies the same change on the server; changed posts get a revision when their post type supports revisions. Literal text or regular expressions, an optional limit per post (e.g. only the leading label), case-insensitive matching that handles the Turkish i / ı / İ / I, and by default only the visible text is changed, never block comments or attributes. A change that would alter the block structure skips that post. Previously a task such as "remove the 'Short bio:' label from these 12 posts" needed a get-post and an update-post per post, and ran into the full-content read limit and the tool-call limit.
+* Improved: `list-posts` filters. `titles` finds many posts by title in one call (ignoring case, extra spaces and accents, with a "contains" fallback) and reports the titles that matched nothing. Also added: `include` / `exclude` IDs, `search_columns` (e.g. search titles only), `content_contains` / `content_not_contains`, `meta_query` with comparison operators (`!=`, `LIKE`, `IN`, `EXISTS`, `NOT EXISTS`, `>` …) and AND / OR, `tax_query`, `author`, `date_after` / `date_before`, `content_preview` (the start of each post's text, which does not count against the full-content read limit) and `fields: "ids"` for the smallest output.
+* Fixed: In long runs the agent listed the same posts again and again. Older tool results are compacted to save context, and a post list lost its IDs after a few more tool calls; the same happened between messages ("continue"). List results now keep every ID and title when compacted.
+* Fixed: A read-only tool called again with exactly the same arguments in one run now gets a notice to reuse the earlier result, and from the third identical call on it is not executed, so a looping agent no longer uses up the tool-call limit and the provider's token limit.
+* Fixed: `list-posts` passed an unchecked `orderby` value to the query.
+
 = 1.3.2 =
 * Added: Navigation menu abilities. `list-navigations` lists the block theme's menus (wp_navigation) with their item count and the templates / template parts that show them (e.g. the footer). `get-navigation` returns a menu as a tree of items addressed by path. `update-navigation` edits the existing menu in place with add / update / remove / move operations (a link that gets children becomes a submenu), or replaces its markup; all operations are validated before anything is saved. Previously the agent could not reliably edit an existing menu and created a new one instead.
 * Added: Approval request dialog in Execute mode with Manual approval. When the agent wants your go-ahead before acting (for example because it chose a different approach than you asked for, such as a code snippet instead of editing a plugin file, the scope grew, or a step cannot be undone), it calls its new request-approval tool. A dialog shows what it will do, with "Continue", "Request changes" (typed right in the dialog) and "Cancel"; closing the dialog counts as Cancel. On Continue the agent carries the action out in the same run, and write actions still pass through the usual confirmation dialog. The tool is not offered in Auto mode, in Ask or Plan mode, or in unattended runs.
