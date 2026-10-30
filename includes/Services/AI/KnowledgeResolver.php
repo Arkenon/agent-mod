@@ -33,6 +33,7 @@ class KnowledgeResolver
 			'admin_email'      => (string) get_bloginfo('admin_email'),
 			'wp_version'       => (string) get_bloginfo('version'),
 			'language'         => (string) get_bloginfo('language'),
+			'php_version'      => PHP_VERSION,
 		];
 	}
 }

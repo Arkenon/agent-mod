@@ -24,6 +24,7 @@
 namespace AgentMod\Services;
 
 use WP_Error;
+use AgentMod\Common\Constants;
 
 defined('ABSPATH') || exit;
 
@@ -75,7 +76,7 @@ class AskUserAbilityService
 	 * @var string
 	 * @since 1.3.1
 	 */
-	private const CATEGORY = 'agent-mod';
+	private const CATEGORY = Constants::SYSTEM_ABILITY_CATEGORY;
 
 	/**
 	 * Supported question types.
@@ -120,7 +121,31 @@ class AskUserAbilityService
 	{
 		$this->settings = $settings;
 
+		add_action('wp_abilities_api_categories_init', [$this, 'registerCategories']);
 		add_action('wp_abilities_api_init', [$this, 'registerAbilities']);
+	}
+
+	/**
+	 * Registers the system ability category.
+	 *
+	 * Shared with agent-mod/find-abilities (FindAbilitiesAbilityService).
+	 *
+	 * @return void
+	 * @since 1.3.4
+	 */
+	public function registerCategories(): void
+	{
+		if (! function_exists('wp_register_ability_category')) {
+			return;
+		}
+
+		wp_register_ability_category(
+			Constants::SYSTEM_ABILITY_CATEGORY,
+			[
+				'label'       => __('AgentMod — System', 'agent-mod'),
+				'description' => __('Tools that are part of how the AgentMod agent works, such as asking the user questions, requesting approval and finding other abilities. AgentMod offers them automatically when they apply; they are never selected per agent.', 'agent-mod'),
+			]
+		);
 	}
 
 	/**

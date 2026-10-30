@@ -19,6 +19,8 @@ use AgentMod\Common\Constants;
 use WP_Error;
 use WP_Post;
 use WP_Query;
+use WP_Taxonomy;
+use WP_Term;
 use WP_Block_Patterns_Registry;
 use WP_Theme_JSON;
 use WP_Theme_JSON_Resolver;
@@ -641,7 +643,7 @@ class AbilityRegistrarService
 			'agent-mod/get-post',
 			[
 				'label'               => __('Get Post or Page', 'agent-mod'),
-				'description'         => __('Returns a post raw block markup as html by post_id, plus its status and custom fields (meta). Use list-posts to find post_id first. For the same text change across many posts use preview-bulk-replace / bulk-replace-content instead of reading each post. The returned html can be modified and passed straight back to update-post as the html parameter. Navigation menus (wp_navigation, referenced by {"ref":ID} in wp:navigation blocks) have dedicated abilities: list-navigations / get-navigation / update-navigation.', 'agent-mod'),
+				'description'         => __('Returns a post raw block markup as html by post_id, plus its status, custom fields (meta) and assigned taxonomy terms (terms, keyed by taxonomy). Use list-posts to find post_id first. For the same text change across many posts use preview-bulk-replace / bulk-replace-content instead of reading each post. The returned html can be modified and passed straight back to update-post as the html parameter. Navigation menus (wp_navigation, referenced by {"ref":ID} in wp:navigation blocks) have dedicated abilities: list-navigations / get-navigation / update-navigation.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeGetPost'],
 				'permission_callback' => static function (): bool {
@@ -678,6 +680,7 @@ class AbilityRegistrarService
 						'url'       => ['type' => 'string'],
 						'html'      => ['type' => 'string'],
 						'meta'      => ['type' => 'object'],
+						'terms'     => ['type' => 'object'],
 						'error'     => ['type' => 'string'],
 					],
 				],
@@ -692,7 +695,7 @@ class AbilityRegistrarService
 			'agent-mod/create-post',
 			[
 				'label'               => __('Create Post or Page', 'agent-mod'),
-				'description'         => __('Creates a new post/page. Provide title and optionally html and meta. The html parameter must be complete, valid serialized block markup; it is parsed with parse_blocks() and re-serialized as-is — attribute/innerHTML consistency is NOT validated server-side. Returns the new post_id for use with get-post/update-post.', 'agent-mod'),
+				'description'         => __('Creates a new post/page. Provide title and optionally html, meta and terms (categories, tags or custom taxonomy terms; create missing terms first with create-terms). The html parameter must be complete, valid serialized block markup; it is parsed with parse_blocks() and re-serialized as-is — attribute/innerHTML consistency is NOT validated server-side. Returns the new post_id for use with get-post/update-post.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeCreatePost'],
 				'permission_callback' => static function (): bool {
@@ -720,6 +723,7 @@ class AbilityRegistrarService
 							'description' => __('Publication status. Default "draft".', 'agent-mod'),
 						],
 						'meta'        => $this->metaWriteSchema(),
+						'terms'       => $this->termWriteSchema(),
 					],
 				],
 				'output_schema'       => [
@@ -744,7 +748,7 @@ class AbilityRegistrarService
 			'agent-mod/update-post',
 			[
 				'label'               => __('Update Post or Page', 'agent-mod'),
-				'description'         => __('Updates a post. Provide post_id plus any of html, title, post_status and meta; fields left out stay unchanged. The html parameter must be complete, valid serialized block markup; it is parsed with parse_blocks() and re-serialized as-is — attribute/innerHTML consistency is NOT validated server-side. To edit a navigation menu (wp_navigation) use update-navigation instead.', 'agent-mod'),
+				'description'         => __('Updates a post. Provide post_id plus any of html, title, post_status, meta and terms (categories, tags or custom taxonomy terms; create missing terms first with create-terms); fields left out stay unchanged. The html parameter must be complete, valid serialized block markup; it is parsed with parse_blocks() and re-serialized as-is — attribute/innerHTML consistency is NOT validated server-side. To edit a navigation menu (wp_navigation) use update-navigation instead.', 'agent-mod'),
 				'category'            => self::CATEGORY,
 				'execute_callback'    => [$this, 'executeUpdatePost'],
 				'permission_callback' => static function (): bool {
@@ -776,6 +780,7 @@ class AbilityRegistrarService
 							'description' => __('Optional. Changes the publication status (e.g. publish a draft).', 'agent-mod'),
 						],
 						'meta'        => $this->metaWriteSchema(),
+						'terms'       => $this->termWriteSchema(),
 					],
 				],
 				'output_schema'       => [
@@ -2350,13 +2355,14 @@ class AbilityRegistrarService
 			'url'       => (string) get_permalink($post->ID),
 			'html'      => $post->post_content,
 			'meta'      => $this->readPostMeta($post->ID, $input['meta_keys'] ?? null),
+			'terms'     => $this->readPostTerms($post),
 		];
 	}
 
 	/**
 	 * Execute callback for agent-mod/create-post.
 	 *
-	 * @param mixed $input Input data (expects 'title', optional 'html', 'post_type', 'post_status', 'meta').
+	 * @param mixed $input Input data (expects 'title', optional 'html', 'post_type', 'post_status', 'meta', 'terms').
 	 *
 	 * @return array<string, mixed>
 	 * @since 1.0.0
@@ -2402,10 +2408,17 @@ class AbilityRegistrarService
 			}
 		}
 
+		// Term checks need no post, so they run before anything is inserted.
+		$termWrites = $this->prepareTermWrites($postType, $input['terms'] ?? null);
+		if (is_wp_error($termWrites)) {
+			return ['success' => false, 'error' => $termWrites->get_error_message()];
+		}
+
 		// Meta capabilities can only be checked against an existing post, so a
-		// post with meta starts as a draft: it can be rolled back without side
-		// effects, and publish-time hooks (SEO, sharing) see the final meta.
-		$hasMeta = ! empty($input['meta']);
+		// post with meta or terms starts as a draft: it can be rolled back without
+		// side effects, and publish-time hooks (SEO, sharing) see the final data.
+		$hasMeta   = ! empty($input['meta']);
+		$deferSave = $hasMeta || ! empty($termWrites);
 
 		// wp_insert_post() unslashes its input; without wp_slash() the JSON
 		// escapes in block attributes (", \\) would be stripped.
@@ -2414,7 +2427,7 @@ class AbilityRegistrarService
 				'post_title'   => $title,
 				'post_content' => $serializedContent,
 				'post_type'    => $postType,
-				'post_status'  => $hasMeta ? 'draft' : $postStatus,
+				'post_status'  => $deferSave ? 'draft' : $postStatus,
 			]),
 			true
 		);
@@ -2425,14 +2438,22 @@ class AbilityRegistrarService
 
 		$postId = (int) $result;
 
-		if ($hasMeta) {
-			$metaWrites = $this->prepareMetaWrites($postId, $input['meta']);
+		if ($deferSave) {
+			$metaWrites = $this->prepareMetaWrites($postId, $input['meta'] ?? null);
 			if (is_wp_error($metaWrites)) {
 				wp_delete_post($postId, true);
 				return ['success' => false, 'error' => $metaWrites->get_error_message()];
 			}
 
 			$this->applyMetaWrites($postId, $metaWrites);
+
+			// A new post only holds the default terms (e.g. Uncategorized), so
+			// the requested terms always replace them.
+			$termError = $this->applyTermWrites($postId, $termWrites, false);
+			if (is_wp_error($termError)) {
+				wp_delete_post($postId, true);
+				return ['success' => false, 'error' => $termError->get_error_message()];
+			}
 
 			if ('draft' !== $postStatus) {
 				$statusResult = wp_update_post(['ID' => $postId, 'post_status' => $postStatus], true);
@@ -2454,7 +2475,7 @@ class AbilityRegistrarService
 	/**
 	 * Execute callback for agent-mod/update-post.
 	 *
-	 * @param mixed $input Input data (expects 'post_id' plus any of 'html', 'title', 'post_status', 'meta').
+	 * @param mixed $input Input data (expects 'post_id' plus any of 'html', 'title', 'post_status', 'meta', 'terms').
 	 *
 	 * @return array<string, mixed>
 	 * @since 1.0.0
@@ -2469,9 +2490,10 @@ class AbilityRegistrarService
 		$hasTitle  = ! empty($input['title']);
 		$hasStatus = ! empty($input['post_status']);
 		$hasMeta   = ! empty($input['meta']);
+		$hasTerms  = ! empty($input['terms']);
 
-		if (! $hasHtml && ! $hasTitle && ! $hasStatus && ! $hasMeta) {
-			return ['success' => false, 'error' => __('Nothing to update: provide at least one of html, title, post_status or meta.', 'agent-mod')];
+		if (! $hasHtml && ! $hasTitle && ! $hasStatus && ! $hasMeta && ! $hasTerms) {
+			return ['success' => false, 'error' => __('Nothing to update: provide at least one of html, title, post_status, meta or terms.', 'agent-mod')];
 		}
 
 		$postId   = absint($input['post_id']);
@@ -2526,8 +2548,18 @@ class AbilityRegistrarService
 			return ['success' => false, 'error' => $metaWrites->get_error_message()];
 		}
 
-		// Meta first, so publish-time hooks fired by a status change see it.
+		$termWrites = $this->prepareTermWrites($post->post_type, $input['terms'] ?? null);
+		if (is_wp_error($termWrites)) {
+			return ['success' => false, 'error' => $termWrites->get_error_message()];
+		}
+
+		// Meta and terms first, so publish-time hooks fired by a status change see them.
 		$this->applyMetaWrites($postId, $metaWrites);
+
+		$termError = $this->applyTermWrites($postId, $termWrites, true);
+		if (is_wp_error($termError)) {
+			return ['success' => false, 'error' => $termError->get_error_message()];
+		}
 
 		if (count($updateArgs) > 1) {
 			// wp_update_post() unslashes its input; keep the attribute JSON escapes.
@@ -3229,6 +3261,233 @@ class AbilityRegistrarService
 			// update_post_meta() unslashes its value.
 			update_post_meta($postId, $write['key'], wp_slash($write['value']));
 		}
+	}
+
+	/**
+	 * Input schema shared by the create-post and update-post terms parameter.
+	 *
+	 * Term references are strings so one fixed item type works with every
+	 * provider; numeric strings are read as term IDs.
+	 *
+	 * @return array<string, mixed>
+	 * @since 1.3.4
+	 */
+	private function termWriteSchema(): array
+	{
+		return [
+			'type'        => 'array',
+			'description' => __('Optional. Taxonomy terms (categories, tags, custom taxonomies) to assign, one item per taxonomy. Terms must already exist: create missing ones first with create-terms. Taxonomies left out keep their current terms.', 'agent-mod'),
+			'items'       => [
+				'type'       => 'object',
+				'required'   => ['taxonomy', 'terms'],
+				'properties' => [
+					'taxonomy' => [
+						'type'        => 'string',
+						'description' => __('Taxonomy slug, e.g. "category", "post_tag" or a custom taxonomy from list-taxonomies.', 'agent-mod'),
+					],
+					'terms'    => [
+						'type'        => 'array',
+						'items'       => ['type' => 'string'],
+						'description' => __('Term IDs (as strings, e.g. "12"), slugs or names. Replaces the post\'s terms in this taxonomy; an empty list removes them all.', 'agent-mod'),
+					],
+					'append'   => [
+						'type'        => 'boolean',
+						'description' => __('update-post only. true adds the terms and keeps the existing ones instead of replacing them. Default false.', 'agent-mod'),
+					],
+				],
+			],
+		];
+	}
+
+	/**
+	 * Validates term write items and resolves every term reference to an ID.
+	 *
+	 * Nothing is written here, so callers can reject the whole request before
+	 * touching the post. Missing terms are never created: wp_set_object_terms()
+	 * would silently add a new term for any unknown name.
+	 *
+	 * @param string $postType Post type the terms are assigned to.
+	 * @param mixed  $items    The 'terms' ability input.
+	 *
+	 * @return array<int, array{taxonomy: string, term_ids: int[], append: bool}>|WP_Error
+	 * @since 1.3.4
+	 */
+	private function prepareTermWrites(string $postType, $items)
+	{
+		if (empty($items)) {
+			return [];
+		}
+
+		if (! is_array($items)) {
+			return new WP_Error('invalid_terms', __('terms must be a list of {taxonomy, terms} objects.', 'agent-mod'));
+		}
+
+		$writes = [];
+		foreach ($items as $item) {
+			$slug     = is_array($item) && isset($item['taxonomy']) ? sanitize_key((string) $item['taxonomy']) : '';
+			$taxonomy = '' !== $slug ? get_taxonomy($slug) : false;
+
+			if (! $taxonomy instanceof WP_Taxonomy) {
+				return new WP_Error(
+					'invalid_terms',
+					/* translators: %s: taxonomy slug */
+					sprintf(__('The taxonomy "%s" is not registered on this site. Call list-taxonomies to see the available slugs.', 'agent-mod'), $slug)
+				);
+			}
+
+			if (! is_object_in_taxonomy($postType, $taxonomy->name)) {
+				return new WP_Error(
+					'invalid_terms',
+					/* translators: 1: taxonomy slug, 2: post type slug */
+					sprintf(__('The taxonomy "%1$s" is not registered for the post type "%2$s".', 'agent-mod'), $taxonomy->name, $postType)
+				);
+			}
+
+			if (isset($writes[$taxonomy->name])) {
+				return new WP_Error(
+					'invalid_terms',
+					/* translators: %s: taxonomy slug */
+					sprintf(__('The taxonomy "%s" is listed more than once. Put all of its terms in a single item.', 'agent-mod'), $taxonomy->name)
+				);
+			}
+
+			if (! current_user_can($taxonomy->cap->assign_terms)) {
+				return new WP_Error(
+					'terms_forbidden',
+					/* translators: %s: taxonomy slug */
+					sprintf(__('You are not allowed to assign terms in the "%s" taxonomy.', 'agent-mod'), $taxonomy->name)
+				);
+			}
+
+			if (! isset($item['terms']) || ! is_array($item['terms'])) {
+				return new WP_Error(
+					'invalid_terms',
+					/* translators: %s: taxonomy slug */
+					sprintf(__('The "%s" item needs a terms list (an empty list removes all of its terms).', 'agent-mod'), $taxonomy->name)
+				);
+			}
+
+			$termIds = [];
+			$missing = [];
+			foreach ($item['terms'] as $reference) {
+				if (! is_scalar($reference) || '' === trim((string) $reference)) {
+					continue;
+				}
+
+				$termId = $this->resolveTermReference(trim((string) $reference), $taxonomy->name);
+				if (null === $termId) {
+					$missing[] = (string) $reference;
+					continue;
+				}
+
+				$termIds[] = $termId;
+			}
+
+			if (! empty($missing)) {
+				return new WP_Error(
+					'terms_not_found',
+					sprintf(
+						/* translators: 1: comma-separated term references, 2: taxonomy slug */
+						__('These terms do not exist in the "%2$s" taxonomy: %1$s. Check them with list-terms, or create them first with create-terms.', 'agent-mod'),
+						implode(', ', $missing),
+						$taxonomy->name
+					)
+				);
+			}
+
+			$writes[$taxonomy->name] = [
+				'taxonomy' => $taxonomy->name,
+				'term_ids' => array_values(array_unique($termIds)),
+				'append'   => ! empty($item['append']),
+			];
+		}
+
+		return array_values($writes);
+	}
+
+	/**
+	 * Resolves a term reference (ID, slug or name) to a term ID.
+	 *
+	 * A numeric reference is tried as an ID first, then as a slug, so numeric
+	 * slugs such as a "2024" tag still resolve.
+	 *
+	 * @param string $reference Term ID, slug or name.
+	 * @param string $taxonomy  Taxonomy slug.
+	 *
+	 * @return int|null Null when no term matches.
+	 * @since 1.3.4
+	 */
+	private function resolveTermReference(string $reference, string $taxonomy): ?int
+	{
+		if (ctype_digit($reference)) {
+			$term = get_term((int) $reference, $taxonomy);
+			if ($term instanceof WP_Term) {
+				return (int) $term->term_id;
+			}
+		}
+
+		$term = get_term_by('slug', sanitize_title($reference), $taxonomy);
+		if (! $term instanceof WP_Term) {
+			$term = get_term_by('name', sanitize_text_field($reference), $taxonomy);
+		}
+
+		return $term instanceof WP_Term ? (int) $term->term_id : null;
+	}
+
+	/**
+	 * Saves term writes validated by prepareTermWrites().
+	 *
+	 * @param int                                                              $postId      Post ID.
+	 * @param array<int, array{taxonomy: string, term_ids: int[], append: bool}> $writes      Validated writes.
+	 * @param bool                                                             $allowAppend Whether the items' append flag is honoured.
+	 *
+	 * @return WP_Error|null Null on success.
+	 * @since 1.3.4
+	 */
+	private function applyTermWrites(int $postId, array $writes, bool $allowAppend): ?WP_Error
+	{
+		foreach ($writes as $write) {
+			// Integer IDs: wp_set_object_terms() reads strings as term names.
+			$result = wp_set_object_terms($postId, $write['term_ids'], $write['taxonomy'], $allowAppend && $write['append']);
+			if (is_wp_error($result)) {
+				return $result;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Reads the terms assigned to a post for get-post, keyed by taxonomy.
+	 *
+	 * Only taxonomies an editor can see (public or shown in the admin UI) are
+	 * listed, which keeps internal ones such as wp_theme out of the result.
+	 * Taxonomies with no terms are listed empty, so the agent also learns
+	 * which taxonomies it can assign.
+	 *
+	 * @param WP_Post $post Post.
+	 *
+	 * @return array<string, array<int, array{id: int, name: string, slug: string}>>
+	 * @since 1.3.4
+	 */
+	private function readPostTerms(WP_Post $post): array
+	{
+		$result = [];
+		foreach (get_object_taxonomies($post->post_type, 'objects') as $taxonomy) {
+			if (! $taxonomy->public && ! $taxonomy->show_ui) {
+				continue;
+			}
+
+			$terms = get_the_terms($post, $taxonomy->name);
+
+			$result[$taxonomy->name] = is_array($terms)
+				? array_map(static function (WP_Term $term): array {
+					return ['id' => (int) $term->term_id, 'name' => $term->name, 'slug' => $term->slug];
+				}, $terms)
+				: [];
+		}
+
+		return $result;
 	}
 
 	/**

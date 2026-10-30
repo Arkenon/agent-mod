@@ -62,7 +62,7 @@ class HistoryCompactor
      * (e.g. a field configuration tree), so its skeleton survives elision.
      *
      * @var string[]
-     * @since x.x.x
+     * @since 1.3.4
      */
     private const STRUCTURE_KEYS = [
         'id', 'ID', 'post_id', 'term_id', 'user_id', 'name', 'slug', 'title', 'label', 'status', 'post_type', 'taxonomy',
@@ -74,7 +74,7 @@ class HistoryCompactor
      * Maximum length of a top-level string kept in a structure summary.
      *
      * @var int
-     * @since x.x.x
+     * @since 1.3.4
      */
     private const STRUCTURE_STRING_LENGTH = 200;
 
@@ -82,7 +82,7 @@ class HistoryCompactor
      * Rough characters-per-token ratio used to estimate history size.
      *
      * @var int
-     * @since x.x.x
+     * @since 1.3.4
      */
     private const CHARS_PER_TOKEN = 4;
 
@@ -90,7 +90,7 @@ class HistoryCompactor
      * Estimated token cost of one file part (image / PDF attachment).
      *
      * @var int
-     * @since x.x.x
+     * @since 1.3.4
      */
     private const FILE_PART_TOKENS = 1500;
 
@@ -126,7 +126,7 @@ class HistoryCompactor
          *
          * @param int $trigger Token threshold.
          *
-         * @since x.x.x
+         * @since 1.3.4
          */
         $trigger = max(0, (int) apply_filters('agent_mod_history_compact_trigger_tokens', Constants::AI_HISTORY_COMPACT_TRIGGER_TOKENS));
 
@@ -136,7 +136,7 @@ class HistoryCompactor
          *
          * @param int $target Token target.
          *
-         * @since x.x.x
+         * @since 1.3.4
          */
         $target = min($trigger, max(0, (int) apply_filters('agent_mod_history_compact_target_tokens', Constants::AI_HISTORY_COMPACT_TARGET_TOKENS)));
 
@@ -229,7 +229,7 @@ class HistoryCompactor
      * @param Message[] $history Conversation history.
      *
      * @return int Estimated tokens.
-     * @since x.x.x
+     * @since 1.3.4
      */
     public function estimateTokens(array $history): int
     {
@@ -272,7 +272,7 @@ class HistoryCompactor
      * @param string $abilityName Ability name.
      *
      * @return bool
-     * @since x.x.x
+     * @since 1.3.4
      */
     public function isStickyTool(string $abilityName): bool
     {
@@ -283,7 +283,7 @@ class HistoryCompactor
      * Returns the ability names whose results are never elided.
      *
      * @return string[]
-     * @since x.x.x
+     * @since 1.3.4
      */
     private function stickyTools(): array
     {
@@ -522,7 +522,7 @@ class HistoryCompactor
      * @param mixed $payload Tool result.
      *
      * @return string|null JSON summary capped at AI_LIST_RESULT_SUMMARY_LENGTH, or null when the result has no nested structure.
-     * @since x.x.x
+     * @since 1.3.4
      */
     public function summarizeStructure($payload): ?string
     {
@@ -550,7 +550,7 @@ class HistoryCompactor
      * @param int          $depth Current depth (0 = top level).
      *
      * @return array<mixed>
-     * @since x.x.x
+     * @since 1.3.4
      */
     private function skeleton(array $value, int $depth): array
     {

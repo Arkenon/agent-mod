@@ -87,6 +87,14 @@ class AIClientAdapter
 	private AskUserAbilityService $askUser;
 
 	/**
+	 * Run-scoped ability catalog (dynamic tool loading).
+	 *
+	 * @var AbilityCatalog
+	 * @since 1.3.4
+	 */
+	private AbilityCatalog $catalog;
+
+	/**
 	 * Constructor (PHP-DI autowired).
 	 *
 	 * @param ToolCallRepairManager $toolCallRepairs  Provider tool-call repair manager.
@@ -94,6 +102,7 @@ class AIClientAdapter
 	 * @param HttpTimeoutManager    $httpTimeouts     AI provider HTTP timeout manager.
 	 * @param HistoryCompactor      $historyCompactor In-loop history compactor.
 	 * @param AskUserAbilityService $askUser          Ask-user ability service.
+	 * @param AbilityCatalog        $catalog          Run-scoped ability catalog.
 	 *
 	 * @since 1.0.0
 	 */
@@ -102,13 +111,15 @@ class AIClientAdapter
 		ProgressStore $progressStore,
 		HttpTimeoutManager $httpTimeouts,
 		HistoryCompactor $historyCompactor,
-		AskUserAbilityService $askUser
+		AskUserAbilityService $askUser,
+		AbilityCatalog $catalog
 	) {
 		$this->toolCallRepairs  = $toolCallRepairs;
 		$this->progressStore    = $progressStore;
 		$this->httpTimeouts     = $httpTimeouts;
 		$this->historyCompactor = $historyCompactor;
 		$this->askUser          = $askUser;
+		$this->catalog          = $catalog;
 	}
 
 	/**
@@ -125,6 +136,8 @@ class AIClientAdapter
 	 *                                           session ('*' approves every write); these skip the
 	 *                                           confirmation gate entirely.
 	 * @param bool        $webSearchEnabled  Whether to enable the provider's native web search tool.
+	 * @param WP_Ability[]|null $tools       Tools sent at the start under dynamic tool loading (see
+	 *                                       AbilityResolver::selectTools()); null sends every ability.
 	 *
 	 * @return AgentResponse
 	 * @since 1.0.0
@@ -138,7 +151,8 @@ class AIClientAdapter
 		int $maxToolCalls,
 		string $requestId = '',
 		array $autoApprovedAbilities = [],
-		bool $webSearchEnabled = false
+		bool $webSearchEnabled = false,
+		?array $tools = null
 	): AgentResponse {
 		if (! function_exists('wp_ai_client_prompt')) {
 			return AgentResponse::fromError(
@@ -149,6 +163,7 @@ class AIClientAdapter
 		// Compensate for provider connectors that drop tool-call metadata across turns.
 		$this->toolCallRepairs->register();
 		$this->httpTimeouts->register();
+		$this->catalog->scope($abilities);
 
 		try {
 			return $this->runGenerationLoop(
@@ -160,11 +175,14 @@ class AIClientAdapter
 				$maxToolCalls,
 				$requestId,
 				$autoApprovedAbilities,
-				$webSearchEnabled
+				$webSearchEnabled,
+				[],
+				$tools
 			);
 		} finally {
 			$this->toolCallRepairs->unregister();
 			$this->httpTimeouts->unregister();
+			$this->catalog->clear();
 
 			// Progress and stop flags are only meaningful while the request is
 			// in flight.
@@ -201,6 +219,7 @@ class AIClientAdapter
 	 * @param array<int, array<string, mixed>>  $executedCalls Calls already executed in earlier legs of this chain.
 	 * @param string      $decision              'approve', 'decline' or 'answer'.
 	 * @param array<string, mixed> $answerPayload Function response for the ask-user call ('answer' only).
+	 * @param WP_Ability[]|null $tools       Tools sent at the start under dynamic tool loading; null sends every ability.
 	 *
 	 * @return AgentResponse
 	 * @since 1.1.0
@@ -217,7 +236,8 @@ class AIClientAdapter
 		bool $webSearchEnabled,
 		array $executedCalls,
 		string $decision,
-		array $answerPayload = []
+		array $answerPayload = [],
+		?array $tools = null
 	): AgentResponse {
 		if (! function_exists('wp_ai_client_prompt')) {
 			return AgentResponse::fromError(
@@ -242,6 +262,7 @@ class AIClientAdapter
 		// Compensate for provider connectors that drop tool-call metadata across turns.
 		$this->toolCallRepairs->register();
 		$this->httpTimeouts->register();
+		$this->catalog->scope($abilities);
 
 		try {
 			if ('answer' === $decision) {
@@ -287,11 +308,13 @@ class AIClientAdapter
 				$requestId,
 				$autoApprovedAbilities,
 				$webSearchEnabled,
-				$executedCalls
+				$executedCalls,
+				$tools
 			);
 		} finally {
 			$this->toolCallRepairs->unregister();
 			$this->httpTimeouts->unregister();
+			$this->catalog->clear();
 
 			if ('' !== $requestId) {
 				$this->progressStore->delete($requestId);
@@ -564,6 +587,7 @@ class AIClientAdapter
 	 * @param array<int, array<string, mixed>> $initialToolCalls Calls executed in earlier legs of a
 	 *                                                           confirmation chain; seeds the executed
 	 *                                                           list so responses report the whole chain.
+	 * @param WP_Ability[]|null $tools Tools sent at the start under dynamic tool loading; null sends every ability.
 	 *
 	 * @return AgentResponse
 	 * @since 1.0.0
@@ -578,7 +602,8 @@ class AIClientAdapter
 		string $requestId = '',
 		array $autoApprovedAbilities = [],
 		bool $webSearchEnabled = false,
-		array $initialToolCalls = []
+		array $initialToolCalls = [],
+		?array $tools = null
 	): AgentResponse {
 		$resolver   = new WP_AI_Client_Ability_Function_Resolver(...$abilities);
 		$history    = $messages;
@@ -631,8 +656,10 @@ class AIClientAdapter
 				}
 			}
 
-			if (! empty($abilities)) {
-				$builder->using_abilities(...$abilities);
+			$sentTools = null === $tools ? $abilities : $this->withLoadedTools($tools, $abilities, $history);
+
+			if (! empty($sentTools)) {
+				$builder->using_abilities(...$sentTools);
 			}
 
 			// Enable the provider's native web search when requested.
@@ -833,6 +860,47 @@ class AIClientAdapter
 			null,
 			$this->extractStopReason($finalResult)
 		);
+	}
+
+	/**
+	 * Appends the abilities loaded during the run to the initial tool set.
+	 *
+	 * Loaded abilities (find-abilities matches and abilities the model called)
+	 * go after the initial set, in the order they were loaded, and stay for the
+	 * rest of the run. The tool block therefore only ever grows at its end,
+	 * which keeps the provider's cached prompt prefix as long as possible.
+	 * Only abilities of the run's allowed set are added.
+	 *
+	 * @param WP_Ability[] $tools     Initial tool set.
+	 * @param WP_Ability[] $abilities Abilities allowed in the run.
+	 * @param Message[]    $history   Wire-format history of the run.
+	 *
+	 * @return WP_Ability[]
+	 * @since 1.3.4
+	 */
+	private function withLoadedTools(array $tools, array $abilities, array $history): array
+	{
+		$allowed = [];
+		foreach ($abilities as $ability) {
+			if ($ability instanceof WP_Ability) {
+				$allowed[$ability->get_name()] = $ability;
+			}
+		}
+
+		$sent = [];
+		foreach ($tools as $tool) {
+			if ($tool instanceof WP_Ability) {
+				$sent[$tool->get_name()] = $tool;
+			}
+		}
+
+		foreach ($this->catalog->loadedNames($history) as $name) {
+			if (! isset($sent[$name]) && isset($allowed[$name])) {
+				$sent[$name] = $allowed[$name];
+			}
+		}
+
+		return array_values($sent);
 	}
 
 	/**
@@ -1211,7 +1279,7 @@ class AIClientAdapter
 	 * @param mixed  $args        Call arguments.
 	 *
 	 * @return string
-	 * @since x.x.x
+	 * @since 1.3.4
 	 */
 	private function readSignature(string $abilityName, $args): string
 	{
@@ -1230,7 +1298,7 @@ class AIClientAdapter
 	 * @param int                $watermark   History index below which results are elided.
 	 *
 	 * @return void
-	 * @since x.x.x
+	 * @since 1.3.4
 	 */
 	private function forgetElidedReads(array &$callCounts, array &$readIndexes, int $watermark): void
 	{

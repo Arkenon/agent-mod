@@ -36,13 +36,17 @@ class PromptBuilder
 	/**
 	 * Builds the full system instruction for an agent.
 	 *
-	 * @param AgentConfig            $agent       The agent configuration.
-	 * @param array<string, string>  $siteContext Site context (may be empty).
+	 * @param AgentConfig                                      $agent       The agent configuration.
+	 * @param array<string, string>                            $siteContext Site context (may be empty).
+	 * @param array<string, array{label: string, count: int}> $toolCatalog Categories of the abilities left to
+	 *                                                                      find under dynamic tool loading
+	 *                                                                      (AbilityCatalog::categoryIndex()); empty
+	 *                                                                      when every ability is sent as a tool.
 	 *
 	 * @return string
 	 * @since 1.0.0
 	 */
-	public function buildSystemInstruction(AgentConfig $agent, array $siteContext = []): string
+	public function buildSystemInstruction(AgentConfig $agent, array $siteContext = [], array $toolCatalog = []): string
 	{
 		$sections = [];
 
@@ -100,6 +104,10 @@ class PromptBuilder
 		// the model tends to re-fetch data it already has.
 		$sections[] = __('Earlier tool results are summarized in the conversation history as "[Tools used this turn]" blocks. Trust those summaries: do not re-call the same read tool with the same arguments to retrieve data you already have.', 'agent-mod');
 
+		if (! empty($toolCatalog)) {
+			$sections[] = $this->buildToolLoadingDirective($toolCatalog);
+		}
+
 		$emphasized = $this->resolveEmphasized($agent);
 		if (! empty($emphasized)) {
 			$sections[] = sprintf(
@@ -112,6 +120,35 @@ class PromptBuilder
 		$instruction = implode("\n\n", array_filter($sections));
 
 		return (string) apply_filters('agent_mod_system_prompt', $instruction, $agent);
+	}
+
+	/**
+	 * Builds the directive for dynamic tool loading.
+	 *
+	 * Without it the model takes its short tool list for everything it can do
+	 * and tells the user a task is impossible. The category list costs a few
+	 * hundred tokens at most and tells the model what is worth searching for.
+	 *
+	 * @param array<string, array{label: string, count: int}> $toolCatalog Categories keyed by slug.
+	 *
+	 * @return string
+	 * @since 1.3.4
+	 */
+	private function buildToolLoadingDirective(array $toolCatalog): string
+	{
+		$lines = [
+			sprintf(
+				/* translators: %s: find-abilities ability name. */
+				__('Only a few of your tools are loaded at the start. Whenever the loaded tools cannot do what the task needs, call %s with short English keywords first; the tools it returns are loaded for your next step. Never tell the user something cannot be done before searching for a tool. Tool categories you can search (slug: label, number of tools):', 'agent-mod'),
+				AbilityCatalog::FIND
+			),
+		];
+
+		foreach ($toolCatalog as $slug => $category) {
+			$lines[] = sprintf('- %s: %s (%d)', '' !== $slug ? $slug : '-', $category['label'], $category['count']);
+		}
+
+		return implode("\n", $lines);
 	}
 
 	/**
@@ -330,6 +367,7 @@ class PromptBuilder
 			'admin_email'      => __('Admin email', 'agent-mod'),
 			'wp_version'       => __('WordPress version', 'agent-mod'),
 			'language'         => __('Language', 'agent-mod'),
+			'php_version'      => __('PHP version', 'agent-mod'),
 		];
 
 		foreach ($siteContext as $key => $value) {
@@ -339,6 +377,10 @@ class PromptBuilder
 			$label   = $labels[$key] ?? $key;
 			$lines[] = sprintf('- %s: %s', $label, $value);
 		}
+
+		// Without this the model treats the block as a hint and re-fetches the
+		// same values with the site/environment info tools on every turn.
+		$lines[] = __('This site context is current and authoritative. Use it directly; do not call tools only to retrieve these values again (for example the site name, URL, WordPress or PHP version).', 'agent-mod');
 
 		return implode("\n", $lines);
 	}

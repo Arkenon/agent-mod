@@ -57,6 +57,41 @@ class Constants
 	public const AI_MAX_SEARCH_RESULTS = 20;
 
 	/**
+	 * Category of AgentMod's system abilities: the tools that are part of how
+	 * the agent works (ask-user, present-plan, request-approval,
+	 * find-abilities) rather than site capabilities. AgentMod alone decides
+	 * when they are offered, so they are never part of an ability selection.
+	 *
+	 * @since 1.3.4
+	 */
+	public const SYSTEM_ABILITY_CATEGORY = 'agent-mod-system';
+
+	/**
+	 * Default tool loading strategy: 'dynamic' sends a small tool set and lets
+	 * the agent load the rest through agent-mod/find-abilities; 'all' sends
+	 * every allowed ability on every request.
+	 *
+	 * @since 1.3.4
+	 */
+	public const AI_TOOL_LOADING = 'dynamic';
+
+	/**
+	 * Allowed-ability count up to which dynamic loading still sends every
+	 * ability: a small set costs less than the extra find round trip.
+	 * Filterable via `agent_mod_dynamic_tools_threshold`.
+	 *
+	 * @since 1.3.4
+	 */
+	public const AI_DYNAMIC_TOOLS_THRESHOLD = 15;
+
+	/**
+	 * Most abilities one agent-mod/find-abilities call returns (and loads).
+	 *
+	 * @since 1.3.4
+	 */
+	public const AI_FIND_ABILITIES_LIMIT = 8;
+
+	/**
 	 * HTTP timeout (seconds) for requests to AI provider APIs.
 	 *
 	 * WordPress defaults to a 30s cURL timeout, which long generations
@@ -82,7 +117,7 @@ class Constants
 	 * eliding old tool results. Below it the history is sent whole. Filterable
 	 * via `agent_mod_history_compact_trigger_tokens`.
 	 *
-	 * @since x.x.x
+	 * @since 1.3.4
 	 */
 	public const AI_HISTORY_COMPACT_TRIGGER_TOKENS = 80000;
 
@@ -92,7 +127,7 @@ class Constants
 	 * cacheable) between them. Filterable via
 	 * `agent_mod_history_compact_target_tokens`.
 	 *
-	 * @since x.x.x
+	 * @since 1.3.4
 	 */
 	public const AI_HISTORY_COMPACT_TARGET_TOKENS = 40000;
 
@@ -252,7 +287,7 @@ class Constants
 				'agent-mod'
 			),
 			__(
-				'When a tool can answer the user accurately, call it before responding. Base your answers on tool results rather than guessing.',
+				'When a tool can answer the user accurately, call it before responding, unless the answer is already given in the site context or earlier in the conversation. Base your answers on tool results rather than guessing.',
 				'agent-mod'
 			),
 		];

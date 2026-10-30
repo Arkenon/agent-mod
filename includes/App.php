@@ -14,6 +14,7 @@ use DI\NotFoundException;
 use Exception;
 use AgentMod\Services\AbilityRegistrarService;
 use AgentMod\Services\AskUserAbilityService;
+use AgentMod\Services\FindAbilitiesAbilityService;
 use AgentMod\Common\DI;
 use AgentMod\Presentation\ControllerInit;
 use AgentMod\Services\LibraryService;
@@ -38,6 +39,7 @@ final class App
 		TaxonomyAbilityService::class,
 		NavigationAbilityService::class,
 		AskUserAbilityService::class,
+		FindAbilitiesAbilityService::class,
 		LibraryService::class,
 		SettingsService::class,
 	];

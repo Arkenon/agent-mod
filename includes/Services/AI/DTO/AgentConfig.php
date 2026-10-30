@@ -204,6 +204,20 @@ final class AgentConfig
 	public string $approvalMode = 'manual';
 
 	/**
+	 * Ability names loaded up front under dynamic tool loading.
+	 *
+	 * Set server-side by the orchestrator from the tools used in recent turns,
+	 * so a follow-up message ("now do the same for the other page") does not
+	 * have to search for them again. Carried on the DTO because the DTO is what
+	 * the confirmation store keeps for a paused run. Names are only ever
+	 * intersected with the allowed abilities, never trusted on their own.
+	 *
+	 * @var string[]
+	 * @since 1.3.4
+	 */
+	public array $preloadedAbilities = [];
+
+	/**
 	 * Constructor.
 	 *
 	 * @param string|null $name                   Agent name.

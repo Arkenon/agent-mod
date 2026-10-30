@@ -35,6 +35,7 @@ agent-mod/
     │   ├── LibraryService.php              # Manages library assets/scripts
     │   ├── SiteManagementAbilityService.php# Main service for site management abilities
     │   ├── NavigationAbilityService.php    # Navigation menu (wp_navigation) list/get/update abilities
+    │   ├── FindAbilitiesAbilityService.php # agent-mod/find-abilities: the agent's tool search (dynamic tool loading)
     │   │
     │   ├── SiteManagement/                 # ⚙️ Site Management Managers
     │   │   ├── Guard.php                   # Capability and security checks
@@ -48,7 +49,8 @@ agent-mod/
     │   └── AI/                             # 🧠 AI Orchestration & Logic
     │       ├── AIOrchestratorService.php   # Main AI engine (handles chat loops, tool calls)
     │       ├── AIClientAdapter.php         # Adapter for WordPress AI Client integration
-    │       ├── AbilityResolver.php         # Filters abilities based on config/mode
+    │       ├── AbilityResolver.php         # Filters abilities based on config/mode; selects the tools sent up front
+    │       ├── AbilityCatalog.php          # Dynamic tool loading: run-scoped ability search, loaded-tool tracking
     │       ├── PromptBuilder.php           # Assembles the final system prompt
     │       ├── ProviderInfoService.php     # Fetches AI provider/model details
     │       ├── ConfirmationStore.php       # Stores pending action states for confirmation
@@ -116,14 +118,7 @@ Array
 
     [agent_mod_abilities] => Array
         (
-            [ability_source] => selected
-            [allowed_abilities] => Array
-                (
-                    [0] => core/get-site-info
-                    [1] => core/get-user-info
-                    [2] => core/get-environment-info
-                )
-
+            [tool_loading] => dynamic
         )
 
     [agent_mod_ai_limits] => Array
@@ -169,6 +164,8 @@ This service is responsible for assembling the final system instruction string s
 ### 🔧 **Services**
 - **AI Engine (`Services/AI`)**: Contains the core logic for chatting, tool execution (`AIOrchestratorService`), and prompt generation.
 - **Abilities (`AbilityRegistrarService`)**: Registers the tools that the AI can use (e.g., creating posts, querying templates). If an ability does not require an input schema do not pass empty object. No input_schema on purpose: WP_Ability rejects a null input when a schema is present, and providers routinely call zero-argument tools with no arguments at all.
+- **System abilities**: Abilities that are part of how the agent works (ask-user, present-plan, request-approval, find-abilities) use the `agent-mod-system` category (`Constants::SYSTEM_ABILITY_CATEGORY`). They are never selectable: `AbilityResolver::resolve()` drops them from every list and adds them back only where they apply, and selection lists (e.g. PRO's `FormOptionsService::abilityOptions()`) skip them via `AbilityResolver::isSelectable()`, which also excludes the MCP Adapter's `mcp-adapter/*` proxy abilities. A new internal tool of this kind goes into that category.
+- **Dynamic tool loading**: By default (`tool_loading` = `dynamic`) only a few tools are sent up front (find-abilities, the interactive chat tools, `agent_mod_core_abilities`, @-mentioned and recently used abilities). The agent loads the rest by calling `agent-mod/find-abilities`; the matches are appended to the tool list for the rest of the run (`AbilityCatalog::loadedNames()` derives them from the history, so resume needs no extra state). The executable set is still the full resolved set, so the write gate, auto-approval and Ask/Plan read-only rules keep working on real ability names. Write ability descriptions so their name, label and description contain the words a user would search with. Sets of up to `AI_DYNAMIC_TOOLS_THRESHOLD` abilities and the `all` setting send every ability.
 - **Settings (`SettingsService`)**: Provides a clean API for reading plugin settings.
 
 ### 🛠️ **Common/Shared**

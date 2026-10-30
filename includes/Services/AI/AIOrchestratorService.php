@@ -73,6 +73,14 @@ class AIOrchestratorService
 	private ConfirmationStore $confirmationStore;
 
 	/**
+	 * Ability catalog (category index for dynamic tool loading).
+	 *
+	 * @var AbilityCatalog
+	 * @since 1.3.4
+	 */
+	private AbilityCatalog $abilityCatalog;
+
+	/**
 	 * Constructor (PHP-DI autowired).
 	 *
 	 * @param PromptBuilder     $promptBuilder     System instruction builder.
@@ -80,6 +88,7 @@ class AIOrchestratorService
 	 * @param KnowledgeResolver $knowledgeResolver Knowledge resolver.
 	 * @param AIClientAdapter   $clientAdapter     WP AI Client adapter.
 	 * @param ConfirmationStore $confirmationStore Pending write-action store.
+	 * @param AbilityCatalog    $abilityCatalog    Ability catalog.
 	 *
 	 * @since 1.0.0
 	 */
@@ -88,13 +97,15 @@ class AIOrchestratorService
 		AbilityResolver $abilityResolver,
 		KnowledgeResolver $knowledgeResolver,
 		AIClientAdapter $clientAdapter,
-		ConfirmationStore $confirmationStore
+		ConfirmationStore $confirmationStore,
+		AbilityCatalog $abilityCatalog
 	) {
 		$this->promptBuilder     = $promptBuilder;
 		$this->abilityResolver   = $abilityResolver;
 		$this->knowledgeResolver = $knowledgeResolver;
 		$this->clientAdapter     = $clientAdapter;
 		$this->confirmationStore = $confirmationStore;
+		$this->abilityCatalog    = $abilityCatalog;
 	}
 
 	/**
@@ -127,8 +138,13 @@ class AIOrchestratorService
 
 		$siteContext = $agent->autoIncludeSiteContext ? $this->knowledgeResolver->getSiteContext() : [];
 
-		$systemInstruction = $this->promptBuilder->buildSystemInstruction($agent, $siteContext);
-		$abilities = $this->abilityResolver->resolve($agent);
+		// Before the tools are selected, and stored with the agent so a paused
+		// run resumes with the same tool list.
+		$agent->preloadedAbilities = $this->recentToolNames($history);
+
+		$toolset = $this->resolveToolset($agent);
+
+		$systemInstruction = $this->promptBuilder->buildSystemInstruction($agent, $siteContext, $toolset['catalog']);
 
 		$messages   = $this->mapHistoryToMessages($history);
 		$messages[] = new Message(MessageRoleEnum::user(), $this->buildMessageParts($message, $attachments));
@@ -136,13 +152,14 @@ class AIOrchestratorService
 		$response = $this->clientAdapter->generate(
 			$systemInstruction,
 			$messages,
-			$abilities,
+			$toolset['abilities'],
 			$agent->provider,
 			$agent->model,
 			$agent->maxToolCalls,
 			$requestId,
 			$autoApprovedAbilities,
-			$agent->webSearchEnabled
+			$agent->webSearchEnabled,
+			$toolset['tools']
 		);
 
 		if ($response->isPendingConfirmation) {
@@ -210,13 +227,14 @@ class AIOrchestratorService
 
 		$siteContext = $agent->autoIncludeSiteContext ? $this->knowledgeResolver->getSiteContext() : [];
 
-		$systemInstruction = $this->promptBuilder->buildSystemInstruction($agent, $siteContext);
-		$abilities         = $this->abilityResolver->resolve($agent);
+		$toolset = $this->resolveToolset($agent);
+
+		$systemInstruction = $this->promptBuilder->buildSystemInstruction($agent, $siteContext, $toolset['catalog']);
 
 		$response = $this->clientAdapter->resume(
 			$systemInstruction,
 			$messages,
-			$abilities,
+			$toolset['abilities'],
 			$agent->provider,
 			$agent->model,
 			$agent->maxToolCalls,
@@ -225,7 +243,8 @@ class AIOrchestratorService
 			$agent->webSearchEnabled,
 			$executedCalls,
 			$decision,
-			$answerPayload
+			$answerPayload,
+			$toolset['tools']
 		);
 
 		if ($response->isPendingConfirmation) {
@@ -234,6 +253,62 @@ class AIOrchestratorService
 		}
 
 		return $response;
+	}
+
+	/**
+	 * Resolves the abilities of a run and the tools sent up front.
+	 *
+	 * @param AgentConfig $agent The agent configuration.
+	 *
+	 * @return array{abilities: \WP_Ability[], tools: \WP_Ability[]|null, catalog: array<string, array{label: string, count: int}>}
+	 *         catalog is empty when every ability is sent as a tool.
+	 * @since 1.3.4
+	 */
+	private function resolveToolset(AgentConfig $agent): array
+	{
+		$abilities = $this->abilityResolver->resolve($agent);
+		$toolset   = $this->abilityResolver->selectTools($agent, $abilities);
+
+		$toolset['catalog'] = null === $toolset['tools'] ? [] : $this->abilityCatalog->categoryIndex($abilities);
+
+		return $toolset;
+	}
+
+	/**
+	 * Ability names the agent used in the recent turns of the conversation.
+	 *
+	 * Covers the same turns whose tool digests are replayed to the model
+	 * (agent_mod_history_tool_digest_turns), so the tools behind the results the
+	 * model reads are loaded too. The history comes from the client; the names
+	 * are only used after being intersected with the allowed abilities.
+	 *
+	 * @param array<int, array<string, mixed>> $history Prior turns.
+	 *
+	 * @return string[]
+	 * @since 1.3.4
+	 */
+	private function recentToolNames(array $history): array
+	{
+		/** This filter is documented in AIOrchestratorService::mapHistoryToMessages(). */
+		$turns = max(0, (int) apply_filters('agent_mod_history_tool_digest_turns', 6));
+
+		$toolTurns = array_filter($history, static function ($turn): bool {
+			return is_array($turn) && ! empty($turn['toolCalls']) && is_array($turn['toolCalls']);
+		});
+
+		$names = [];
+
+		foreach ($turns > 0 ? array_slice($toolTurns, -$turns) : [] as $turn) {
+			foreach ($turn['toolCalls'] as $call) {
+				$name = is_array($call) ? sanitize_text_field((string) ($call['name'] ?? '')) : '';
+
+				if ('' !== $name && AbilityCatalog::FIND !== $name) {
+					$names[] = $name;
+				}
+			}
+		}
+
+		return array_slice(array_values(array_unique($names)), 0, 20);
 	}
 
 	/**

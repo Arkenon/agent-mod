@@ -238,32 +238,21 @@ final class SettingsController
 				'section_icon'  => 'admin-plugins',
 				'fields'        => [
 					[
-						'fieldType'   => 'select',
-						'name'        => 'ability_source',
-						'fieldLabel'  => __('Ability Source', 'agent-mod'),
-						'fieldHelpText'        => __('Choose whether to allow all abilities or only selected ones.', 'agent-mod'),
-						'options'     => 'All Abilities : all, Selected Abilities : selected',
-						'default'     => 'all',
-					],
-					[
-						'fieldType'    => 'select',
-						'multiple'     => true,
-						'name'         => 'allowed_abilities',
-						'fieldLabel'   => __('Allowed Abilities', 'agent-mod'),
-						'className'    => 'agent-mod-wp-core-ui-select-multiple',
-						'fieldHelpText' => __('Select the abilities to allow. Used only when Ability Source is set to Selected Abilities.', 'agent-mod'),
-						'options'      => $this->getAbilityOptions(),
-						'default'      => [],
-						'dependencies' => [
-							'relation'   => 'and',
-							'conditions' => [
-								[
-									'field'    => 'ability_source',
-									'operator' => '==',
-									'value'    => 'selected',
-								],
+						'fieldType'     => 'select',
+						'name'          => 'tool_loading',
+						'fieldLabel'    => __('Tool Loading', 'agent-mod'),
+						'fieldHelpText' => __('Dynamic (recommended): the agent starts with a few tools and loads the abilities it needs by searching for them, which keeps every request small. All: every ability is sent with every request; costs far more tokens on sites with many abilities.', 'agent-mod'),
+						'options'       => [
+							[
+								'label' => __('Dynamic (recommended)', 'agent-mod'),
+								'value' => 'dynamic',
+							],
+							[
+								'label' => __('All abilities', 'agent-mod'),
+								'value' => 'all',
 							],
 						],
+						'default'       => Constants::AI_TOOL_LOADING,
 					],
 				],
 			],
@@ -355,26 +344,5 @@ final class SettingsController
 			],
 			$this->providerInfo->getModelOptions()
 		);
-	}
-
-	/**
-	 * Get allowed abilities options for the settings field.
-	 *
-	 * @return array<int, array<string, string>>
-	 * @since 1.0.0
-	 */
-	private function getAbilityOptions(): array
-	{
-		$options = [];
-
-		$abilities = wp_get_abilities();
-		foreach ($abilities as $ability) {
-			$options[] = [
-				'label' => $ability->get_label(),
-				'value' => $ability->get_name(),
-			];
-		}
-
-		return $options;
 	}
 }

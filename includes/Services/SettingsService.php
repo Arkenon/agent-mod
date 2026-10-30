@@ -259,24 +259,47 @@ final class SettingsService
 	}
 
 	/**
+	 * Ability source of the settings-based (default) agent.
+	 *
+	 * Always 'all' since dynamic tool loading: the agent finds the abilities it
+	 * needs itself, so the settings page no longer offers a selection. A saved
+	 * 'selected' value from earlier versions is ignored on purpose. Agents that
+	 * carry their own ability list (e.g. PRO agents) still pass it explicitly.
+	 *
 	 * @return string
 	 * @since 1.1.0
 	 */
 	public function getAbilitySource(): string
 	{
-		$saved = trim((string) ($this->getSettings()['agent_mod_abilities']['ability_source'] ?? ''));
-		$value = '' !== $saved ? $saved : 'all';
-		return (string) $value;
+		return 'all';
 	}
 
 	/**
+	 * Allowed abilities of the settings-based (default) agent.
+	 *
+	 * Always empty: see getAbilitySource(). Returning the stale saved list would
+	 * let a selection the settings page no longer shows leak into agents that
+	 * fall back to it.
+	 *
 	 * @return string[]
 	 * @since 1.1.0
 	 */
 	public function getAllowedAbilities(): array
 	{
-		$saved = $this->getSettings()['agent_mod_abilities']['allowed_abilities'] ?? [];
-		return is_array($saved) ? $saved : [];
+		return [];
+	}
+
+	/**
+	 * Tool loading strategy: 'dynamic' or 'all'.
+	 *
+	 * @return string
+	 * @since 1.3.4
+	 */
+	public function getToolLoading(): string
+	{
+		$saved = (string) ($this->getSettings()['agent_mod_abilities']['tool_loading'] ?? '');
+
+		return in_array($saved, ['dynamic', 'all'], true) ? $saved : Constants::AI_TOOL_LOADING;
 	}
 
 	/**
