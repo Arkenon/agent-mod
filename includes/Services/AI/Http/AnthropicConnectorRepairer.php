@@ -63,6 +63,23 @@
  *    (ProductAbilityTrait::validate_product_fields_for_config()). Only the top
  *    level is touched; nested combiners are legal and are left alone.
  *
+ * 4. Output cap of 4096 tokens: the API requires `max_tokens` on every request,
+ *    and when the caller sets none the connector sends its own fallback,
+ *    AnthropicTextGenerationModel::DEFAULT_MAX_TOKENS = 4096. AgentMod sets none
+ *    (the other connectors then use the model's own limit), so every Claude
+ *    response — thinking included, which is always on for current models —
+ *    was capped at 4096 tokens. One long tool call (a code snippet, block
+ *    markup, a plan) is enough to hit it, and the connector then throws
+ *    TokenLimitReachedException ("Generation stopped due to token limit
+ *    (4096) with stop reason "max_tokens""), which ends the whole run. An
+ *    outgoing `max_tokens` equal to that fallback is raised to
+ *    RAISED_MAX_TOKENS (filterable via `agent_mod_anthropic_max_tokens`); the
+ *    cap is a ceiling, not a target, so short answers cost the same. Claude 3
+ *    models are left alone: some of them cap output at 4096 or 8192 and would
+ *    reject more. Once the connector picks a model-appropriate default (or
+ *    AgentMod sets a value itself), the outgoing value is no longer 4096 and
+ *    this repair stops matching.
+ *
  * Rather than patching the third-party connector (forbidden by project rules and
  * lost on update), all repairs hook the WordPress HTTP API — the AI Client routes
  * every Anthropic call through wp_safe_remote_request() — and are strictly scoped
@@ -117,6 +134,27 @@ class AnthropicConnectorRepairer implements ProviderToolCallRepairerInterface
      * @since 1.1.0
      */
     private const MAX_CONTINUATIONS = 5;
+
+    /**
+     * The connector's fallback `max_tokens` (repair 4).
+     *
+     * Mirrors AnthropicTextGenerationModel::DEFAULT_MAX_TOKENS.
+     *
+     * @var int
+     * @since 1.3.5
+     */
+    private const CONNECTOR_DEFAULT_MAX_TOKENS = 4096;
+
+    /**
+     * Output cap sent instead of the connector's fallback (repair 4).
+     *
+     * Anthropic's recommended default for non-streaming requests; every Claude
+     * model newer than Claude 3 accepts at least 32,000.
+     *
+     * @var int
+     * @since 1.3.5
+     */
+    private const RAISED_MAX_TOKENS = 16000;
 
     /**
      * Transient key prefix for persisted thinking signatures.
@@ -213,8 +251,9 @@ class AnthropicConnectorRepairer implements ProviderToolCallRepairerInterface
      * Applies every request-side repair to an outgoing Anthropic call.
      *
      * Re-injects captured thinking signatures into outgoing thinking blocks and
-     * drops the blocks that would still be unsigned (repair 1), then flattens
-     * top-level combiners out of the tool schemas (repair 3).
+     * drops the blocks that would still be unsigned (repair 1), flattens
+     * top-level combiners out of the tool schemas (repair 3) and raises the
+     * connector's fallback output cap (repair 4).
      *
      * @param mixed  $args The WordPress HTTP request arguments.
      * @param string $url  The request URL.
@@ -243,6 +282,10 @@ class AnthropicConnectorRepairer implements ProviderToolCallRepairerInterface
         // including the very first one, before any message carries a thinking
         // block — so it is deliberately not gated on $payload->messages.
         $changed = $this->flattenToolSchemas($payload);
+
+        if ($this->raiseDefaultMaxTokens($payload)) {
+            $changed = true;
+        }
 
         foreach ((array) ($payload->messages ?? []) as $message) {
             if (! $message instanceof stdClass || empty($message->content) || ! is_array($message->content)) {
@@ -281,6 +324,47 @@ class AnthropicConnectorRepairer implements ProviderToolCallRepairerInterface
         }
 
         return $args;
+    }
+
+    /**
+     * Raises the connector's fallback output cap (repair 4).
+     *
+     * @param stdClass $payload The decoded request payload (modified in place).
+     *
+     * @return bool True if `max_tokens` was changed.
+     * @since 1.3.5
+     */
+    private function raiseDefaultMaxTokens(stdClass $payload): bool
+    {
+        if (self::CONNECTOR_DEFAULT_MAX_TOKENS !== ($payload->max_tokens ?? null)) {
+            return false;
+        }
+
+        $model = (string) ($payload->model ?? '');
+
+        if ('' === $model || 0 === strpos($model, 'claude-3')) {
+            return false;
+        }
+
+        /**
+         * Filters the output cap sent to Claude instead of the connector's 4096 fallback.
+         *
+         * Must not exceed what the model accepts, or the API rejects the request.
+         *
+         * @param int    $maxTokens Output cap.
+         * @param string $model     Model id of the request.
+         *
+         * @since 1.3.5
+         */
+        $maxTokens = (int) apply_filters('agent_mod_anthropic_max_tokens', self::RAISED_MAX_TOKENS, $model);
+
+        if ($maxTokens <= self::CONNECTOR_DEFAULT_MAX_TOKENS) {
+            return false;
+        }
+
+        $payload->max_tokens = $maxTokens;
+
+        return true;
     }
 
     /**

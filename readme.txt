@@ -4,7 +4,7 @@ Tags: ai, agent, chatbot, assistant, abilities
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.3.4
+Stable tag: 1.3.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -122,6 +122,9 @@ Under the AgentMod menu in your WordPress admin, there is a dedicated **Abilitie
 If you ask the agent to create a post, it will show you a confirmation modal summarizing the action before anything is written to the database. You must explicitly approve the action for it to proceed.
 
 == Changelog ==
+= 1.3.5 =
+* Fixed: With a Claude model, a longer task could stop with "Generation stopped due to token limit (4096) with stop reason "max_tokens"" and the whole run was lost. When no limit is set, the Anthropic connector caps every response at 4096 tokens, thinking included, which a single long tool call (a code snippet, block markup, a plan) can exceed. AgentMod now raises that cap to 16,000 tokens; the cap is a ceiling, so shorter answers cost the same. Claude 3 models keep their own lower limits, and a value set explicitly is left unchanged. The `agent_mod_anthropic_max_tokens` filter changes the value. OpenAI and Google models were not affected.
+
 = 1.3.4 =
 * Added: Dynamic tool loading, the new default. Instead of sending every ability with every request, the agent starts with a few tools and loads the abilities a task needs through the new `agent-mod/find-abilities` tool; what it finds stays available for the rest of the run, and tools used in the recent messages are loaded up front. On a site with about 100 abilities, the tool definitions sent with each request drop from about 23,000 to about 1,100 tokens, so even a "hello" costs a fraction of what it did. Write confirmation, auto-approval and the read-only rule of Ask and Plan modes work exactly as before. Agents with 15 or fewer abilities still get all of them up front. The new "Tool Loading" setting (Settings > Abilities) switches back to sending every ability.
 * Changed: The "Ability Source" and "Allowed Abilities" settings are removed. The default agent can use every ability and finds the ones it needs; a selection saved in an earlier version is no longer applied.
