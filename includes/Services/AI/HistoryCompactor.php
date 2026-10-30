@@ -8,11 +8,20 @@
  * a large tool result (skill body, template HTML) fetched at iteration 2 is
  * re-uploaded verbatim on every later iteration, and screenshot attachments on
  * the user message are re-uploaded too. This service compacts the copy of the
- * history that goes to the provider: old tool results are elided to short
- * stubs (their call id and name are preserved — providers require a response
- * for every outstanding call), and binary file parts are kept only on the most
- * recent user message. The canonical history kept for persistence and the
- * confirmation/resume flow is never modified.
+ * history that goes to the provider: binary file parts are kept only on the
+ * most recent user message, and once the history grows past a token threshold
+ * old tool results are elided to short summaries (their call id and name are
+ * preserved — providers require a response for every outstanding call). The
+ * canonical history kept for persistence and the confirmation/resume flow is
+ * never modified.
+ *
+ * Elision is threshold-based and sticky on purpose. Below the trigger nothing
+ * is elided, so the model keeps every result it fetched. When the trigger is
+ * crossed, results are elided oldest first down to a lower target and a
+ * watermark records how far it went; later iterations elide exactly the same
+ * messages until the next crossing. The sent prefix therefore stays byte-
+ * identical between compactions, which keeps provider prompt caches warm —
+ * a window sliding on every iteration would invalidate them each time.
  *
  * @package AgentMod
  * @subpackage Services\AI
@@ -49,24 +58,87 @@ class HistoryCompactor
     private const LIST_ITEM_KEYS = ['post_id', 'post_ids', 'id', 'ID', 'term_id', 'user_id', 'navigation_id', 'title', 'name', 'slug', 'status', 'post_type', 'matches'];
 
     /**
+     * Keys kept at every depth in the structure summary of a nested result
+     * (e.g. a field configuration tree), so its skeleton survives elision.
+     *
+     * @var string[]
+     * @since x.x.x
+     */
+    private const STRUCTURE_KEYS = [
+        'id', 'ID', 'post_id', 'term_id', 'user_id', 'name', 'slug', 'title', 'label', 'status', 'post_type', 'taxonomy',
+        'type', 'fieldType', 'fieldLabel', 'meta_box_id', 'meta_box_title', 'section_name', 'section_title', 'menu_slug',
+        'options', 'multiple', 'required', 'default',
+    ];
+
+    /**
+     * Maximum length of a top-level string kept in a structure summary.
+     *
+     * @var int
+     * @since x.x.x
+     */
+    private const STRUCTURE_STRING_LENGTH = 200;
+
+    /**
+     * Rough characters-per-token ratio used to estimate history size.
+     *
+     * @var int
+     * @since x.x.x
+     */
+    private const CHARS_PER_TOKEN = 4;
+
+    /**
+     * Estimated token cost of one file part (image / PDF attachment).
+     *
+     * @var int
+     * @since x.x.x
+     */
+    private const FILE_PART_TOKENS = 1500;
+
+    /**
      * Compacts a history for sending to the provider.
      *
-     * @param Message[] $history Conversation history (never mutated).
+     * Pass the same $watermark variable on every iteration of one run: it
+     * records up to which history index tool results have been elided, so
+     * later calls elide the same messages and only move it on the next
+     * threshold crossing.
+     *
+     * @param Message[] $history   Conversation history (never mutated).
+     * @param int       $watermark History index below which tool results are elided; advanced in place.
      *
      * @return Message[] Compacted copy.
      * @since 1.1.5
      */
-    public function compact(array $history): array
+    public function compact(array $history, int &$watermark = 0): array
     {
         /**
-         * Filters how many of the most recent tool-result messages are re-sent
-         * verbatim; older ones are elided to stubs.
+         * Filters how many of the most recent tool-result messages are always
+         * re-sent verbatim, even once the history has been compacted.
          *
          * @param int $keep Number of tool-result messages kept verbatim.
          *
          * @since 1.1.5
          */
         $keep = max(0, (int) apply_filters('agent_mod_history_keep_tool_results', Constants::AI_HISTORY_KEEP_TOOL_RESULTS));
+
+        /**
+         * Filters the estimated history size (tokens) at which old tool
+         * results start being elided.
+         *
+         * @param int $trigger Token threshold.
+         *
+         * @since x.x.x
+         */
+        $trigger = max(0, (int) apply_filters('agent_mod_history_compact_trigger_tokens', Constants::AI_HISTORY_COMPACT_TRIGGER_TOKENS));
+
+        /**
+         * Filters the estimated history size (tokens) a compaction elides
+         * down to. Kept below the trigger so compactions stay rare.
+         *
+         * @param int $target Token target.
+         *
+         * @since x.x.x
+         */
+        $target = min($trigger, max(0, (int) apply_filters('agent_mod_history_compact_target_tokens', Constants::AI_HISTORY_COMPACT_TARGET_TOKENS)));
 
         $toolResultIndexes = [];
         $fileMessageIndexes = [];
@@ -83,9 +155,11 @@ class HistoryCompactor
             }
         }
 
-        // Tool-result messages recent enough to stay verbatim. (array_slice
-        // with -0 would return the whole array, so 0 is handled explicitly.)
-        $verbatim = $keep > 0 ? array_flip(array_slice($toolResultIndexes, -$keep)) : [];
+        // The first tool-result message recent enough to always stay verbatim.
+        // (array_slice with -0 would return the whole array, so 0 is handled
+        // explicitly.)
+        $recent      = $keep > 0 ? array_slice($toolResultIndexes, -$keep) : [];
+        $firstRecent = empty($recent) ? PHP_INT_MAX : (int) reset($recent);
 
         // Only the most recent attachment-bearing user message keeps its files.
         $lastFileIndex = empty($fileMessageIndexes) ? -1 : (int) end($fileMessageIndexes);
@@ -96,12 +170,15 @@ class HistoryCompactor
 
         foreach ($history as $index => $message) {
             if (! $message instanceof Message) {
-                $compacted[] = $message;
+                $compacted[$index] = $message;
                 continue;
             }
 
-            if (in_array($index, $toolResultIndexes, true) && ! isset($verbatim[$index])) {
-                $compacted[] = $this->elideToolResults($message, $sticky[$index] ?? []);
+            // Everything below the watermark was elided by an earlier
+            // compaction of this run and stays elided, so the prefix the
+            // provider sees does not change between compactions.
+            if ($index < $watermark && in_array($index, $toolResultIndexes, true)) {
+                $compacted[$index] = $this->elideToolResults($message, $sticky[$index] ?? []);
                 continue;
             }
 
@@ -109,14 +186,130 @@ class HistoryCompactor
                 in_array($index, $fileMessageIndexes, true)
                 && $index !== $lastFileIndex
             ) {
-                $compacted[] = $this->stripFiles($message);
+                $compacted[$index] = $this->stripFiles($message);
                 continue;
             }
 
-            $compacted[] = $message;
+            $compacted[$index] = $message;
         }
 
-        return $compacted;
+        $tokens = $this->estimateTokens($compacted);
+
+        if ($tokens < $trigger) {
+            return array_values($compacted);
+        }
+
+        // Over the threshold: elide the oldest results down to the target and
+        // move the watermark past the last one elided.
+        foreach ($toolResultIndexes as $index) {
+            if ($tokens <= $target || $index >= $firstRecent) {
+                break;
+            }
+
+            if ($index < $watermark) {
+                continue;
+            }
+
+            $before            = $this->estimateTokens([$compacted[$index]]);
+            $compacted[$index] = $this->elideToolResults($history[$index], $sticky[$index] ?? []);
+            $tokens           -= $before - $this->estimateTokens([$compacted[$index]]);
+            $watermark         = $index + 1;
+        }
+
+        return array_values($compacted);
+    }
+
+    /**
+     * Estimates the token size of a history.
+     *
+     * A characters / 4 heuristic over text and JSON-encoded function call and
+     * response parts; each file part counts as a fixed amount. Only used to
+     * decide when to compact, so a rough figure is enough.
+     *
+     * @param Message[] $history Conversation history.
+     *
+     * @return int Estimated tokens.
+     * @since x.x.x
+     */
+    public function estimateTokens(array $history): int
+    {
+        $chars = 0;
+        $files = 0;
+
+        foreach ($history as $message) {
+            if (! $message instanceof Message) {
+                continue;
+            }
+
+            foreach ($message->getParts() as $part) {
+                $type = $part->getType();
+
+                if ($type->isFile()) {
+                    $files++;
+                } elseif ($type->isFunctionCall()) {
+                    $call   = $part->getFunctionCall();
+                    $chars += null === $call ? 0 : strlen((string) wp_json_encode($call->getArgs())) + strlen((string) $call->getName());
+                } elseif ($type->isFunctionResponse()) {
+                    $response = $part->getFunctionResponse();
+                    $chars   += null === $response ? 0 : strlen((string) wp_json_encode($response->getResponse()));
+                } else {
+                    $chars += strlen((string) $part->getText());
+                }
+            }
+        }
+
+        return (int) ceil($chars / self::CHARS_PER_TOKEN) + $files * self::FILE_PART_TOKENS;
+    }
+
+    /**
+     * Whether an ability's results are exempt from elision.
+     *
+     * By default the Pro skill fetcher, the ask-user / request-approval
+     * answers and the Native Custom Fields configuration reads: a field
+     * configuration is what the agent writes code against, and losing it
+     * mid-task sends the agent back to re-read it or to guess meta keys.
+     *
+     * @param string $abilityName Ability name.
+     *
+     * @return bool
+     * @since x.x.x
+     */
+    public function isStickyTool(string $abilityName): bool
+    {
+        return in_array($abilityName, $this->stickyTools(), true);
+    }
+
+    /**
+     * Returns the ability names whose results are never elided.
+     *
+     * @return string[]
+     * @since x.x.x
+     */
+    private function stickyTools(): array
+    {
+        /**
+         * Filters the ability names whose most recent result per argument
+         * identity is never elided from the in-loop history.
+         *
+         * @param string[] $stickyTools Ability names.
+         *
+         * @since 1.1.5
+         */
+        // The user's answers to ask-user / request-approval are their own input,
+        // so they are never elided either.
+        return (array) apply_filters(
+            'agent_mod_history_sticky_tools',
+            array_merge(
+                [
+                    'agent-mod-pro/get-skill-by-slug',
+                    'native-custom-fields/get-post-meta-fields',
+                    'native-custom-fields/get-term-meta-fields',
+                    'native-custom-fields/get-user-meta-fields',
+                    'native-custom-fields/get-options-page',
+                ],
+                AskUserAbilityService::PAUSING_TOOLS
+            )
+        );
     }
 
     /**
@@ -137,20 +330,7 @@ class HistoryCompactor
      */
     private function resolveStickyParts(array $history, array $toolResultIndexes): array
     {
-        /**
-         * Filters the ability names whose most recent result per argument
-         * identity is never elided from the in-loop history.
-         *
-         * @param string[] $stickyTools Ability names.
-         *
-         * @since 1.1.5
-         */
-        // The user's answers to ask-user / request-approval are their own input,
-        // so they are never elided either.
-        $stickyTools = (array) apply_filters(
-            'agent_mod_history_sticky_tools',
-            array_merge(['agent-mod-pro/get-skill-by-slug'], AskUserAbilityService::PAUSING_TOOLS)
-        );
+        $stickyTools = $this->stickyTools();
 
         if (empty($stickyTools)) {
             return [];
@@ -233,23 +413,33 @@ class HistoryCompactor
             }
 
             // A list keeps its IDs and titles: losing them is what sent the
-            // agent back to list the same posts again and again.
-            $listSummary = $this->summarizeListResult($response->getResponse());
+            // agent back to list the same posts again and again. A nested
+            // result (e.g. a field configuration) keeps its skeleton.
+            $listSummary      = $this->summarizeListResult($response->getResponse());
+            $structureSummary = null === $listSummary ? $this->summarizeStructure($response->getResponse()) : null;
 
-            $payload = null !== $listSummary
-                ? [
+            if (null !== $listSummary) {
+                $payload = [
                     'elided'       => true,
                     'list_summary' => $listSummary,
                     'note'         => __('Older list result reduced to IDs and titles to save context. Reuse these IDs; do not list the same items again.', 'agent-mod'),
-                ]
-                : [
+                ];
+            } elseif (null !== $structureSummary) {
+                $payload = [
+                    'elided'            => true,
+                    'structure_summary' => $structureSummary,
+                    'note'              => __('Older result reduced to its structure (names, types, labels) to save context. If you need the omitted details, call the same tool again.', 'agent-mod'),
+                ];
+            } else {
+                $payload = [
                     'elided'  => true,
                     'summary' => mb_substr(
                         (string) wp_json_encode($response->getResponse(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                         0,
                         Constants::AI_TOOL_RESULT_STUB_LENGTH
-                    ) . '… ' . __('(older tool result elided to save context; re-call the tool only if you truly need the full data again)', 'agent-mod'),
+                    ) . '… ' . __('(older tool result elided to save context; if you need the full data, call the same tool again)', 'agent-mod'),
                 ];
+            }
 
             $parts[] = new MessagePart(
                 new FunctionResponse(
@@ -318,6 +508,70 @@ class HistoryCompactor
             0,
             Constants::AI_LIST_RESULT_SUMMARY_LENGTH
         );
+    }
+
+    /**
+     * Reduces a nested tool result to its structural skeleton.
+     *
+     * Applies to results that hold nested arrays but are not ID lists, such
+     * as a Native Custom Fields configuration (sections → fields → sub-fields).
+     * Top-level scalars are kept (long strings cut short); below the top level
+     * only identifying keys (name, type, fieldType, label, options …) are kept,
+     * at any depth.
+     *
+     * @param mixed $payload Tool result.
+     *
+     * @return string|null JSON summary capped at AI_LIST_RESULT_SUMMARY_LENGTH, or null when the result has no nested structure.
+     * @since x.x.x
+     */
+    public function summarizeStructure($payload): ?string
+    {
+        if (! is_array($payload) || empty(array_filter($payload, 'is_array'))) {
+            return null;
+        }
+
+        $skeleton = $this->skeleton($payload, 0);
+
+        if (empty($skeleton)) {
+            return null;
+        }
+
+        return mb_substr(
+            (string) wp_json_encode($skeleton, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            0,
+            Constants::AI_LIST_RESULT_SUMMARY_LENGTH
+        );
+    }
+
+    /**
+     * Recursively keeps the structural keys of a nested array.
+     *
+     * @param array<mixed> $value Array to reduce.
+     * @param int          $depth Current depth (0 = top level).
+     *
+     * @return array<mixed>
+     * @since x.x.x
+     */
+    private function skeleton(array $value, int $depth): array
+    {
+        $keep = array_flip(self::STRUCTURE_KEYS);
+        $out  = [];
+
+        foreach ($value as $key => $item) {
+            if (is_array($item)) {
+                $child = $this->skeleton($item, $depth + 1);
+
+                if (! empty($child)) {
+                    $out[$key] = $child;
+                }
+            } elseif (0 === $depth) {
+                $out[$key] = is_string($item) ? mb_substr($item, 0, self::STRUCTURE_STRING_LENGTH) : $item;
+            } elseif (is_int($key) || isset($keep[$key])) {
+                $out[$key] = $item;
+            }
+        }
+
+        return $out;
     }
 
     /**

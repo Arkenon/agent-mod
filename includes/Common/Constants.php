@@ -69,13 +69,32 @@ class Constants
 	public const AI_HTTP_TIMEOUT = 120;
 
 	/**
-	 * How many of the most recent tool-result messages are re-sent verbatim on
-	 * each iteration of the tool-calling loop; older ones are elided to stubs.
-	 * Filterable via `agent_mod_history_keep_tool_results`.
+	 * How many of the most recent tool-result messages are always re-sent
+	 * verbatim, even once the history has been compacted. Filterable via
+	 * `agent_mod_history_keep_tool_results`.
 	 *
 	 * @since 1.1.5
 	 */
-	public const AI_HISTORY_KEEP_TOOL_RESULTS = 4;
+	public const AI_HISTORY_KEEP_TOOL_RESULTS = 6;
+
+	/**
+	 * Estimated history size (tokens) at which the tool-calling loop starts
+	 * eliding old tool results. Below it the history is sent whole. Filterable
+	 * via `agent_mod_history_compact_trigger_tokens`.
+	 *
+	 * @since x.x.x
+	 */
+	public const AI_HISTORY_COMPACT_TRIGGER_TOKENS = 80000;
+
+	/**
+	 * Estimated history size (tokens) a compaction elides down to. The gap to
+	 * the trigger keeps compactions rare, so the sent prefix stays stable (and
+	 * cacheable) between them. Filterable via
+	 * `agent_mod_history_compact_target_tokens`.
+	 *
+	 * @since x.x.x
+	 */
+	public const AI_HISTORY_COMPACT_TARGET_TOKENS = 40000;
 
 	/**
 	 * Length (characters) of the stub kept when an old tool result is elided

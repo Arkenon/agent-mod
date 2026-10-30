@@ -585,6 +585,10 @@ class AIClientAdapter
 		$toolCalls  = $initialToolCalls;
 		$tokenUsage = [];
 		$callCounts = [];
+		// History index of the latest result of each read call signature, and
+		// the index below which the compactor has elided results in this run.
+		$readIndexes = [];
+		$watermark   = 0;
 
 		for ($i = 0; $i < $maxToolCalls; $i++) {
 			// The user may press Stop at any time; the flag is written by the
@@ -609,8 +613,14 @@ class AIClientAdapter
 
 			// The provider gets a compacted copy; $history itself stays intact
 			// for the AgentResponse / confirmation-resume flow.
+			$compacted = $this->historyCompactor->compact($history, $watermark);
+
+			// A read whose result was elided may run again: blocking it would
+			// leave the model with neither the data nor a way to get it back.
+			$this->forgetElidedReads($callCounts, $readIndexes, $watermark);
+
 			$builder = wp_ai_client_prompt()
-				->with_history(...$this->historyCompactor->compact($history))
+				->with_history(...$compacted)
 				->using_system_instruction($systemInstruction);
 
 			if ('' !== $provider) {
@@ -758,7 +768,14 @@ class AIClientAdapter
 			);
 
 			$resultMessage = $this->executeAbilities($resolver, $message, $callCounts);
-			$history[]     = $resultMessage;
+
+			foreach ($requestedCalls as $call) {
+				if (! $this->isWriteAbility((string) $call['name'])) {
+					$readIndexes[$this->readSignature((string) $call['name'], $call['args'])] = count($history);
+				}
+			}
+
+			$history[] = $resultMessage;
 
 			$this->logToolFailures($resultMessage);
 
@@ -780,7 +797,7 @@ class AIClientAdapter
 		}
 
 		$finalBuilder = wp_ai_client_prompt()
-			->with_history(...$this->historyCompactor->compact($history))
+			->with_history(...$this->historyCompactor->compact($history, $watermark))
 			->using_system_instruction($systemInstruction);
 
 		if ('' !== $provider) {
@@ -1046,7 +1063,26 @@ class AIClientAdapter
 
 			$digest = (string) wp_json_encode($responses[$index]->getResponse(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-			$calls[$index]['result'] = $isAnswer ? $digest : mb_substr($digest, 0, $digestLength);
+			if ($isAnswer) {
+				$calls[$index]['result'] = $digest;
+				continue;
+			}
+
+			// A configuration the agent writes code against (e.g. a field
+			// configuration) keeps the larger summary budget, so a follow-up
+			// message can still use it instead of asking the user to paste it.
+			if ($this->historyCompactor->isStickyTool((string) ($call['name'] ?? ''))) {
+				$calls[$index]['result'] = mb_substr($digest, 0, max($digestLength, Constants::AI_LIST_RESULT_SUMMARY_LENGTH));
+				continue;
+			}
+
+			// A nested result too long for the digest keeps its skeleton
+			// rather than its first few hundred characters.
+			$structureSummary = mb_strlen($digest) > $digestLength
+				? $this->historyCompactor->summarizeStructure($responses[$index]->getResponse())
+				: null;
+
+			$calls[$index]['result'] = $structureSummary ?? mb_substr($digest, 0, $digestLength);
 		}
 
 		return $calls;
@@ -1135,7 +1171,7 @@ class AIClientAdapter
 			return $resolver->execute_ability($functionCall);
 		}
 
-		$signature = $abilityName . '|' . md5((string) wp_json_encode($this->normalizeArgs($functionCall->getArgs() ?? [])));
+		$signature = $this->readSignature($abilityName, $functionCall->getArgs());
 		$seen      = $callCounts[$signature] ?? 0;
 
 		$callCounts[$signature] = $seen + 1;
@@ -1166,6 +1202,43 @@ class AIClientAdapter
 		}
 
 		return $response;
+	}
+
+	/**
+	 * Builds the repeat-guard signature of a read call.
+	 *
+	 * @param string $abilityName Ability name.
+	 * @param mixed  $args        Call arguments.
+	 *
+	 * @return string
+	 * @since x.x.x
+	 */
+	private function readSignature(string $abilityName, $args): string
+	{
+		return $abilityName . '|' . md5((string) wp_json_encode($this->normalizeArgs($args ?? [])));
+	}
+
+	/**
+	 * Resets the repeat-guard count of reads whose latest result was elided.
+	 *
+	 * The guard exists to stop a model re-fetching data it still has. Once the
+	 * compactor has elided that data, a repeat is the only way to get it back,
+	 * so the signature starts counting from zero again.
+	 *
+	 * @param array<string, int> $callCounts  Per-run counts of read call signatures.
+	 * @param array<string, int> $readIndexes History index of the latest result per signature.
+	 * @param int                $watermark   History index below which results are elided.
+	 *
+	 * @return void
+	 * @since x.x.x
+	 */
+	private function forgetElidedReads(array &$callCounts, array &$readIndexes, int $watermark): void
+	{
+		foreach ($readIndexes as $signature => $index) {
+			if ($index < $watermark) {
+				unset($callCounts[$signature], $readIndexes[$signature]);
+			}
+		}
 	}
 
 	/**
