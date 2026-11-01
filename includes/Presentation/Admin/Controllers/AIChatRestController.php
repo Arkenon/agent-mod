@@ -343,8 +343,26 @@ final class AIChatRestController
 						'attachments' => [],
 						'toolCalls'   => $response->toolCalls,
 						'tokenUsage'  => $response->tokenUsage,
+						// The resolved provider/model that produced this answer,
+						// so a restored conversation can continue on the same
+						// model instead of silently falling back to a default.
+						'provider'    => (string) $agent->provider,
+						'model'       => (string) ($agent->model ?? ''),
 					],
 				];
+
+				/**
+				 * Fires after a chat turn completes, with the new turns to persist.
+				 *
+				 * Assistant turns carry `text`, `attachments`, `toolCalls`,
+				 * `tokenUsage` and (since 1.3.6) `provider` / `model` — the
+				 * provider/model pair the answer was generated with.
+				 *
+				 * @param int   $conversationId Conversation ID.
+				 * @param array $newTurns       The user turn and the assistant turn.
+				 *
+				 * @since 1.0.5
+				 */
 				do_action('agent_mod_append_messages', $conversationId, $newTurns);
 			}
 		}
@@ -571,8 +589,11 @@ final class AIChatRestController
 						// Seeded loop: already the complete chain-wide list.
 						'toolCalls'   => $response->toolCalls,
 						'tokenUsage'  => $response->tokenUsage,
+						'provider'    => (string) $agent->provider,
+						'model'       => (string) ($agent->model ?? ''),
 					],
 				];
+				// This action is documented in handleChat().
 				do_action('agent_mod_append_messages', $conversationId, $newTurns);
 			}
 		}

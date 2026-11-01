@@ -482,6 +482,18 @@
 	line-height: 20px;
 	white-space: pre-wrap;
 	word-wrap: break-word;
+	// Both elements always reserve the scrollbar's width. Without it, the
+	// textarea's content area narrows as soon as a long prompt makes it
+	// scroll (≈17px with classic Windows scrollbars) while the overlay's
+	// doesn't, so the two wrap lines differently and the visible text drifts
+	// away from the real caret.
+	scrollbar-gutter: stable;
+}
+
+// TextareaControl's field wrapper must not add any spacing below the
+// textarea, or the overlay (inset: 0) ends up taller than the textarea.
+.agent-mod-chat__input .components-base-control__field {
+	margin-bottom: 0;
 }
 
 .agent-mod-chat__input-highlight {
@@ -503,6 +515,13 @@
 
 .agent-mod-chat__input textarea {
 	position: relative;
+	// Grows with its content (where supported) up to a cap, so long prompts
+	// don't need a manual resize and can never push the composer's actions
+	// off screen — the cap also limits manual resizing.
+	field-sizing: content;
+	min-height: 62px;
+	max-height: min(40vh, 300px);
+	overflow-y: auto;
 	resize: vertical;
 	background: transparent;
 	color: transparent;
@@ -514,12 +533,19 @@
 	display: none;
 }
 
+// The tools wrap inside their own box; the row itself never wraps, so the
+// Send/Stop button always stays at the bottom right instead of dropping onto
+// a line of its own below the visible area.
 .agent-mod-chat__composer-actions {
 	display: flex;
-	align-items: center;
+	align-items: flex-end;
 	justify-content: space-between;
 	gap: 8px;
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
+
+	> .components-button {
+		flex-shrink: 0;
+	}
 }
 
 // All tools sit side by side here (agent selector, provider, attach, new topic).

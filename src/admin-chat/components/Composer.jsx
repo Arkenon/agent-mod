@@ -301,6 +301,7 @@ export default function Composer() {
 
 					<TextareaControl
 						ref={textareaRef}
+						__nextHasNoMarginBottom
 						className="agent-mod-chat__input"
 						value={text}
 						onChange={onChangeText}

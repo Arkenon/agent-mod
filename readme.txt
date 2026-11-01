@@ -4,7 +4,7 @@ Tags: ai, agent, chatbot, assistant, abilities
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.3.5
+Stable tag: 1.3.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -122,6 +122,12 @@ Under the AgentMod menu in your WordPress admin, there is a dedicated **Abilitie
 If you ask the agent to create a post, it will show you a confirmation modal summarizing the action before anything is written to the database. You must explicitly approve the action for it to proceed.
 
 == Changelog ==
+= 1.3.6 =
+* Fixed: In the chat, the Send button could end up below the visible area once the conversation and the prompt grew long, so it could only be reached by zooming the browser out. When the composer tools did not fit on one line, the Send button wrapped onto a line of its own; now only the tools wrap and Send/Stop always stays at the bottom right.
+* Fixed: With a long prompt, the text cursor was shown several lines below the text being typed and only lined up again after resizing the input. As soon as the input showed a scrollbar, the text and the cursor wrapped at different widths; both now reserve the scrollbar's space.
+* Improved: The message input grows with its content (in Chromium-based browsers) up to a maximum height and then scrolls, and it can no longer be resized beyond that height, so it never pushes the chat's actions off screen.
+* Changed: The assistant turns passed to the `agent_mod_append_messages` action now include the `provider` and `model` the answer was generated with, so extensions that store conversations can restore the model a conversation last used.
+
 = 1.3.5 =
 * Fixed: With a Claude model, a longer task could stop with "Generation stopped due to token limit (4096) with stop reason "max_tokens"" and the whole run was lost. When no limit is set, the Anthropic connector caps every response at 4096 tokens, thinking included, which a single long tool call (a code snippet, block markup, a plan) can exceed. AgentMod now raises that cap to 16,000 tokens; the cap is a ceiling, so shorter answers cost the same. Claude 3 models keep their own lower limits, and a value set explicitly is left unchanged. The `agent_mod_anthropic_max_tokens` filter changes the value. OpenAI and Google models were not affected.
 
