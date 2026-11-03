@@ -331,9 +331,7 @@ class PromptBuilder
 			}
 
 			if ($readonlyOnly) {
-				$meta = (array) $ability->get_meta();
-
-				if (true !== ($meta['annotations']['readonly'] ?? false)) {
+				if (! AbilityResolver::isReadonly($ability)) {
 					continue;
 				}
 			}

@@ -32,6 +32,27 @@ class AbilityResolver
 	private const MCP_ADAPTER_PREFIX = 'mcp-adapter/';
 
 	/**
+	 * Name prefix of the Agents API's own abilities, which are never resolved.
+	 *
+	 * @var string
+	 * @since 1.3.7
+	 */
+	private const AGENTS_API_PREFIX = 'agents/';
+
+	/**
+	 * Action policy values an ability may declare in its `action_policy` meta.
+	 *
+	 * Same vocabulary as the Agents API (WP_Agent_Action_Policy): `direct` runs
+	 * without a stop, `preview` must be confirmed first, `forbidden` never runs.
+	 *
+	 * @var string
+	 * @since 1.3.7
+	 */
+	public const ACTION_POLICY_DIRECT    = 'direct';
+	public const ACTION_POLICY_PREVIEW   = 'preview';
+	public const ACTION_POLICY_FORBIDDEN = 'forbidden';
+
+	/**
 	 * Settings service; supplies the tool loading strategy.
 	 *
 	 * @var SettingsService
@@ -72,7 +93,8 @@ class AbilityResolver
 		// System abilities are added below and in selectTools() exactly when they
 		// apply, never because they were selected or registered.
 		$abilities = array_values(array_filter($abilities, static function ($ability): bool {
-			return ! $ability instanceof WP_Ability || self::isSelectable($ability);
+			return ! $ability instanceof WP_Ability
+				|| (self::isSelectable($ability) && self::ACTION_POLICY_FORBIDDEN !== self::actionPolicy($ability));
 		}));
 
 		// Ask/Plan modes only get read-only abilities; Pro keeps final say via the filter below.
@@ -107,6 +129,9 @@ class AbilityResolver
 	 *    for every other ability. execute-ability would run any of them under
 	 *    its own name, past the per-name write confirmation, auto-approval and
 	 *    a PRO agent's allowlist; the agent calls abilities directly anyway.
+	 *  - The Agents API's abilities (agents/*): runtime plumbing (agents/chat,
+	 *    run control, workflows, sessions, access grants). agents/ability-call is
+	 *    the same kind of proxy as the MCP Adapter's execute-ability.
 	 *
 	 * @param WP_Ability $ability The ability.
 	 *
@@ -115,7 +140,63 @@ class AbilityResolver
 	 */
 	public static function isSelectable(WP_Ability $ability): bool
 	{
-		return ! self::isSystemAbility($ability) && 0 !== strpos($ability->get_name(), self::MCP_ADAPTER_PREFIX);
+		$name = $ability->get_name();
+
+		return ! self::isSystemAbility($ability)
+			&& 0 !== strpos($name, self::MCP_ADAPTER_PREFIX)
+			&& 0 !== strpos($name, self::AGENTS_API_PREFIX);
+	}
+
+	/**
+	 * The action policy an ability declares, or '' when it declares none.
+	 *
+	 * Read from the ability's `action_policy` meta item (top level, or inside
+	 * `annotations`), using the Agents API vocabulary. Unknown values count as
+	 * not declared.
+	 *
+	 * @param WP_Ability $ability The ability.
+	 *
+	 * @return string One of the ACTION_POLICY_* constants, or ''.
+	 * @since 1.3.7
+	 */
+	public static function actionPolicy(WP_Ability $ability): string
+	{
+		$policy = $ability->get_meta_item('action_policy', null);
+
+		if (null === $policy) {
+			$annotations = $ability->get_meta_item('annotations', []);
+			$policy      = is_array($annotations) ? ($annotations['action_policy'] ?? null) : null;
+		}
+
+		$policy = is_string($policy) ? strtolower(trim($policy)) : '';
+
+		return in_array($policy, [self::ACTION_POLICY_DIRECT, self::ACTION_POLICY_PREVIEW, self::ACTION_POLICY_FORBIDDEN], true)
+			? $policy
+			: '';
+	}
+
+	/**
+	 * Whether an ability may run without the write confirmation.
+	 *
+	 * True only for abilities explicitly annotated read-only that do not also
+	 * declare a `preview` or `forbidden` action policy. A declared policy can
+	 * only make an ability stricter here, never looser: `direct` on an ability
+	 * without the read-only annotation still goes through the confirmation.
+	 *
+	 * @param WP_Ability $ability The ability.
+	 *
+	 * @return bool
+	 * @since 1.3.7
+	 */
+	public static function isReadonly(WP_Ability $ability): bool
+	{
+		$annotations = $ability->get_meta_item('annotations', []);
+
+		if (! is_array($annotations) || true !== ($annotations['readonly'] ?? null)) {
+			return false;
+		}
+
+		return ! in_array(self::actionPolicy($ability), [self::ACTION_POLICY_PREVIEW, self::ACTION_POLICY_FORBIDDEN], true);
 	}
 
 	/**
@@ -256,7 +337,7 @@ class AbilityResolver
 	}
 
 	/**
-	 * Keeps only abilities explicitly annotated as read-only.
+	 * Keeps only read-only abilities (see isReadonly()).
 	 *
 	 * Abilities without a readonly annotation are treated as writable and removed.
 	 *
@@ -268,13 +349,7 @@ class AbilityResolver
 	private function filterReadonly(array $abilities): array
 	{
 		return array_values(array_filter($abilities, static function ($ability): bool {
-			if (! $ability instanceof WP_Ability) {
-				return false;
-			}
-
-			$meta = (array) $ability->get_meta();
-
-			return true === ($meta['annotations']['readonly'] ?? false);
+			return $ability instanceof WP_Ability && self::isReadonly($ability);
 		}));
 	}
 

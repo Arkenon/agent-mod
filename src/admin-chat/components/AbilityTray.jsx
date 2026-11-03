@@ -30,6 +30,7 @@ import { __ } from '@wordpress/i18n';
 import { store as abilitiesStore } from '@wordpress/abilities';
 
 import { STORE_NAME } from '../store';
+import { isReadonlyAbility, isSelectableAbility } from '../utils/abilities';
 
 export default function AbilityTray( {
 	onInsert,
@@ -66,7 +67,7 @@ export default function AbilityTray( {
 	// Ask/Plan modes: only read-only abilities are callable, so only they are listed.
 	const readonlyOnly = 'execute' !== selectedMode;
 	const items = source.filter(
-		( item ) => ! readonlyOnly || true === item.meta?.annotations?.readonly
+		( item ) => isSelectableAbility( item ) && ( ! readonlyOnly || isReadonlyAbility( item ) )
 	);
 
 	const term = search.trim().toLowerCase();

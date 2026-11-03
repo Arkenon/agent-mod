@@ -324,8 +324,6 @@ class AbilityCatalog
 	 */
 	private function isReadonly(WP_Ability $ability): bool
 	{
-		$annotations = $ability->get_meta_item('annotations', []);
-
-		return is_array($annotations) && true === ($annotations['readonly'] ?? null);
+		return AbilityResolver::isReadonly($ability);
 	}
 }

@@ -13,6 +13,7 @@ use DI\DependencyException;
 use DI\NotFoundException;
 use Exception;
 use AgentMod\Services\AbilityRegistrarService;
+use AgentMod\Services\AgentsApiBridgeService;
 use AgentMod\Services\AskUserAbilityService;
 use AgentMod\Services\FindAbilitiesAbilityService;
 use AgentMod\Common\DI;
@@ -40,6 +41,7 @@ final class App
 		NavigationAbilityService::class,
 		AskUserAbilityService::class,
 		FindAbilitiesAbilityService::class,
+		AgentsApiBridgeService::class,
 		LibraryService::class,
 		SettingsService::class,
 	];

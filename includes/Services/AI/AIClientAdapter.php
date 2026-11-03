@@ -1480,9 +1480,9 @@ class AIClientAdapter
 			return false;
 		}
 
-		$annotations = $ability->get_meta_item('annotations', []);
-
-		return ! (is_array($annotations) && true === ($annotations['readonly'] ?? null));
+		// A declared `preview` / `forbidden` action policy (Agents API vocabulary)
+		// overrides the read-only annotation; see AbilityResolver::isReadonly().
+		return ! AbilityResolver::isReadonly($ability);
 	}
 
 	/**

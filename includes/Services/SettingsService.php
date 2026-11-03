@@ -14,6 +14,7 @@
 namespace AgentMod\Services;
 
 use AgentMod\Common\Constants;
+use AgentMod\Services\AI\AbilityResolver;
 use AgentMod\Services\AI\ProviderInfoService;
 
 defined('ABSPATH') || exit;
@@ -337,14 +338,12 @@ final class SettingsService
 				continue;
 			}
 
-			$meta = (array) $ability->get_meta();
-
 			$details[] = [
 				'name'  => $ability->get_name(),
 				'label' => $ability->get_label(),
 				'meta'  => [
 					'annotations' => [
-						'readonly' => true === ($meta['annotations']['readonly'] ?? false),
+						'readonly' => AbilityResolver::isReadonly($ability),
 					],
 				],
 			];

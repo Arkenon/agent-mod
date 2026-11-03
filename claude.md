@@ -252,3 +252,16 @@ After the Git release is pushed, the same version is published to WordPress.org 
      `TortoiseProc.exe /command:commit /path:"<working copy>" /logmsg:"Release <version>: <short summary>"`
      Tell the user to tick the unversioned `tags/<version>` folder (and any missing/deleted files) and press OK.
 - `assets/` (banners, icons, screenshots) is changed only when asked.
+
+## Agents API integration (infrastructure only — added 2026-11-03, v1.3.7)
+
+The Agents API (`wordpress/agents-api`, Automattic, a WordPress core candidate: `wp_register_agent()`, `agents/chat`, conversation loop, action policy, pending actions, routines…) is integrated **optionally**. AgentMod does NOT depend on it: no Composer requirement, no plugin dependency, every entry point feature-detects it (`function_exists('wp_register_agent')` / `AgentsApiBridgeService::isAvailable()`) and is a no-op without it. AgentMod must keep working on sites without it, possibly for a long time — never add a hard dependency or call its symbols unguarded.
+
+What exists today:
+- `Services/AgentsApiBridgeService.php`: agents other plugins register with `wp_register_agent()` are appended to the Agent Tray (`agent_mod_get_agents`, prio 20) with a string id `agents-api:<slug>`, and `agent_mod_agent_config_data` (prio 20) maps the registered agent's `default_config` onto AgentConfig keys (system prompt appended to the settings base prompt, `enabled_tools`/`tools`/`abilities` → `selected` ability list, provider/model). The id is cleared so the run is not tied to a stored agent. They run on AgentMod's own engine, so the write confirmation gate applies. Agents AgentMod PRO itself published (`meta.source_plugin` starting with `agent-mod`) are skipped.
+- `AbilityResolver::isSelectable()` also excludes `agents/*` (runtime plumbing; `agents/ability-call` is a proxy like `mcp-adapter/execute-ability`). The JS mirror is `src/admin-chat/utils/abilities.js` (Ability Tray + mention validation under "All Abilities").
+- `AbilityResolver::actionPolicy()` / `isReadonly()`: an ability may declare `action_policy` (`direct` / `preview` / `forbidden`, Agents API vocabulary) in its meta (top level or inside `annotations`). It can only make an ability stricter: `preview` forces the confirmation and removes it from Ask/Plan, `forbidden` drops it from resolve(); `direct` never skips the confirmation. Use `AbilityResolver::isReadonly()` everywhere a read-only decision is made — do not re-check `annotations.readonly` by hand.
+
+Known limits: a conversation with an Agents API agent is stored as the default agent (agent id 0), and the default agent's PRO skills are appended to its prompt.
+
+Deliberately NOT done yet (wait for a stable Agents API, ≥ 1.0 or merged into core — the API was 0.x with frequent breaking changes and requires PHP 8.1): replacing `AIClientAdapter::runGenerationLoop()` with `WP_Agent_Conversation_Loop`, `ConfirmationStore` with pending actions, `ProgressStore` with chat run control, a `WP_Agent_Conversation_Store` adapter for PRO conversations, PRO Scheduled Tasks with Routines, Skills with the context section registry. Plan for that phase: put an engine interface behind `AIClientAdapter` first, keep the current loop as the default implementation, then add an Agents API implementation; decide the PHP 8.1 minimum at that point.

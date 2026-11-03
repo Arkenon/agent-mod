@@ -8,6 +8,8 @@
  * (components/Composer.jsx).
  */
 
+import { isSelectableAbility } from './abilities';
+
 /**
  * Matches a complete "@namespace/ability-name" mention, capturing the name
  * (without the leading "@").
@@ -161,11 +163,11 @@ export function resolveKnownAbilityNames(
 	allAbilities
 ) {
 	if ( 'selected' === abilitySource ) {
-		return ( selectedAbilities || [] ).map( ( ability ) => ability.name );
+		return ( selectedAbilities || [] ).filter( isSelectableAbility ).map( ( ability ) => ability.name );
 	}
 
 	if ( Array.isArray( allAbilities ) && 0 < allAbilities.length ) {
-		return allAbilities.map( ( ability ) => ability.name );
+		return allAbilities.filter( isSelectableAbility ).map( ( ability ) => ability.name );
 	}
 
 	return null;
