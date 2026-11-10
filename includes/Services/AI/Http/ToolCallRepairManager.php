@@ -50,18 +50,21 @@ class ToolCallRepairManager
      * Each provider repairer is injected by type and added to the set. New
      * providers are wired up by adding a constructor parameter here.
      *
-     * @param GoogleConnectorRepairer    $googleConnectorRepairer    Google (Gemini) connector repairer.
-     * @param AnthropicConnectorRepairer $anthropicConnectorRepairer Anthropic (Claude) connector repairer.
+     * @param GoogleConnectorRepairer         $googleConnectorRepairer         Google (Gemini) connector repairer.
+     * @param AnthropicConnectorRepairer      $anthropicConnectorRepairer      Anthropic (Claude) connector repairer.
+     * @param OpenAiCompatibleStreamRepairer  $openAiCompatibleStreamRepairer  OpenAI-compatible gateway SSE repairer (@since 1.3.8).
      *
      * @since 1.0.0
      */
     public function __construct(
         GoogleConnectorRepairer $googleConnectorRepairer,
-        AnthropicConnectorRepairer $anthropicConnectorRepairer
+        AnthropicConnectorRepairer $anthropicConnectorRepairer,
+        OpenAiCompatibleStreamRepairer $openAiCompatibleStreamRepairer
     ) {
         $this->repairers = [
             $googleConnectorRepairer,
             $anthropicConnectorRepairer,
+            $openAiCompatibleStreamRepairer,
         ];
     }
 

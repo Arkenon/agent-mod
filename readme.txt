@@ -4,7 +4,7 @@ Tags: ai, agent, chatbot, assistant, abilities
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.3.7
+Stable tag: 1.3.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -122,6 +122,9 @@ Under the AgentMod menu in your WordPress admin, there is a dedicated **Abilitie
 If you ask the agent to create a post, it will show you a confirmation modal summarizing the action before anything is written to the database. You must explicitly approve the action for it to proceed.
 
 == Changelog ==
+= 1.3.8 =
+* Fixed: OpenAI-compatible gateways (custom base URLs, proxies, self-hosted gateways) that answer in streaming format (`data: {...}` lines ending with `data: [DONE]`) even when no stream was requested failed with a JSON parse error. Requests to a `/chat/completions` endpoint now ask for a non-streamed answer explicitly when the request does not say otherwise, and a streamed answer that arrives anyway is reassembled into a normal one: text, reasoning, tool calls, finish reason and token usage are kept, and a JSON answer followed by a trailing `data: [DONE]` is cut at that marker. Regular JSON answers and other providers are not touched.
+
 = 1.3.7 =
 * Added: Optional support for the Agents API (`wp_register_agent()`). When the Agents API is installed, agents that other plugins register there appear in the chat's Agent Tray and run on AgentMod: its tool loading, Ask/Plan/Execute modes and write confirmation apply to them exactly as to AgentMod's own agents, and AgentMod's base system prompt stays in front of the agent's own instructions. An agent only gets the abilities it declares. Nothing changes on sites without the Agents API.
 * Added: Abilities can declare an `action_policy` (`direct`, `preview` or `forbidden`, the Agents API vocabulary). `preview` always asks for confirmation, even on an ability annotated read-only, and keeps it out of Ask and Plan modes; `forbidden` abilities are never offered to the agent. A declared policy can only make an ability stricter, never skip the confirmation.
